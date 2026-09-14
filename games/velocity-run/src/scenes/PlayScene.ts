@@ -1,9 +1,14 @@
 import Phaser from "phaser";
-import { Juice, ParticlePool, Synth } from "@gamesweb/game-core";
+import { clamp, Juice, ParticlePool, Synth } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { velocityRunManifest } from "@gamesweb/game-sdk";
 import { COURSES, medalFor, type Course, type Rect } from "../levels/courses";
 import { aabb, Runner } from "../systems/movement";
+
+function axis(v: number, half: number, world: number) {
+  if (world <= half * 2) return world / 2;
+  return clamp(v, half, world - half);
+}
 
 export class VelocityPlayScene extends Phaser.Scene {
   private platform!: PlatformSDK;
@@ -31,6 +36,19 @@ export class VelocityPlayScene extends Phaser.Scene {
   private camY = 0;
   private touchMove = 0;
   private touchJump = false;
+  private audioReady = false;
+
+  private fitCam(w: number, h: number) {
+    this.cameras.resize(w, h);
+    this.cameras.main.setViewport(0, 0, w, h);
+    this.cameras.main.setSize(w, h);
+  }
+
+  private ensureAudio() {
+    if (this.audioReady) return;
+    this.audioReady = true;
+    void this.synth.resume().then(() => this.synth.startBed("run"));
+  }
 
   constructor() {
     super("velocity-run-play");
@@ -54,7 +72,7 @@ export class VelocityPlayScene extends Phaser.Scene {
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hud = this.add
-      .text(24, 20, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "18px", color: "#e8fbff" })
+      .text(24, 54, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "18px", color: "#e8fbff" })
       .setScrollFactor(0)
       .setDepth(21);
     this.hint = this.add
@@ -85,7 +103,7 @@ export class VelocityPlayScene extends Phaser.Scene {
     };
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      void this.synth.resume();
+      this.ensureAudio();
       if (p.y > this.scale.height * 0.62) {
         if (p.x < this.scale.width * 0.33) this.touchMove = -1;
         else if (p.x > this.scale.width * 0.66) this.touchMove = 1;
@@ -101,7 +119,8 @@ export class VelocityPlayScene extends Phaser.Scene {
 
     this.platform.session.start();
     this.platform.events.emit({ name: "gameplay_started", props: { gameId: "velocity-run", course: this.course.id } });
-    void this.synth.resume().then(() => this.synth.startBed("run"));
+    this.fitCam(this.scale.width, this.scale.height);
+    this.scale.on("resize", (gs: Phaser.Structs.Size) => this.fitCam(gs.width, gs.height));
     this.game.events.on("platform-pause", () => (this.paused = true));
     this.game.events.on("platform-resume", () => (this.paused = false));
   }
@@ -134,6 +153,7 @@ export class VelocityPlayScene extends Phaser.Scene {
       this.running = true;
       this.startMs = this.time.now;
       this.hint.setAlpha(0);
+      this.ensureAudio();
     }
 
     if (!this.ended) {
@@ -164,6 +184,8 @@ export class VelocityPlayScene extends Phaser.Scene {
     const look = this.runner.facing * 90;
     this.camX += (this.runner.x + look - this.camX) * (1 - Math.exp(-dt * 5.5));
     this.camY += (this.runner.y - 40 - this.camY) * (1 - Math.exp(-dt * 3.2));
+    this.camX = axis(this.camX, this.scale.width / 2, this.course.width);
+    this.camY = axis(this.camY, this.scale.height / 2, this.course.height);
     const sh = this.juice.applyCamera({ x: this.camX, y: this.camY }, this.time.now);
     this.cameras.main.centerOn(sh.x, sh.y);
     this.parts.update(dt);
@@ -298,9 +320,7 @@ export class VelocityPlayScene extends Phaser.Scene {
 
     const t = (this.timeMs / 1000).toFixed(2);
     const medal = medalFor(this.course, this.timeMs);
-    this.hud.setText(
-      `${this.course.name}\n${t}s${medal ? `  ${medal}` : ""}\n1–3 change course`,
-    );
+    this.hud.setText(`${this.course.name}\n${t}s${medal ? `  ${medal}` : ""}`);
 
     this.overlay.clear();
     if (this.sys.game.device.input.touch) {
@@ -320,8 +340,10 @@ export function mountVelocityRun(parent: HTMLElement, platform: PlatformSDK, cou
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
+    width: Math.max(320, parent.clientWidth || 1280),
+    height: Math.max(240, parent.clientHeight || 720),
     backgroundColor: "#071018",
-    scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
+    scale: { mode: Phaser.Scale.RESIZE },
     scene: [VelocityPlayScene],
     disableContextMenu: true,
     banner: false,

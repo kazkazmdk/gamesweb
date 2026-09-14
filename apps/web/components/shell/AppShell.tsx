@@ -46,7 +46,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <>
         {children}
         <Toasts />
-        <SavePrompt />
       </>
     );
   }

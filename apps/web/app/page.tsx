@@ -40,7 +40,7 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)] via-transparent to-transparent" />
         <div className="relative flex min-h-[78vh] flex-col justify-end px-5 pb-10 pt-10 md:min-h-[86vh] md:px-10 md:pb-16">
           <p className="text-[12px] uppercase tracking-[0.22em] text-white/55">
-            {returning ? greeting() : "Instant play"}
+            {returning ? "Continue" : "Instant play"}
           </p>
           {returning ? (
             <p className="mt-2 text-[14px] text-white/70">

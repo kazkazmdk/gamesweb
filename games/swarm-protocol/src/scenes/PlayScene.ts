@@ -59,6 +59,20 @@ export class SwarmPlayScene extends Phaser.Scene {
   private wave = 1;
   private lastSpawn = 0;
   private elites = 0;
+  private audioReady = false;
+
+  private fitCam(w: number, h: number) {
+    this.cameras.resize(w, h);
+    this.cameras.main.setViewport(0, 0, w, h);
+    this.cameras.main.setSize(w, h);
+    this.cameras.main.setZoom(Math.max(w / ARENA, h / ARENA));
+  }
+
+  private ensureAudio() {
+    if (this.audioReady) return;
+    this.audioReady = true;
+    void this.synth.resume().then(() => this.synth.startBed("swarm"));
+  }
 
   constructor() {
     super("swarm-play");
@@ -71,7 +85,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hud = this.add
-      .text(22, 18, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#f7ebe3" })
+      .text(22, 54, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#f7ebe3" })
       .setScrollFactor(0)
       .setDepth(21);
     const kb = this.input.keyboard!;
@@ -117,9 +131,9 @@ export class SwarmPlayScene extends Phaser.Scene {
     }
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      void this.synth.resume();
+      this.ensureAudio();
       if (this.choosing) {
-        const i = Math.floor(((p.x - (this.scale.width / 2 - 330)) / 230));
+        const i = Math.floor((p.x - (this.scale.width / 2 - 330)) / 230);
         if (i >= 0 && i < 3) this.take(i);
         return;
       }
@@ -138,7 +152,8 @@ export class SwarmPlayScene extends Phaser.Scene {
 
     this.platform.session.start();
     this.platform.events.emit({ name: "gameplay_started", props: { gameId: "swarm-protocol" } });
-    void this.synth.resume().then(() => this.synth.startBed("swarm"));
+    this.fitCam(this.scale.width, this.scale.height);
+    this.scale.on("resize", (gs: Phaser.Structs.Size) => this.fitCam(gs.width, gs.height));
     this.game.events.on("platform-pause", () => (this.paused = true));
     this.game.events.on("platform-resume", () => (this.paused = false));
     this.started = this.time.now;
@@ -204,6 +219,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.vy = (my / mag) * speed;
     this.px = clamp(this.px + this.vx * dt, 40, ARENA - 40);
     this.py = clamp(this.py + this.vy * dt, 40, ARENA - 40);
+    if (mx || my) this.ensureAudio();
 
     if (Phaser.Input.Keyboard.JustDown(this.keys.dash) && this.dashCd <= 0) this.dash();
     this.dashCd = Math.max(0, this.dashCd - dt * 1000);
@@ -219,6 +235,10 @@ export class SwarmPlayScene extends Phaser.Scene {
 
     this.camX += (this.px - this.camX) * (1 - Math.exp(-dt * 8));
     this.camY += (this.py - this.camY) * (1 - Math.exp(-dt * 8));
+    const hw = this.scale.width / 2;
+    const hh = this.scale.height / 2;
+    if (ARENA > hw * 2) this.camX = clamp(this.camX, hw, ARENA - hw);
+    if (ARENA > hh * 2) this.camY = clamp(this.camY, hh, ARENA - hh);
     const sh = this.juice.applyCamera({ x: this.camX, y: this.camY }, this.time.now);
     this.cameras.main.centerOn(sh.x, sh.y);
     this.parts.update(dt);
@@ -588,8 +608,10 @@ export function mountSwarmProtocol(parent: HTMLElement, platform: PlatformSDK) {
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
+    width: Math.max(320, parent.clientWidth || 1280),
+    height: Math.max(240, parent.clientHeight || 720),
     backgroundColor: "#140e0c",
-    scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
+    scale: { mode: Phaser.Scale.RESIZE },
     scene: [SwarmPlayScene],
     disableContextMenu: true,
     banner: false,

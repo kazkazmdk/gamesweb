@@ -6,61 +6,88 @@ export function GameArt({ slug, className = "" }: { slug: string; className?: st
 
 function NeonArt({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 1600 900" className={className} aria-hidden>
+    <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" className={className} aria-hidden>
       <defs>
-        <linearGradient id="nd-sky" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#1a0f16" />
+        <linearGradient id="nd-sky" x1="0" y1="0" x2="0.4" y2="1">
+          <stop offset="0" stopColor="#241018" />
+          <stop offset="0.45" stopColor="#140c10" />
           <stop offset="1" stopColor="#0b0a0c" />
         </linearGradient>
-        <linearGradient id="nd-road" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#2a2428" />
-          <stop offset="1" stopColor="#171417" />
-        </linearGradient>
+        <radialGradient id="nd-glow" cx="72%" cy="28%" r="45%">
+          <stop offset="0" stopColor="#e35aa0" stopOpacity="0.42" />
+          <stop offset="1" stopColor="#e35aa0" stopOpacity="0" />
+        </radialGradient>
       </defs>
       <rect width="1600" height="900" fill="url(#nd-sky)" />
-      <ellipse cx="1180" cy="220" rx="420" ry="180" fill="#e35aa0" opacity="0.18" />
-      <path d="M-40 640 C 240 520, 420 780, 720 640 S 1180 420, 1640 560 L 1640 900 L -40 900 Z" fill="url(#nd-road)" />
-      <path d="M-20 670 C 260 560, 430 800, 740 660 S 1200 450, 1620 580" fill="none" stroke="#e35aa0" strokeWidth="3" opacity="0.55" />
-      <g transform="translate(980 560) rotate(-18)">
-        <rect x="-42" y="-18" width="84" height="36" rx="8" fill="#1c1a1d" />
-        <rect x="10" y="-14" width="28" height="28" rx="6" fill="#e35aa0" />
+      <rect width="1600" height="900" fill="url(#nd-glow)" />
+      <path d="M-80 720 C 180 480, 360 820, 640 600 S 1080 360, 1680 540 L 1680 900 L -80 900 Z" fill="#161218" />
+      <path d="M-80 700 C 200 470, 380 800, 660 590 S 1100 350, 1680 520" fill="none" stroke="#e35aa0" strokeWidth="4" opacity="0.7" />
+      <path d="M-80 730 C 220 510, 400 830, 680 620 S 1120 390, 1680 560" fill="none" stroke="#f3f1ec" strokeWidth="1.2" opacity="0.18" />
+      <g transform="translate(1040 530) rotate(-22)">
+        <rect x="-52" y="-20" width="104" height="40" rx="10" fill="#1c181c" />
+        <rect x="14" y="-16" width="34" height="32" rx="7" fill="#e35aa0" />
+        <rect x="-28" y="-24" width="16" height="8" rx="2" fill="#111" />
+        <rect x="-28" y="16" width="16" height="8" rx="2" fill="#111" />
       </g>
-      <circle cx="240" cy="180" r="2" fill="#f3f1ec" opacity="0.7" />
-      <circle cx="400" cy="120" r="1.5" fill="#f3f1ec" opacity="0.5" />
-      <circle cx="1320" cy="90" r="2" fill="#f3f1ec" opacity="0.6" />
+      <circle cx="180" cy="120" r="2.2" fill="#f3f1ec" opacity="0.7" />
+      <circle cx="320" cy="80" r="1.4" fill="#f3f1ec" opacity="0.45" />
+      <circle cx="1280" cy="70" r="2" fill="#f3f1ec" opacity="0.55" />
+      <circle cx="1460" cy="160" r="1.2" fill="#f3f1ec" opacity="0.4" />
     </svg>
   );
 }
 
 function VelocityArt({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 1600 900" className={className} aria-hidden>
-      <rect width="1600" height="900" fill="#071018" />
-      <ellipse cx="420" cy="160" rx="380" ry="160" fill="#3ec6e8" opacity="0.14" />
-      <rect x="120" y="640" width="420" height="36" fill="#1b3a48" />
-      <rect x="620" y="520" width="260" height="28" fill="#1b3a48" />
-      <rect x="980" y="430" width="220" height="28" fill="#1b3a48" />
-      <rect x="1280" y="620" width="260" height="36" fill="#1b3a48" />
-      <rect x="620" y="500" width="40" height="20" fill="#d96b6b" />
-      <rect x="1410" y="540" width="22" height="80" fill="#8ff3ff" />
-      <rect x="708" y="478" width="18" height="32" rx="4" fill="#3ec6e8" />
-      <path d="M120 200 H 1480" stroke="#3ec6e8" strokeOpacity="0.08" />
+    <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" className={className} aria-hidden>
+      <defs>
+        <linearGradient id="vr-sky" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#0b2430" />
+          <stop offset="1" stopColor="#071018" />
+        </linearGradient>
+        <radialGradient id="vr-glow" cx="30%" cy="18%" r="50%">
+          <stop offset="0" stopColor="#3ec6e8" stopOpacity="0.32" />
+          <stop offset="1" stopColor="#3ec6e8" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect width="1600" height="900" fill="url(#vr-sky)" />
+      <rect width="1600" height="900" fill="url(#vr-glow)" />
+      <rect x="0" y="760" width="520" height="140" fill="#12303c" />
+      <rect x="0" y="760" width="520" height="4" fill="#3ec6e8" opacity="0.5" />
+      <rect x="620" y="620" width="280" height="32" fill="#1b3a48" />
+      <rect x="620" y="620" width="280" height="4" fill="#3ec6e8" opacity="0.55" />
+      <rect x="980" y="500" width="240" height="32" fill="#1b3a48" />
+      <rect x="1280" y="680" width="320" height="40" fill="#1b3a48" />
+      <rect x="1410" y="600" width="24" height="80" fill="#8ff3ff" />
+      <polygon points="640,620 680,560 720,620" fill="#d96b6b" />
+      <rect x="708" y="576" width="22" height="44" rx="5" fill="#3ec6e8" />
+      <rect x="714" y="588" width="6" height="8" fill="#071018" />
     </svg>
   );
 }
 
 function SwarmArt({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 1600 900" className={className} aria-hidden>
+    <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" className={className} aria-hidden>
+      <defs>
+        <radialGradient id="sp-glow" cx="68%" cy="48%" r="50%">
+          <stop offset="0" stopColor="#f07a3a" stopOpacity="0.38" />
+          <stop offset="1" stopColor="#f07a3a" stopOpacity="0" />
+        </radialGradient>
+      </defs>
       <rect width="1600" height="900" fill="#140e0c" />
-      <ellipse cx="1100" cy="420" rx="460" ry="260" fill="#f07a3a" opacity="0.14" />
-      <circle cx="800" cy="460" r="240" fill="none" stroke="#f07a3a" strokeOpacity="0.25" />
-      <circle cx="800" cy="460" r="14" fill="#f07a3a" />
-      <circle cx="1040" cy="340" r="18" fill="#e8b089" />
-      <circle cx="620" cy="560" r="26" fill="#c45c3a" />
-      <polygon points="920,560 940,600 900,600" fill="#f0d27a" />
-      <circle cx="1180" cy="520" r="10" fill="#d98a4a" />
-      <circle cx="540" cy="360" r="8" fill="#ffc58a" />
+      <rect width="1600" height="900" fill="url(#sp-glow)" />
+      <circle cx="980" cy="430" r="280" fill="none" stroke="#f07a3a" strokeOpacity="0.28" strokeWidth="2" />
+      <circle cx="980" cy="430" r="160" fill="none" stroke="#f07a3a" strokeOpacity="0.12" />
+      <circle cx="980" cy="430" r="16" fill="#f07a3a" />
+      <circle cx="980" cy="430" r="6" fill="#140e0c" />
+      <circle cx="1220" cy="300" r="22" fill="#e8b089" />
+      <circle cx="760" cy="560" r="32" fill="#c45c3a" />
+      <polygon points="1100,560 1130,620 1070,620" fill="#f0d27a" />
+      <circle cx="1340" cy="520" r="12" fill="#d98a4a" />
+      <circle cx="680" cy="320" r="9" fill="#ffc58a" />
+      <circle cx="860" cy="240" r="7" fill="#ffc58a" />
+      <circle cx="1180" cy="640" r="8" fill="#ffc58a" />
     </svg>
   );
 }

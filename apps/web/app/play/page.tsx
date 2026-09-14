@@ -1,7 +1,9 @@
 "use client";
 
 import { GAME_MANIFESTS, recommend } from "@gamesweb/game-sdk";
-import { GameCard } from "@/components/game/GameCard";
+import { GameArt } from "@/components/game/GameArt";
+import { GameCard, PlayButton } from "@/components/game/GameCard";
+import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
 
 export default function PlayPage() {
@@ -14,37 +16,45 @@ export default function PlayPage() {
     friendsPlaying: [],
   });
   const featured = GAME_MANIFESTS.find((g) => g.id === rec[0]) ?? GAME_MANIFESTS[0];
+  useAccent(featured.accent);
   const continueG = store.continuePlaying();
 
   return (
-    <div className="px-5 py-6 md:px-10">
-      <h1 className="display text-[40px] md:text-[56px]">Play</h1>
-      <p className="mt-2 max-w-xl text-[15px] text-[var(--text-dim)]">From catalogue to canvas in one click.</p>
-
-      <Section title="Featured">
-        <div className="max-w-3xl">
-          <GameCard game={featured} kicker="Start here" />
+    <div>
+      <section className="relative min-h-[58vh] overflow-hidden">
+        <GameArt slug={featured.slug} className="absolute inset-0 h-full w-full" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg)] via-[color-mix(in_srgb,var(--bg)_40%,transparent)] to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)] via-transparent to-transparent" />
+        <div className="relative flex min-h-[58vh] flex-col justify-end px-5 pb-10 md:px-10">
+          <p className="text-[12px] uppercase tracking-[0.2em] text-white/50">Featured</p>
+          <h1 className="display mt-3 text-[56px] md:text-[80px]">{featured.title}</h1>
+          <p className="mt-2 max-w-lg text-[16px] text-white/70">{featured.tagline}</p>
+          <div className="mt-6">
+            <PlayButton href={`/play/${featured.slug}`} />
+          </div>
         </div>
-      </Section>
-      <Section title="Continue">
-        {continueG.length ? (
-          <Grid games={continueG} />
-        ) : (
-          <p className="text-[14px] text-[var(--text-dim)]">Pick your first game.</p>
-        )}
-      </Section>
-      <Section title="For you">
-        <Grid games={rec.map((id) => GAME_MANIFESTS.find((g) => g.id === id)!)} />
-      </Section>
-      <Section title="Competitive">
-        <Grid games={[...GAME_MANIFESTS].sort((a, b) => a.title.localeCompare(b.title))} />
-      </Section>
-      <Section title="Quick sessions">
-        <Grid games={[...GAME_MANIFESTS].sort((a, b) => a.sessionHint.localeCompare(b.sessionHint))} />
-      </Section>
-      <Section title="All games">
-        <Grid games={GAME_MANIFESTS} />
-      </Section>
+      </section>
+      <div className="px-5 py-8 md:px-10">
+        <Section title="Continue">
+          {continueG.length ? (
+            <Grid games={continueG} />
+          ) : (
+            <p className="text-[14px] text-[var(--text-dim)]">Pick your first game.</p>
+          )}
+        </Section>
+        <Section title="For you">
+          <Grid games={rec.map((id) => GAME_MANIFESTS.find((g) => g.id === id)!)} />
+        </Section>
+        <Section title="Competitive">
+          <Grid games={[...GAME_MANIFESTS]} />
+        </Section>
+        <Section title="Quick sessions">
+          <Grid games={[...GAME_MANIFESTS].sort((a, b) => a.sessionHint.localeCompare(b.sessionHint))} />
+        </Section>
+        <Section title="All games">
+          <Grid games={GAME_MANIFESTS} />
+        </Section>
+      </div>
     </div>
   );
 }

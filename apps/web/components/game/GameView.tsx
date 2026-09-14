@@ -51,6 +51,7 @@ export function GameView({ slug }: { slug: string }) {
     async function boot() {
       const parent = wrap.current;
       if (!parent) return;
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       let instance: Phaser.Game | null = null;
       if (game!.id === "neon-drift") {
         const mod = await import("@gamesweb/neon-drift");
@@ -66,14 +67,27 @@ export function GameView({ slug }: { slug: string }) {
         instance.destroy(true);
         return;
       }
+      const fit = () => {
+        const w = parent.clientWidth;
+        const h = parent.clientHeight;
+        if (w > 0 && h > 0) instance?.scale.resize(w, h);
+      };
+      fit();
+      const ro = new ResizeObserver(fit);
+      ro.observe(parent);
       phaser.current = instance;
       setLoaded(true);
       analytics.track("game_loaded", { gameId: game!.id });
+      cleanupRo = () => {
+        ro.disconnect();
+      };
     }
+    let cleanupRo: () => void = () => undefined;
     void boot();
     return () => {
       dead = true;
       window.clearInterval(t);
+      cleanupRo();
       phaser.current?.destroy(true);
       phaser.current = null;
     };
@@ -90,14 +104,28 @@ export function GameView({ slug }: { slug: string }) {
   }, [player.history, game?.id]);
 
   useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setPaused((p) => {
+          const next = !p;
+          phaser.current?.events.emit(next ? "platform-pause" : "platform-resume");
+          return next;
+        });
+      }
+    };
     const onVis = () => {
       if (document.hidden) {
         setPaused(true);
         phaser.current?.events.emit("platform-pause");
       }
     };
+    window.addEventListener("keydown", onKey);
     document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, []);
 
   const quests = dailyQuests(player.dayKey);
@@ -191,7 +219,7 @@ export function GameView({ slug }: { slug: string }) {
         </div>
       ) : null}
 
-      <div ref={wrap} className="absolute inset-0 top-0" />
+      <div ref={wrap} className="absolute inset-0 overflow-hidden [&_canvas]:!h-full [&_canvas]:!w-full [&_canvas]:!max-h-full [&_canvas]:!max-w-full" />
 
       <div
         className={`absolute inset-x-0 bottom-0 z-20 flex justify-between px-4 py-3 text-[11px] text-white/55 transition-opacity ${intense && !paused && !result ? "opacity-0" : "opacity-100"}`}

@@ -6,6 +6,11 @@ import { DriftScore } from "../systems/scoring";
 import { buildTrack, queryTrack, startPose, type TrackSample } from "../systems/track";
 import { Car } from "../systems/vehicle";
 
+function axis(v: number, half: number, world: number) {
+  if (world <= half * 2) return world / 2;
+  return clamp(v, half, world - half);
+}
+
 type ResultKind = "crash" | "finish" | "time";
 
 export class DriftPlayScene extends Phaser.Scene {
@@ -39,7 +44,24 @@ export class DriftPlayScene extends Phaser.Scene {
   private cleanLap = true;
   private shownHint = true;
   private nearArmed = true;
+  private audioReady = false;
   private lastSkid = 0;
+
+  private fitCam(w: number, h: number) {
+    this.cameras.resize(w, h);
+    this.cameras.main.setViewport(0, 0, w, h);
+    this.cameras.main.setSize(w, h);
+    this.cameras.main.setZoom(1.22);
+  }
+
+  private ensureAudio() {
+    if (this.audioReady) return;
+    this.audioReady = true;
+    void this.synth.resume().then(() => {
+      this.synth.startEngine();
+      this.synth.startBed("drift");
+    });
+  }
 
   constructor() {
     super("neon-drift-play");
@@ -67,7 +89,7 @@ export class DriftPlayScene extends Phaser.Scene {
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hud = this.add
-      .text(28, 22, "", {
+      .text(28, 54, "", {
         fontFamily: "ui-sans-serif, system-ui, sans-serif",
         fontSize: "18px",
         color: "#f3f1ec",
@@ -101,7 +123,7 @@ export class DriftPlayScene extends Phaser.Scene {
     };
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      void this.synth.resume();
+      this.ensureAudio();
       this.touchSteer = p.x < this.scale.width * 0.5 ? -1 : 1;
       if (p.y > this.scale.height * 0.78 && p.x > this.scale.width * 0.38 && p.x < this.scale.width * 0.62) {
         this.touchBrake = true;
@@ -115,10 +137,8 @@ export class DriftPlayScene extends Phaser.Scene {
 
     this.platform.session.start();
     this.platform.events.emit({ name: "gameplay_started", props: { gameId: "neon-drift" } });
-    void this.synth.resume().then(() => {
-      this.synth.startEngine();
-      this.synth.startBed("drift");
-    });
+    this.fitCam(this.scale.width, this.scale.height);
+    this.scale.on("resize", (gs: Phaser.Structs.Size) => this.fitCam(gs.width, gs.height));
 
     this.game.events.on("platform-pause", this.onPause, this);
     this.game.events.on("platform-resume", this.onResume, this);
@@ -165,7 +185,10 @@ export class DriftPlayScene extends Phaser.Scene {
     else if (accel || this.input.activePointer.isDown) this.car.throttle = 1;
     else this.car.throttle = this.input.activePointer.wasTouch ? 0.7 : 0;
 
-    if (this.car.throttle !== 0 || this.car.steer !== 0) this.shownHint = false;
+    if (this.car.throttle !== 0 || this.car.steer !== 0) {
+      this.shownHint = false;
+      this.ensureAudio();
+    }
 
     this.car.step(dt);
     const q = queryTrack(this.samples, this.car.x, this.car.y);
@@ -248,6 +271,8 @@ export class DriftPlayScene extends Phaser.Scene {
     const targetY = this.car.y + this.car.vy * 0.18;
     this.camX += (targetX - this.camX) * (1 - Math.exp(-dt * 6));
     this.camY += (targetY - this.camY) * (1 - Math.exp(-dt * 6));
+    this.camX = axis(this.camX, this.scale.width / 2, 3200);
+    this.camY = axis(this.camY, this.scale.height / 2, 2200);
     const shaken = this.juice.applyCamera({ x: this.camX, y: this.camY }, this.time.now);
     this.cameras.main.centerOn(shaken.x, shaken.y);
 
@@ -390,8 +415,10 @@ export function mountNeonDrift(parent: HTMLElement, platform: PlatformSDK, daily
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
+    width: Math.max(320, parent.clientWidth || 1280),
+    height: Math.max(240, parent.clientHeight || 720),
     backgroundColor: "#0b0a0c",
-    scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
+    scale: { mode: Phaser.Scale.RESIZE },
     scene: [DriftPlayScene],
     disableContextMenu: true,
     banner: false,

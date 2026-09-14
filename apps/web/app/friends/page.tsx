@@ -15,7 +15,8 @@ export default function FriendsPage() {
       </p>
       <button
         type="button"
-        className="mt-6 h-11 rounded-full bg-[var(--text)] px-5 text-[13px] text-[var(--bg)]"
+        className="mt-6 inline-flex h-11 items-center rounded-full px-5 text-[13px] font-medium"
+        style={{ background: "#f3f1ec", color: "#14110f" }}
         onClick={async () => {
           await navigator.clipboard.writeText(store.inviteLink());
           store.markInvite();
