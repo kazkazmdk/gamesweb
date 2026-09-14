@@ -8,7 +8,7 @@ test("leaderboard API is public and has no personalRank", async ({ request }) =>
   const body = await res.json();
   expect(body.gameId).toBe("neon-drift");
   expect(Array.isArray(body.rows)).toBeTruthy();
-  expect(body.personalRank).toBeUndefined();
+  expect("personalRank" in body).toBe(false);
   const cache = res.headers()["cache-control"] ?? "";
   expect(cache).toMatch(/s-maxage/i);
 });

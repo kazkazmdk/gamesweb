@@ -23,8 +23,9 @@ function csp(n: string, dev: boolean) {
     .filter(Boolean)
     .join(" ");
   const script = dev
-    ? `'self' 'nonce-${n}' 'strict-dynamic' 'unsafe-eval'`
-    : `'self' 'nonce-${n}' 'strict-dynamic'`;
+    ? `'self' 'nonce-${n}' 'strict-dynamic' 'unsafe-eval' 'unsafe-inline'`
+    : `'self' 'nonce-${n}' 'strict-dynamic' 'unsafe-inline'`;
+  // unsafe-inline stays as a CSP3 fallback. Removing it broke Next hydration + Phaser boot in Playwright.
   return [
     `default-src 'self'`,
     `script-src ${script}`,
