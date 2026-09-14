@@ -11,7 +11,7 @@ jobs:
     timeout-minutes: 25
     env:
       GAMESWEB_BACKEND: memory
-      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3010
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

@@ -29,7 +29,10 @@ export async function POST(req: Request) {
 
   const idem = body.data.idempotencyKey ?? `score:${body.data.sessionId}`;
   const cached = await backend.getIdempotency(idem);
-  if (cached) return jsonOk(cached.response, { status: cached.status });
+  if (cached) {
+    const body = cached.response as Record<string, unknown>;
+    return jsonOk({ ...body, alreadyApplied: true }, { status: cached.status });
+  }
 
   let session = await backend.getSession(body.data.sessionId);
   if (!session && body.data.offline) {
