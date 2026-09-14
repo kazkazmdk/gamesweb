@@ -1,0 +1,41 @@
+{
+  "name": "@gamesweb/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack --hostname 0.0.0.0 --port 3000",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0 --port 3000",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gamesweb/analytics": "workspace:*",
+    "@gamesweb/config": "workspace:*",
+    "@gamesweb/database": "workspace:*",
+    "@gamesweb/game-core": "workspace:*",
+    "@gamesweb/game-sdk": "workspace:*",
+    "@gamesweb/neon-drift": "workspace:*",
+    "@gamesweb/swarm-protocol": "workspace:*",
+    "@gamesweb/ui": "workspace:*",
+    "@gamesweb/velocity-run": "workspace:*",
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.57.4",
+    "next": "^15.5.3",
+    "phaser": "^3.90.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@tailwindcss/postcss": "^4.1.12",
+    "@types/node": "^22.18.0",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "eslint": "^9.35.0",
+    "eslint-config-next": "^15.5.3",
+    "tailwindcss": "^4.1.12",
+    "typescript": "^5.9.2"
+  }
+}

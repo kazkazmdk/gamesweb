@@ -1,0 +1,22 @@
+{
+  "name": "gamesweb",
+  "private": true,
+  "packageManager": "pnpm@10.33.3",
+  "scripts": {
+    "dev": "pnpm --filter @gamesweb/web dev",
+    "build": "pnpm --filter @gamesweb/web build",
+    "start": "pnpm --filter @gamesweb/web start",
+    "lint": "pnpm --filter @gamesweb/web lint",
+    "typecheck": "pnpm --filter @gamesweb/web typecheck",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:supabase": "node --experimental-strip-types scripts/verify-supabase-security.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.0",
+    "vitest": "3.2.4"
+  }
+}

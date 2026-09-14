@@ -1,0 +1,14 @@
+{
+  "name": "@gamesweb/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@gamesweb/config": "workspace:*",
+    "@gamesweb/game-sdk": "workspace:*",
+    "zod": "^3.25.76"
+  }
+}
