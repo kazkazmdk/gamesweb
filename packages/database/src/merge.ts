@@ -1,4 +1,5 @@
 import { xpRewards } from "@gamesweb/config";
+import { reconstructAchievementsFromScores } from "./ownership";
 import type { AccountProgress, GuestSnapshot } from "./types";
 
 const ACHIEVEMENT_XP: Record<string, number> = {
@@ -48,31 +49,30 @@ export function achievementXp(id: string): number {
 
 /**
  * Guest → account merge.
- * XP is NOT guest.xp + account.xp (that farms). Account keeps its XP and
- * receives XP only for achievements the account did not already hold.
- * Each anonymous_id may merge at most once (enforced by guest_migrations).
+ * Client-claimed achievements/XP/quests are ignored. Competitive progress is
+ * reconstructed from verified scores only. Unverified rows transfer as unverified.
  */
 export function mergeGuestIntoAccount(account: AccountProgress, guest: GuestSnapshot): AccountProgress {
-  const accountSet = new Set(account.achievements);
-  const guestSet = new Set(guest.achievements);
-  const added: string[] = [];
-  for (const id of guestSet) {
-    if (!accountSet.has(id)) added.push(id);
-  }
-  const achievements = [...accountSet, ...added];
-
-  let xp = account.xp;
-  for (const id of added) xp += achievementXp(id);
-  xp = Math.min(xp, 5_000_000);
-
   const seen = new Set(account.scores.map((s) => s.id));
   const scores = [...account.scores];
   for (const row of guest.scores) {
     if (row.verified === "flagged") continue;
     if (seen.has(row.id)) continue;
     seen.add(row.id);
-    scores.push(row);
+    scores.push({
+      ...row,
+      verified: row.verified === "verified" ? "verified" : "unverified",
+    });
   }
+
+  const reconstructed = reconstructAchievementsFromScores(scores);
+  const accountSet = new Set(account.achievements);
+  const added = reconstructed.filter((id) => !accountSet.has(id));
+  const achievements = [...accountSet, ...added];
+
+  let xp = account.xp;
+  for (const id of added) xp += achievementXp(id);
+  xp = Math.min(xp, 5_000_000);
 
   const saves = { ...account.saves };
   for (const [gameId, save] of Object.entries(guest.saves ?? {})) {

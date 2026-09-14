@@ -1,3 +1,4 @@
+import { idempotencyScope } from "@gamesweb/database";
 import { getIdentity, identityKey } from "@/lib/api/identity";
 import { jsonError, jsonOk, readJson } from "@/lib/api/errors";
 import { slog } from "@/lib/api/log";
@@ -29,8 +30,9 @@ export async function POST(req: Request) {
   const applied: string[] = [];
   for (const op of ops) {
     if (!op?.opId || typeof op.opId !== "string") continue;
+    const scope = idempotencyScope(identity);
     const key = op.idempotencyKey ?? `sync:${op.opId}`;
-    const cached = await backend.getIdempotency(key);
+    const cached = await backend.getIdempotency(scope, key);
     if (cached) {
       applied.push(op.opId);
       continue;
@@ -42,7 +44,7 @@ export async function POST(req: Request) {
           await backend.upsertPresence(identity, status, typeof op.payload?.gameId === "string" ? op.payload.gameId : null);
         }
       }
-      await backend.putIdempotency(key, 200, { ok: true });
+      await backend.putIdempotency(scope, key, "sync", 200, { ok: true }, identity);
       applied.push(op.opId);
     } catch {
       slog("api_error", { endpoint: "sync", type: op.type });

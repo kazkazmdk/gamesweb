@@ -2,13 +2,24 @@ import type {
   AccountProgress,
   DeviceClass,
   FriendshipStatus,
-  GuestSnapshot,
   LeaderboardEntry,
   PresenceStatus,
   ProgressionDiff,
   VerifiedStatus,
 } from "@gamesweb/database";
 import type { Identity } from "@/lib/api/identity";
+
+export type OfflineRun = {
+  gameId: string;
+  mode: string;
+  score: number;
+  durationMs: number;
+  startedAt: number;
+  endedAt: number;
+  metadata: Record<string, number | string | boolean>;
+  localSessionId?: string;
+  gameVersion?: string;
+};
 
 export type StoredSession = {
   id: string;
@@ -27,7 +38,7 @@ export type StoredSession = {
 
 export type StoredScore = {
   id: string;
-  sessionId: string;
+  sessionId: string | null;
   userId: string | null;
   anonymousId: string | null;
   gameId: string;
@@ -36,6 +47,7 @@ export type StoredScore = {
   metadata: Record<string, number | string | boolean>;
   createdAt: number;
   verified: VerifiedStatus;
+  offlineSubmission?: boolean;
 };
 
 export type StoredProfile = {
@@ -87,6 +99,25 @@ export type ScoreWriteResult = {
   alreadyApplied: boolean;
 };
 
+export type SubmitScoreInput = {
+  identity: Identity;
+  session: StoredSession | null;
+  gameId?: string;
+  mode: string;
+  score: number;
+  durationMs: number;
+  result?: string;
+  metadata: Record<string, number | string | boolean>;
+  verified: VerifiedStatus;
+  offline?: boolean;
+  flagReasons?: string[];
+  gameVersion?: string;
+  buildSha?: string;
+  clientStartedAt?: number;
+  clientEndedAt?: number;
+  localSessionId?: string;
+};
+
 export type BackendStore = {
   kind: "memory" | "supabase";
   startSession(input: {
@@ -94,19 +125,11 @@ export type BackendStore = {
     gameId: string;
     gameVersion: string;
     device: DeviceClass;
+    buildSha?: string;
+    appVersion?: string;
   }): Promise<StoredSession>;
   getSession(id: string): Promise<StoredSession | null>;
-  submitScore(input: {
-    identity: Identity;
-    session: StoredSession;
-    mode: string;
-    score: number;
-    durationMs: number;
-    result?: string;
-    metadata: Record<string, number | string | boolean>;
-    verified: VerifiedStatus;
-    offline?: boolean;
-  }): Promise<ScoreWriteResult>;
+  submitScore(input: SubmitScoreInput): Promise<ScoreWriteResult>;
   leaderboard(gameId: string, mode: string, limit: number): Promise<LeaderboardEntry[]>;
   personalRank(identity: Identity, gameId: string, mode: string): Promise<number | null>;
   upsertPresence(identity: Identity, status: PresenceStatus, gameId: string | null): Promise<void>;
@@ -129,8 +152,8 @@ export type BackendStore = {
   putSave(identity: Identity, save: Omit<StoredSave, "userId"> & { userId?: string }): Promise<StoredSave | { error: string }>;
   getOrCreateProfile(identity: Identity): Promise<StoredProfile>;
   updateProfile(identity: Identity, patch: Partial<Pick<StoredProfile, "username" | "displayName" | "avatar" | "shareActivity">>): Promise<StoredProfile | { error: string }>;
-  mergeGuest(identity: Identity, anonymousId: string, snapshot: GuestSnapshot): Promise<{ ok: true; profile: StoredProfile; alreadyMerged: boolean } | { error: string }>;
-  getIdempotency(key: string): Promise<{ status: number; response: unknown } | null>;
-  putIdempotency(key: string, status: number, response: unknown): Promise<void>;
+  mergeGuest(identity: Identity, input?: { offlineRuns?: OfflineRun[] }): Promise<{ ok: true; profile: StoredProfile; alreadyMerged: boolean } | { error: string }>;
+  getIdempotency(scope: string, key: string): Promise<{ status: number; response: unknown } | null>;
+  putIdempotency(scope: string, key: string, endpoint: string, status: number, response: unknown, identity: Identity): Promise<void>;
   accountProgress(userId: string): Promise<AccountProgress>;
 };

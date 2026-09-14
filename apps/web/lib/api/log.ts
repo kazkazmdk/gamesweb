@@ -9,7 +9,8 @@ export function slog(
     | "invalid_payload"
     | "suspicious_run"
     | "api_error"
-    | "not_configured",
+    | "not_configured"
+    | "score_finalized",
   fields: Record<string, string | number | boolean | null | undefined> = {},
 ) {
   const safe: Record<string, string | number | boolean | null> = { event };

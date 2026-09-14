@@ -16,7 +16,6 @@ export function GameHub({ game }: { game: GameManifest }) {
   const pb = store.personalBest(game.id, mode, game.id === "velocity-run");
   const related = GAME_MANIFESTS.filter((g) => g.id !== game.id);
   const board = store.leaderboard(game.id, mode);
-  const friends = player.friends.filter((f) => f.gameId === game.id);
 
   return (
     <article>
@@ -82,9 +81,15 @@ export function GameHub({ game }: { game: GameManifest }) {
               {game.achievements.map((a) => {
                 const unlocked = player.achievements.includes(`${game.id}:${a.key}`);
                 return (
-                  <li key={a.key} className="rounded-xl border border-[var(--line)] px-3 py-3">
+                  <li
+                    key={a.key}
+                    className={`rounded-xl border px-3 py-3 ${unlocked ? "border-[var(--accent)]/40 bg-[color-mix(in_srgb,var(--accent)_8%,transparent)]" : "border-[var(--line)] opacity-60"}`}
+                  >
                     <p className="text-[14px]">
-                      {a.name} {unlocked ? "·" : ""}
+                      {unlocked ? a.name : a.name}
+                      <span className="ml-2 text-[11px] uppercase tracking-[0.12em] text-[var(--text-faint)]">
+                        {unlocked ? "Unlocked" : "Locked"}
+                      </span>
                     </p>
                     <p className="text-[12px] text-[var(--text-dim)]">{a.description}</p>
                   </li>
@@ -122,14 +127,16 @@ export function GameHub({ game }: { game: GameManifest }) {
           </section>
           <section>
             <h2 className="text-[13px] uppercase tracking-[0.18em] text-[var(--text-faint)]">Friends</h2>
-            {friends.length ? (
+            {player.friends.filter((f) => f.status === "accepted" && f.presence === "playing" && f.gameId === game.id).length ? (
               <ul className="mt-3 text-[14px]">
-                {friends.map((f) => (
-                  <li key={f.id}>{f.displayName} is playing</li>
-                ))}
+                {player.friends
+                  .filter((f) => f.status === "accepted" && f.presence === "playing" && f.gameId === game.id)
+                  .map((f) => (
+                    <li key={f.id}>{f.displayName} is playing</li>
+                  ))}
               </ul>
             ) : (
-              <p className="mt-3 text-[14px] text-[var(--text-dim)]">Games are better with rivals.</p>
+              <p className="mt-3 text-[14px] text-[var(--text-dim)]">No friends in this world right now.</p>
             )}
           </section>
           <section>

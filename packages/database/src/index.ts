@@ -1,7 +1,15 @@
 export type { Json, DeviceClass, VerifiedStatus, FriendshipStatus, PresenceStatus, ProfileRow, PublicProfile, GameSessionRow, ScoreRow, LeaderboardEntry, ProgressionDiff, GuestSnapshot, AccountProgress } from "./types";
 export { validateScore, type ScorePayload, type ScoreValidation } from "./validate-score";
 export { mergeGuestIntoAccount, achievementXp } from "./merge";
-export { computeRunRewards, type RunContext } from "./rewards";
+export { computeRunRewards, isPersonalBest, type RunContext } from "./rewards";
+export {
+  assertSessionOwnership,
+  idempotencyScope,
+  reconstructAchievementsFromScores,
+  achievementId,
+  type IdentityRef,
+  type ScoreLike,
+} from "./ownership";
 export {
   GAME_IDS,
   GAME_MODES,

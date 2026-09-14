@@ -18,7 +18,7 @@ export const StartSessionSchema = z.object({
 });
 
 export const SubmitScoreSchema = z.object({
-  sessionId: z.string().uuid(),
+  sessionId: z.string().uuid().optional(),
   gameId: z.enum(GAME_IDS),
   gameVersion: z.string().min(1).max(32),
   mode: z.string().min(1).max(32),
@@ -28,6 +28,8 @@ export const SubmitScoreSchema = z.object({
   endedAt: z.number().int().nonnegative(),
   metadata: ScoreMetadataSchema.default({}),
   offline: z.boolean().optional(),
+  offlineSubmission: z.boolean().optional(),
+  localSessionId: z.string().max(80).optional(),
   idempotencyKey: z.string().max(80).optional(),
 });
 
@@ -63,56 +65,24 @@ export const ProfileUpdateSchema = z.object({
   shareActivity: z.boolean().optional(),
 });
 
-export const GuestMergeSchema = z.object({
-  anonymousId: z.string().min(8).max(80),
-  snapshot: z.object({
-    xp: z.number().int().min(0).max(5_000_000),
-    achievements: z.array(z.string().max(80)).max(200),
-    scores: z
+export const GuestMergeSchema = z
+  .object({
+    offlineRuns: z
       .array(
         z.object({
-          id: z.string().max(80),
-          gameId: z.string().max(40),
+          gameId: z.enum(GAME_IDS),
           mode: z.string().max(32),
           score: z.number().finite(),
-          at: z.number().int(),
-          verified: z.enum(["verified", "unverified", "flagged"]),
+          durationMs: z.number().int().min(0).max(30 * 60 * 1000),
+          startedAt: z.number().int(),
+          endedAt: z.number().int(),
           metadata: ScoreMetadataSchema.default({}),
         }),
       )
-      .max(400),
-    saves: z
-      .record(
-        z.string().max(40),
-        z.object({
-          version: z.string().max(32),
-          payload: z.record(z.string(), z.unknown()),
-          updatedAt: z.number().int().optional(),
-        }),
-      )
+      .max(40)
       .optional(),
-    questProgress: z.record(z.string().max(80), z.number()).optional(),
-    questCompleted: z.array(z.string().max(80)).max(200).optional(),
-    stats: z.record(z.string().max(80), z.number()).optional(),
-    history: z
-      .array(
-        z.object({
-          gameId: z.string().max(40),
-          at: z.number().int(),
-          durationMs: z.number().int(),
-          score: z.number(),
-          result: z.string().max(40),
-        }),
-      )
-      .max(80)
-      .optional(),
-    username: z.string().max(20).optional(),
-    displayName: z.string().max(32).optional(),
-    avatar: z.string().max(32).optional(),
-    streak: z.number().int().min(0).max(3650).optional(),
-  }),
-  idempotencyKey: z.string().max(80).optional(),
-});
+  })
+  .strict();
 
 export const AuthMagicLinkSchema = z.object({
   email: z.string().trim().email().max(254),

@@ -4,7 +4,8 @@ import { jsonError, jsonOk, readJson } from "@/lib/api/errors";
 import { slog } from "@/lib/api/log";
 import { assertSameOrigin, clientIp, hashKey } from "@/lib/api/origin";
 import { policies, rateLimit } from "@/lib/api/rate-limit";
-import { appUrl, isSupabaseConfigured, supabasePublishableKey, supabaseUrl } from "@/lib/env";
+import { appUrl, isSupabaseConfigured } from "@/lib/env";
+import { createSupabaseServer } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
   const denied = assertSameOrigin(req);
@@ -32,25 +33,21 @@ export async function POST(req: Request) {
     return jsonOk({ ok: false, mode: "local", code: "NOT_CONFIGURED" as const });
   }
 
-  const url = supabaseUrl()!;
-  const key = supabasePublishableKey()!;
-  const redirectTo = `${appUrl()}/auth/callback`;
-  const res = await fetch(`${url}/auth/v1/otp`, {
-    method: "POST",
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
+  const supabase = await createSupabaseServer();
+  if (!supabase) {
+    return jsonOk({ ok: false, mode: "local", code: "NOT_CONFIGURED" as const });
+  }
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email: body.data.email,
+    options: {
+      emailRedirectTo: `${appUrl()}/auth/callback`,
+      shouldCreateUser: true,
+      captchaToken: body.data.captchaToken,
     },
-    body: JSON.stringify({
-      email: body.data.email,
-      create_user: true,
-      gotrue_meta_security: {},
-      options: { emailRedirectTo: redirectTo },
-    }),
   });
-  if (!res.ok) {
-    slog("auth_failure", { reason: "supabase", status: res.status });
+  if (error) {
+    slog("auth_failure", { reason: "supabase" });
     return jsonError("AUTH_FAILURE", "Could not send sign-in email.", 502);
   }
   return jsonOk({ ok: true, mode: "supabase" });

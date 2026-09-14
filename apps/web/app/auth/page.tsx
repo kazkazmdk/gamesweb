@@ -52,7 +52,7 @@ export default function AuthPage() {
       ) : null}
       {sent ? (
         <p className="mt-8 text-[15px]">
-          {configured ? "Check your email for a sign-in link. Guest runs merge on first login." : "No account was created. Keep playing as a guest on this device."}
+          {configured ? "Check your email for a sign-in link. We’ll merge the runs this device already saved." : "No account was created. Keep playing as a guest on this device."}
         </p>
       ) : (
         <form onSubmit={onSubmit} className="mt-8 space-y-4">

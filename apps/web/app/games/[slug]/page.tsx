@@ -1,6 +1,7 @@
 import { brand } from "@gamesweb/config";
 import { GAME_MANIFESTS, getManifest } from "@gamesweb/game-sdk";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { GameHub } from "@/components/game/GameHub";
 import { gameSeoTitle, INDEX, videoGameJsonLd } from "@/lib/seo";
@@ -41,9 +42,10 @@ export default async function GameHubPage({ params }: { params: Promise<{ slug: 
   const game = getManifest(slug);
   if (!game) notFound();
   const jsonLd = videoGameJsonLd(game);
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <GameHub game={game} />
     </>
   );

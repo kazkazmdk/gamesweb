@@ -25,6 +25,13 @@ export type RunContext = {
   questCompleted: string[];
 };
 
+export function isPersonalBest(gameId: string, score: number, pbBefore: number): boolean {
+  const lower = gameId === "velocity-run";
+  const hasExisting = lower ? Number.isFinite(pbBefore) && pbBefore < 1e12 : Number.isFinite(pbBefore) && pbBefore > 0;
+  if (!hasExisting) return score > 0;
+  return lower ? score < pbBefore : score > pbBefore;
+}
+
 export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
   questProgress: Record<string, number>;
   pbImproved: boolean;
@@ -42,33 +49,42 @@ export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
     };
   }
 
-  const unverifiedScale = ctx.verified === "unverified" ? 0.5 : 1;
+  const pbImproved = isPersonalBest(ctx.gameId, ctx.score, ctx.pbBefore);
+
+  if (ctx.verified === "unverified") {
+    const scale = Math.min(1, ctx.durationMs / (xpRewards.minRunSecondsForFullXp * 1000));
+    const xp = Math.round(Math.max(4, xpRewards.runComplete * 0.25 * scale));
+    const newXp = ctx.existingXp + xp;
+    const lv = levelFromXp(newXp);
+    return {
+      xpEarned: xp,
+      newLevel: lv.level,
+      newXp,
+      achievements: [],
+      questsCompleted: [],
+      questProgress: ctx.questProgress,
+      pbImproved: false,
+    };
+  }
+
   let xp = 0;
   const unlocked: string[] = [];
   const have = new Set(ctx.existingAchievements);
 
   const scale = Math.min(1, ctx.durationMs / (xpRewards.minRunSecondsForFullXp * 1000));
-  xp += Math.round((xpRewards.runComplete * scale + (ctx.durationMs / 60000) * xpRewards.runCompletePerMinute) * unverifiedScale);
+  xp += Math.round(xpRewards.runComplete * scale + (ctx.durationMs / 60000) * xpRewards.runCompletePerMinute);
 
-  if (ctx.gamesPlayedToday === 0) xp += Math.round(xpRewards.firstPlayOfDay * unverifiedScale);
+  if (ctx.gamesPlayedToday === 0) xp += xpRewards.firstPlayOfDay;
 
   const firstThisGame = !ctx.playedGameIds.includes(ctx.gameId);
-  if (firstThisGame) xp += Math.round(xpRewards.newGameTried * unverifiedScale);
+  if (firstThisGame) xp += xpRewards.newGameTried;
 
-  const lower = ctx.gameId === "velocity-run";
-  const pbImproved = Number.isFinite(ctx.pbBefore)
-    ? lower
-      ? ctx.score < ctx.pbBefore
-      : ctx.score > ctx.pbBefore
-    : ctx.score > 0;
-  if (pbImproved && Number.isFinite(ctx.pbBefore) && ctx.pbBefore > 0 && ctx.pbBefore < 1e12) {
-    xp += Math.round(xpRewards.personalBest * unverifiedScale);
-  }
+  if (pbImproved) xp += xpRewards.personalBest;
 
   function unlock(id: string) {
     if (have.has(id) || unlocked.includes(id)) return;
     unlocked.push(id);
-    xp += Math.round(achievementXp(id) * unverifiedScale);
+    xp += achievementXp(id);
   }
 
   unlock("platform:first-run");
@@ -135,7 +151,7 @@ export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
     questProgress[q.id] = value;
     if (value >= q.target) {
       questsCompleted.push(q.id);
-      xp += Math.round(q.xp * unverifiedScale);
+      xp += q.xp;
     }
   }
 
@@ -148,6 +164,6 @@ export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
     achievements: unlocked,
     questsCompleted,
     questProgress,
-    pbImproved: Boolean(pbImproved && Number.isFinite(ctx.pbBefore)),
+    pbImproved,
   };
 }

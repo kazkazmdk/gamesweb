@@ -60,4 +60,5 @@ test("leaderboard API returns the expected schema", async ({ request }) => {
   const body = await res.json();
   expect(body.gameId).toBe("neon-drift");
   expect(Array.isArray(body.rows)).toBeTruthy();
+  expect(body.personalRank).toBeUndefined();
 });

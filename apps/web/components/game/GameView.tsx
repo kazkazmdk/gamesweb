@@ -21,6 +21,7 @@ export function GameView({ slug }: { slug: string }) {
   const [boot, setBoot] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [loadPct, setLoadPct] = useState(12);
+  const [bootError, setBootError] = useState(false);
   const [paused, setPaused] = useState(false);
   const [result, setResult] = useState<null | {
     score: number;
@@ -38,6 +39,7 @@ export function GameView({ slug }: { slug: string }) {
     if (!game) return;
     analytics.track("game_selected", { gameId: game.id });
     analytics.track("game_load_started", { gameId: game.id });
+    setBootError(false);
     const t = window.setInterval(() => setLoadPct((p) => Math.min(92, p + 8)), 120);
     let dead = false;
     const platform: PlatformSDK = store.createPlatform(game.id, {
@@ -84,6 +86,7 @@ export function GameView({ slug }: { slug: string }) {
     }
     let cleanupRo: () => void = () => undefined;
     void boot().catch(() => {
+      setBootError(true);
       analytics.track("game_boot_failed", { gameId: game!.id });
     });
     return () => {
@@ -203,7 +206,7 @@ export function GameView({ slug }: { slug: string }) {
         </div>
       </div>
 
-      {!loaded ? (
+      {!loaded && !bootError ? (
         <div className="absolute inset-0 z-10 grid place-items-center bg-[var(--bg)]">
           <div className="w-[min(420px,90vw)] text-center">
             <p className="display text-[40px]">{game.title}</p>
@@ -211,6 +214,27 @@ export function GameView({ slug }: { slug: string }) {
             <div className="mx-auto mt-6 h-1 w-48 overflow-hidden rounded-full bg-white/10">
               <div className="h-full bg-[var(--accent)]" style={{ width: `${loadPct}%` }} />
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {bootError ? (
+        <div className="absolute inset-0 z-30 grid place-items-center bg-black">
+          <div className="w-[min(360px,90vw)] text-center">
+            <p className="display text-[36px]">Game failed to load</p>
+            <p className="mt-2 text-[13px] text-white/55">The world did not boot. Your progress is still on this device.</p>
+            <button
+              type="button"
+              className="mt-6 rounded-full bg-white px-5 py-3 text-[14px] text-black"
+              onClick={() => {
+                setBootError(false);
+                setLoaded(false);
+                setLoadPct(10);
+                setBoot((n) => n + 1);
+              }}
+            >
+              Retry
+            </button>
           </div>
         </div>
       ) : null}
@@ -337,8 +361,19 @@ function Results({
       <div className="w-[min(420px,92vw)] rounded-2xl border border-white/10 bg-[#121214] p-6">
         <p className="text-[12px] uppercase tracking-[0.18em] text-white/45">{result}</p>
         <p className="display mt-2 text-[48px]">{formatScore(gameId, score)}</p>
-        <p className="mt-2 text-[13px] text-white/55">{Math.round(durationMs / 1000)}s · Lv {player.xp >= 0 ? "" : ""}{store.view().level}</p>
+        <p className="mt-2 text-[13px] text-white/55">{Math.round(durationMs / 1000)}s · Lv {store.view().level}</p>
         <p className="mt-1 text-[13px] text-white/55">{done}/3 challenges today</p>
+        <p className="mt-2 text-[12px] text-white/45">
+          {player.syncStatus === "saving"
+            ? "Saving…"
+            : player.syncStatus === "offline"
+              ? "Saved locally"
+              : player.syncStatus === "review"
+                ? "Score under review"
+                : player.syncStatus === "saved"
+                  ? "Saved"
+                  : null}
+        </p>
         <div className="mt-6 flex flex-col gap-2">
           <button
             type="button"

@@ -17,12 +17,19 @@ export type ApiErrorCode =
   | "MERGE_FAILURE"
   | "INTERNAL";
 
+function withId(headers?: HeadersInit) {
+  const id = crypto.randomUUID();
+  return { "x-request-id": id, ...Object.fromEntries(new Headers(headers).entries()) };
+}
+
 export function jsonError(code: ApiErrorCode, message: string, status: number) {
-  return NextResponse.json({ error: { code, message } }, { status });
+  const headers = withId();
+  return NextResponse.json({ error: { code, message }, requestId: headers["x-request-id"] }, { status, headers });
 }
 
 export function jsonOk<T>(body: T, init?: { status?: number; headers?: HeadersInit }) {
-  return NextResponse.json(body, init);
+  const headers = withId(init?.headers);
+  return NextResponse.json(body, { status: init?.status, headers });
 }
 
 export async function readJson(req: Request): Promise<{ ok: true; data: unknown } | { ok: false; response: NextResponse }> {

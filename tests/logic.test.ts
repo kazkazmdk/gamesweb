@@ -106,7 +106,7 @@ describe("medalForTime", () => {
 });
 
 describe("mergeGuestIntoAccount", () => {
-  it("does not sum XP and unions achievements", () => {
+  it("ignores claimed achievements and reconstructs from verified scores", () => {
     const merged = mergeGuestIntoAccount(
       {
         xp: 800,
@@ -122,13 +122,35 @@ describe("mergeGuestIntoAccount", () => {
         xp: 1000,
         achievements: ["platform:first-run", "neon-drift:score-25k"],
         scores: [
-          { id: "a", gameId: "neon-drift", mode: "circuit", score: 10, at: 1, verified: "verified", metadata: {} },
+          { id: "a", gameId: "neon-drift", mode: "circuit", score: 25000, at: 1, verified: "verified", metadata: {} },
         ],
       },
     );
     expect(merged.xp).toBe(800 + 30);
     expect(merged.achievements).toContain("neon-drift:score-25k");
     expect(merged.scores).toHaveLength(1);
+  });
+
+  it("does not grant XP for client-claimed achievements without verified scores", () => {
+    const merged = mergeGuestIntoAccount(
+      {
+        xp: 100,
+        achievements: [],
+        scores: [],
+        saves: {},
+        questProgress: {},
+        questCompleted: [],
+        stats: {},
+        streak: 0,
+      },
+      {
+        xp: 9999,
+        achievements: ["neon-drift:score-60k", "platform:three-worlds"],
+        scores: [],
+      },
+    );
+    expect(merged.xp).toBe(100);
+    expect(merged.achievements).toEqual([]);
   });
 
   it("skips flagged guest scores", () => {
@@ -154,27 +176,57 @@ describe("mergeGuestIntoAccount", () => {
 });
 
 describe("computeRunRewards", () => {
-  it("awards no XP for flagged runs", () => {
-    const diff = computeRunRewards({
-      gameId: "neon-drift",
+  it("restricts unverified rewards and zeros flagged runs", () => {
+    const base = {
+      gameId: "neon-drift" as const,
       mode: "circuit",
       score: 25000,
       durationMs: 40000,
       result: "finish",
       metadata: { laps: 2, combo: 5 },
-      verified: "flagged",
-      existingAchievements: [],
+      existingAchievements: [] as string[],
       existingXp: 10,
       gamesPlayedToday: 0,
-      uniqueGamesToday: [],
-      playedGameIds: [],
+      uniqueGamesToday: [] as string[],
+      playedGameIds: [] as string[],
       pbBefore: 0,
+      pbCount: 0,
+      dayKey: utcDayKey(),
+      hourUtc: 12,
+      questProgress: {},
+      questCompleted: [] as string[],
+    };
+    const unverified = computeRunRewards({ ...base, verified: "unverified" });
+    const verified = computeRunRewards({ ...base, verified: "verified" });
+    expect(unverified.achievements).toEqual([]);
+    expect(unverified.xpEarned).toBeLessThan(verified.xpEarned);
+    expect(unverified.xpEarned).toBeGreaterThan(0);
+    const flagged = computeRunRewards({ ...base, verified: "flagged" });
+    expect(flagged.xpEarned).toBe(0);
+  });
+
+  it("counts a first Velocity time as a personal best", () => {
+    const diff = computeRunRewards({
+      gameId: "velocity-run",
+      mode: "course-1",
+      score: 42000,
+      durationMs: 42000,
+      result: "finish",
+      metadata: { deaths: 1, medal: "none" },
+      verified: "verified",
+      existingAchievements: ["platform:first-run", "velocity-run:first-finish", "velocity-run:bronze"],
+      existingXp: 100,
+      gamesPlayedToday: 1,
+      uniqueGamesToday: ["velocity-run"],
+      playedGameIds: ["velocity-run"],
+      pbBefore: Number.POSITIVE_INFINITY,
       pbCount: 0,
       dayKey: utcDayKey(),
       hourUtc: 12,
       questProgress: {},
       questCompleted: [],
     });
-    expect(diff.xpEarned).toBe(0);
+    expect(diff.pbImproved).toBe(true);
+    expect(diff.xpEarned).toBeGreaterThanOrEqual(35);
   });
 });

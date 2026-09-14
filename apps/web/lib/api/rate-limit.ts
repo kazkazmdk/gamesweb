@@ -1,4 +1,5 @@
 import { slog } from "@/lib/api/log";
+import { hasUpstash, isVercelProduction } from "@/lib/env";
 
 type Policy = { limit: number; windowMs: number };
 
@@ -19,7 +20,6 @@ async function upstashLimit(key: string, policy: Policy): Promise<{ ok: boolean;
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
-  const id = encodeURIComponent(`gw:${key}`);
   try {
     const res = await fetch(`${url.replace(/\/$/, "")}/pipeline`, {
       method: "POST",
@@ -32,7 +32,6 @@ async function upstashLimit(key: string, policy: Policy): Promise<{ ok: boolean;
     if (!res.ok) return null;
     const data = (await res.json()) as Array<{ result: number }>;
     const n = Number(data[0]?.result ?? 0);
-    void id;
     return { ok: n <= policy.limit, remaining: Math.max(0, policy.limit - n) };
   } catch {
     return null;
@@ -41,9 +40,23 @@ async function upstashLimit(key: string, policy: Policy): Promise<{ ok: boolean;
 
 export async function rateLimit(key: string, policy: Policy): Promise<{ ok: boolean; remaining: number }> {
   const remote = await upstashLimit(key, policy);
-  const result = remote ?? (await memoryLimit(key, policy));
+  if (remote) {
+    if (!remote.ok) slog("rate_limit_triggered", { key: key.split(":")[0] ?? "unknown", limit: policy.limit });
+    return remote;
+  }
+  if (isVercelProduction()) {
+    slog("not_configured", { reason: "rate_limit_redis" });
+    return { ok: false, remaining: 0 };
+  }
+  const result = await memoryLimit(key, policy);
   if (!result.ok) slog("rate_limit_triggered", { key: key.split(":")[0] ?? "unknown", limit: policy.limit });
   return result;
+}
+
+export function rateLimitBackend(): "upstash" | "memory" | "unconfigured" {
+  if (hasUpstash()) return "upstash";
+  if (isVercelProduction()) return "unconfigured";
+  return "memory";
 }
 
 export const policies = {

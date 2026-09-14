@@ -8,8 +8,6 @@ function read(name: string): string | undefined {
 export function runtimeEnv(): RuntimeEnv {
   const vercel = read("VERCEL_ENV");
   if (vercel === "production" || vercel === "preview") return vercel;
-  if (read("NODE_ENV") === "production" && vercel === "production") return "production";
-  if (vercel === "preview") return "preview";
   return "development";
 }
 
@@ -39,6 +37,10 @@ export function isSupabaseConfigured(): boolean {
 
 export function hasSupabaseAdmin(): boolean {
   return Boolean(supabaseUrl() && supabaseSecretKey());
+}
+
+export function hasUpstash(): boolean {
+  return Boolean(read("UPSTASH_REDIS_REST_URL") && read("UPSTASH_REDIS_REST_TOKEN"));
 }
 
 export function showSeedData(): boolean {
@@ -74,5 +76,15 @@ export function assertProductionSecrets(): string[] {
   if (!supabaseUrl()) missing.push("NEXT_PUBLIC_SUPABASE_URL");
   if (!supabasePublishableKey()) missing.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
   if (!supabaseSecretKey()) missing.push("SUPABASE_SECRET_KEY");
+  if (!hasUpstash()) {
+    missing.push("UPSTASH_REDIS_REST_URL");
+    missing.push("UPSTASH_REDIS_REST_TOKEN");
+  }
+  const url = appUrl();
+  if (!url.startsWith("https://")) missing.push("NEXT_PUBLIC_APP_URL (must be https in production)");
+  if (read("NEXT_PUBLIC_SHOW_SEED_DATA") === "true") missing.push("NEXT_PUBLIC_SHOW_SEED_DATA must be false");
+  const pub = supabasePublishableKey();
+  const secret = supabaseSecretKey();
+  if (pub && secret && pub === secret) missing.push("SUPABASE_SECRET_KEY must not equal the publishable key");
   return missing;
 }

@@ -1,17 +1,18 @@
 import { levelFromXp } from "@gamesweb/config";
 import {
+  assertSessionOwnership,
   computeRunRewards,
   lowerIsBetter,
   mergeGuestIntoAccount,
   PRESENCE_STALE_MS,
-  type GuestSnapshot,
   type LeaderboardEntry,
   type VerifiedStatus,
 } from "@gamesweb/database";
 import { utcDayKey } from "@gamesweb/game-sdk";
 import type { Identity } from "@/lib/api/identity";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
-import type { BackendStore, ScoreWriteResult, StoredProfile, StoredSave, StoredSession } from "@/lib/backend/types";
+import { commitSha, APP_VERSION } from "@/lib/version";
+import type { BackendStore, OfflineRun, ScoreWriteResult, StoredProfile, StoredSave, StoredSession, SubmitScoreInput } from "@/lib/backend/types";
 
 function admin() {
   const client = createSupabaseAdmin();
@@ -56,6 +57,8 @@ export class SupabaseBackend implements BackendStore {
     gameId: string;
     gameVersion: string;
     device: StoredSession["device"];
+    buildSha?: string;
+    appVersion?: string;
   }): Promise<StoredSession> {
     const sb = admin();
     if (input.identity.userId) await this.getOrCreateProfile(input.identity);
@@ -67,6 +70,9 @@ export class SupabaseBackend implements BackendStore {
         game_id: input.gameId,
         game_version: input.gameVersion,
         device: input.device,
+        build_sha: input.buildSha ?? commitSha(),
+        app_version: input.appVersion ?? APP_VERSION,
+        client_started_at: new Date().toISOString(),
       })
       .select("*")
       .single();
@@ -146,54 +152,50 @@ export class SupabaseBackend implements BackendStore {
     return (await loadProfileRow(identity.userId))!;
   }
 
-  async submitScore(input: {
-    identity: Identity;
-    session: StoredSession;
-    mode: string;
-    score: number;
-    durationMs: number;
-    result?: string;
-    metadata: Record<string, number | string | boolean>;
-    verified: VerifiedStatus;
-    offline?: boolean;
-  }): Promise<ScoreWriteResult> {
+  async submitScore(input: SubmitScoreInput): Promise<ScoreWriteResult> {
     const sb = admin();
-    const { data: existing } = await sb.from("scores").select("*").eq("session_id", input.session.id).maybeSingle();
-    if (existing) {
-      const profile = await this.getOrCreateProfile(input.identity);
-      return {
-        alreadyApplied: true,
-        score: {
-          id: existing.id,
-          sessionId: existing.session_id,
-          userId: existing.user_id,
-          anonymousId: existing.anonymous_id,
-          gameId: existing.game_id,
-          mode: existing.mode,
-          score: existing.score,
-          metadata: existing.metadata ?? {},
-          createdAt: new Date(existing.created_at).getTime(),
-          verified: existing.verified_status,
-        },
-        progression: {
-          xpEarned: 0,
-          newLevel: levelFromXp(profile.xp).level,
-          newXp: profile.xp,
-          achievements: [],
-          questsCompleted: [],
-        },
-      };
+    const resolvedGameId = input.session?.gameId ?? input.gameId;
+    if (!resolvedGameId) throw new Error("invalid_score");
+
+    if (input.session && assertSessionOwnership(input.session, input.identity) !== "ok") {
+      throw Object.assign(new Error("forbidden"), { code: "FORBIDDEN" });
+    }
+
+    if (input.session) {
+      const { data: existing } = await sb.from("scores").select("*").eq("session_id", input.session.id).maybeSingle();
+      if (existing) {
+        const profile = await this.getOrCreateProfile(input.identity);
+        return {
+          alreadyApplied: true,
+          score: {
+            id: existing.id,
+            sessionId: existing.session_id,
+            userId: existing.user_id,
+            anonymousId: existing.anonymous_id,
+            gameId: existing.game_id,
+            mode: existing.mode,
+            score: existing.score,
+            metadata: existing.metadata ?? {},
+            createdAt: new Date(existing.created_at).getTime(),
+            verified: existing.verified_status,
+          },
+          progression: {
+            xpEarned: 0,
+            newLevel: levelFromXp(profile.xp).level,
+            newXp: profile.xp,
+            achievements: [],
+            questsCompleted: [],
+          },
+        };
+      }
     }
 
     const profile = await this.getOrCreateProfile(input.identity);
-    const { data: prevRows } = await sb
-      .from("scores")
-      .select("score")
-      .eq("game_id", input.session.gameId)
-      .eq("mode", input.mode)
-      .eq("user_id", input.identity.userId)
-      .neq("verified_status", "flagged");
-    const lower = lowerIsBetter(input.session.gameId);
+    const ownerFilter = input.identity.userId
+      ? sb.from("scores").select("score").eq("game_id", resolvedGameId).eq("mode", input.mode).eq("user_id", input.identity.userId).eq("verified_status", "verified")
+      : sb.from("scores").select("score").eq("game_id", resolvedGameId).eq("mode", input.mode).eq("anonymous_id", input.identity.anonymousId).eq("verified_status", "verified");
+    const { data: prevRows } = await ownerFilter;
+    const lower = lowerIsBetter(resolvedGameId);
     const scores = (prevRows ?? []).map((r: { score: number }) => r.score);
     const pbBefore = scores.length ? (lower ? Math.min(...scores) : Math.max(...scores)) : lower ? Number.POSITIVE_INFINITY : 0;
 
@@ -209,7 +211,7 @@ export class SupabaseBackend implements BackendStore {
     const played = [...new Set((today ?? []).map((r: { game_id: string }) => r.game_id))];
 
     const rewards = computeRunRewards({
-      gameId: input.session.gameId,
+      gameId: resolvedGameId,
       mode: input.mode,
       score: input.score,
       durationMs: input.durationMs,
@@ -229,48 +231,80 @@ export class SupabaseBackend implements BackendStore {
       questCompleted: profile.questCompleted,
     });
 
+    if (input.session) {
+      const { data: rpc, error: rpcError } = await sb.rpc("finalize_game_run", {
+        p_session_id: input.session.id,
+        p_identity_user_id: input.identity.userId,
+        p_identity_anonymous_id: input.identity.anonymousId,
+        p_mode: input.mode,
+        p_score: input.score,
+        p_duration_ms: input.durationMs,
+        p_result: input.result ?? "finish",
+        p_verified: input.verified,
+        p_metadata: input.metadata,
+        p_progression: {
+          newXp: rewards.newXp,
+          newLevel: rewards.newLevel,
+          achievements: rewards.achievements,
+          questsCompleted: rewards.questsCompleted,
+          questProgress: rewards.questProgress,
+        },
+        p_flag_reasons: input.flagReasons ?? [],
+        p_game_version: input.gameVersion ?? input.session.gameVersion,
+        p_build_sha: input.buildSha ?? commitSha(),
+        p_offline: Boolean(input.offline),
+        p_client_started_at: input.clientStartedAt ? new Date(input.clientStartedAt).toISOString() : null,
+        p_client_ended_at: input.clientEndedAt ? new Date(input.clientEndedAt).toISOString() : null,
+      });
+      if (rpcError) throw new Error(rpcError.message.includes("forbidden") ? "forbidden" : "score_insert_failed");
+      const payload = rpc as { alreadyApplied?: boolean; scoreId?: string };
+      return {
+        alreadyApplied: Boolean(payload.alreadyApplied),
+        score: {
+          id: payload.scoreId ?? crypto.randomUUID(),
+          sessionId: input.session.id,
+          userId: input.identity.userId,
+          anonymousId: input.identity.anonymousId,
+          gameId: resolvedGameId,
+          mode: input.mode,
+          score: input.score,
+          metadata: input.metadata,
+          createdAt: Date.now(),
+          verified: input.verified,
+          offlineSubmission: Boolean(input.offline),
+        },
+        progression: {
+          xpEarned: payload.alreadyApplied ? 0 : rewards.xpEarned,
+          newLevel: rewards.newLevel,
+          newXp: rewards.newXp,
+          achievements: payload.alreadyApplied ? [] : rewards.achievements,
+          questsCompleted: payload.alreadyApplied ? [] : rewards.questsCompleted,
+        },
+      };
+    }
+
     const { data: scoreRow, error } = await sb
       .from("scores")
       .insert({
         user_id: input.identity.userId,
         anonymous_id: input.identity.anonymousId,
-        game_id: input.session.gameId,
+        game_id: resolvedGameId,
         mode: input.mode,
         score: input.score,
         metadata: input.metadata,
-        verified_status: input.verified,
-        session_id: input.session.id,
+        verified_status: input.verified === "flagged" ? "flagged" : "unverified",
+        session_id: null,
+        offline_submission: true,
+        flag_reasons: input.flagReasons ?? [],
+        game_version: input.gameVersion,
+        build_sha: input.buildSha ?? commitSha(),
+        client_started_at: input.clientStartedAt ? new Date(input.clientStartedAt).toISOString() : null,
+        client_ended_at: input.clientEndedAt ? new Date(input.clientEndedAt).toISOString() : null,
+        local_session_id: input.localSessionId ?? null,
       })
       .select("*")
       .single();
     if (error || !scoreRow) throw new Error("score_insert_failed");
-
-    await sb
-      .from("game_sessions")
-      .update({
-        ended_at: new Date().toISOString(),
-        duration_ms: input.durationMs,
-        score: input.score,
-        result: input.result ?? "finish",
-        metadata: input.metadata,
-      })
-      .eq("id", input.session.id);
-
-    if (input.identity.userId) {
-      await sb.from("profiles").update({ xp: rewards.newXp, level: rewards.newLevel, last_seen_at: new Date().toISOString() }).eq("user_id", input.identity.userId);
-      for (const id of rewards.achievements) {
-        await sb.from("player_achievements").upsert({ user_id: input.identity.userId, achievement_id: id });
-      }
-      for (const [questId, progress] of Object.entries(rewards.questProgress)) {
-        const completed = rewards.questsCompleted.includes(questId);
-        await sb.from("quest_progress").upsert({
-          quest_id: questId,
-          user_id: input.identity.userId,
-          progress,
-          completed_at: completed ? new Date().toISOString() : null,
-        });
-      }
-    }
 
     return {
       alreadyApplied: false,
@@ -285,6 +319,7 @@ export class SupabaseBackend implements BackendStore {
         metadata: scoreRow.metadata ?? {},
         createdAt: new Date(scoreRow.created_at).getTime(),
         verified: scoreRow.verified_status,
+        offlineSubmission: true,
       },
       progression: {
         xpEarned: rewards.xpEarned,
@@ -298,37 +333,14 @@ export class SupabaseBackend implements BackendStore {
 
   async leaderboard(gameId: string, mode: string, limit: number): Promise<LeaderboardEntry[]> {
     const sb = admin();
-    const lower = lowerIsBetter(gameId);
-    const { data } = await sb
-      .from("scores")
-      .select("score, created_at, user_id, verified_status, profiles!inner(username, display_name, avatar, is_seed)")
-      .eq("game_id", gameId)
-      .eq("mode", mode)
-      .eq("verified_status", "verified")
-      .eq("profiles.is_seed", false)
-      .not("user_id", "is", null)
-      .order("score", { ascending: lower })
-      .limit(400);
-    const best = new Map<string, { score: number; created_at: string; username: string; display_name: string; avatar: string }>();
-    for (const row of data ?? []) {
-      const p = row.profiles as unknown as { username: string; display_name: string; avatar: string; is_seed: boolean };
-      if (!row.user_id || p.is_seed) continue;
-      const cur = best.get(row.user_id);
-      if (!cur || (lower ? row.score < cur.score : row.score > cur.score)) {
-        best.set(row.user_id, {
-          score: row.score,
-          created_at: row.created_at,
-          username: p.username,
-          display_name: p.display_name,
-          avatar: p.avatar,
-        });
-      }
-    }
-    return [...best.values()]
-      .sort((a, b) => (lower ? a.score - b.score : b.score - a.score))
-      .slice(0, limit)
-      .map((row, i) => ({
-        rank: i + 1,
+    const { data, error } = await sb.rpc("best_verified_scores", {
+      p_game_id: gameId,
+      p_mode: mode,
+      p_limit: limit,
+    });
+    if (!error && data) {
+      return (data as Array<{ rank: number; display_name: string; username: string; avatar: string; score: number; created_at: string }>).map((row) => ({
+        rank: row.rank,
         displayName: row.display_name,
         username: row.username,
         avatar: row.avatar,
@@ -336,10 +348,36 @@ export class SupabaseBackend implements BackendStore {
         verified: true,
         timestamp: row.created_at,
       }));
+    }
+
+    const lower = lowerIsBetter(gameId);
+    const { data: fallback } = await sb
+      .from("public_scores")
+      .select("score, created_at, username, display_name, avatar")
+      .eq("game_id", gameId)
+      .eq("mode", mode)
+      .order("score", { ascending: lower })
+      .limit(limit);
+    return (fallback ?? []).map((row: { score: number; created_at: string; username: string; display_name: string; avatar: string }, i: number) => ({
+      rank: i + 1,
+      displayName: row.display_name,
+      username: row.username,
+      avatar: row.avatar,
+      score: row.score,
+      verified: true,
+      timestamp: row.created_at,
+    }));
   }
 
   async personalRank(identity: Identity, gameId: string, mode: string) {
     if (!identity.userId) return null;
+    const sb = admin();
+    const { data, error } = await sb.rpc("personal_verified_rank", {
+      p_user_id: identity.userId,
+      p_game_id: gameId,
+      p_mode: mode,
+    });
+    if (!error && typeof data === "number") return data;
     const board = await this.leaderboard(gameId, mode, 100);
     const profile = await this.getOrCreateProfile(identity);
     return board.find((r) => r.username === profile.username)?.rank ?? null;
@@ -347,11 +385,12 @@ export class SupabaseBackend implements BackendStore {
 
   async upsertPresence(identity: Identity, status: import("@gamesweb/database").PresenceStatus, gameId: string | null) {
     if (!identity.userId) return;
+    const profile = await this.getOrCreateProfile(identity);
     const sb = admin();
     await sb.from("presence").upsert({
       user_id: identity.userId,
       status,
-      game_id: gameId,
+      game_id: profile.shareActivity ? gameId : null,
       updated_at: new Date().toISOString(),
     });
   }
@@ -428,51 +467,50 @@ export class SupabaseBackend implements BackendStore {
       .from("friendships")
       .select("requester_id, addressee_id, status")
       .or(`requester_id.eq.${identity.userId},addressee_id.eq.${identity.userId}`);
-    const ids = [...new Set((data ?? []).flatMap((f: { requester_id: string; addressee_id: string }) => [f.requester_id, f.addressee_id]))].filter(
+    const visible = (data ?? []).filter((f: { status: string }) => f.status !== "blocked");
+    const ids = [...new Set(visible.flatMap((f: { requester_id: string; addressee_id: string }) => [f.requester_id, f.addressee_id]))].filter(
       (id) => id !== identity.userId,
     );
     const { data: profiles } = ids.length ? await sb.from("profiles").select("user_id, username, display_name, avatar, share_activity").in("user_id", ids) : { data: [] };
     const { data: presence } = ids.length ? await sb.from("presence").select("*").in("user_id", ids) : { data: [] };
     const pmap = new Map((profiles ?? []).map((p: { user_id: string }) => [p.user_id, p]));
     const prmap = new Map((presence ?? []).map((p: { user_id: string }) => [p.user_id, p]));
-    return (data ?? [])
-      .filter((f: { status: string; requester_id: string }) => f.status !== "blocked" || f.requester_id === identity.userId)
-      .map((f: { requester_id: string; addressee_id: string; status: string }) => {
-        const otherId = f.requester_id === identity.userId ? f.addressee_id : f.requester_id;
-        const p = pmap.get(otherId) as
-          | { username: string; display_name: string; avatar: string; share_activity: boolean }
-          | undefined;
-        const pr = prmap.get(otherId) as { status: string; game_id: string | null; updated_at: string } | undefined;
-        const stale = !pr || Date.now() - new Date(pr.updated_at).getTime() > PRESENCE_STALE_MS;
-        const status =
-          f.status === "blocked"
-            ? ("blocked" as const)
-            : f.status === "accepted"
-              ? ("accepted" as const)
-              : f.requester_id === identity.userId
-                ? ("pending-out" as const)
-                : ("pending-in" as const);
-        return {
-          userId: otherId,
-          username: p?.username ?? "player",
-          displayName: p?.display_name ?? "Player",
-          avatar: p?.avatar ?? "orb-0",
-          status,
-          presence: (stale || !p?.share_activity ? "offline" : pr?.status) as "online" | "away" | "playing" | "offline",
-          gameId: stale || !p?.share_activity ? undefined : (pr?.game_id ?? undefined),
-        };
-      });
+    return visible.map((f: { requester_id: string; addressee_id: string; status: string }) => {
+      const otherId = f.requester_id === identity.userId ? f.addressee_id : f.requester_id;
+      const p = pmap.get(otherId) as
+        | { username: string; display_name: string; avatar: string; share_activity: boolean }
+        | undefined;
+      const pr = prmap.get(otherId) as { status: string; game_id: string | null; updated_at: string } | undefined;
+      const stale = !pr || Date.now() - new Date(pr.updated_at).getTime() > PRESENCE_STALE_MS;
+      const status =
+        f.status === "accepted"
+          ? ("accepted" as const)
+          : f.requester_id === identity.userId
+            ? ("pending-out" as const)
+            : ("pending-in" as const);
+      return {
+        userId: otherId,
+        username: p?.username ?? "player",
+        displayName: p?.display_name ?? "Player",
+        avatar: p?.avatar ?? "orb-0",
+        status,
+        presence: (stale || !p?.share_activity ? "offline" : pr?.status) as "online" | "away" | "playing" | "offline",
+        gameId: stale || !p?.share_activity ? undefined : (pr?.game_id ?? undefined),
+      };
+    });
   }
 
   async searchUsers(identity: Identity, q: string) {
     const sb = admin();
+    const me = identity.userId ? await this.getOrCreateProfile(identity) : null;
     const { data } = await sb
       .from("public_profiles")
       .select("username, display_name, avatar")
       .ilike("username", `${q}%`)
-      .limit(8);
+      .limit(12);
     return (data ?? [])
-      .filter((p: { username: string }) => p.username !== identity.userId)
+      .filter((p: { username: string }) => p.username !== identity.userId && p.username !== me?.username)
+      .slice(0, 8)
       .map((p: { username: string; display_name: string; avatar: string }) => ({
         username: p.username,
         displayName: p.display_name,
@@ -539,8 +577,9 @@ export class SupabaseBackend implements BackendStore {
     return this.getOrCreateProfile(identity);
   }
 
-  async mergeGuest(identity: Identity, anonymousId: string, snapshot: GuestSnapshot) {
+  async mergeGuest(identity: Identity, input: { offlineRuns?: OfflineRun[] } = {}) {
     if (!identity.userId) return { error: "auth_required" };
+    const anonymousId = identity.anonymousId;
     const sb = admin();
     const { data: existing } = await sb.from("guest_migrations").select("anonymous_id").eq("anonymous_id", anonymousId).maybeSingle();
     if (existing) {
@@ -548,30 +587,63 @@ export class SupabaseBackend implements BackendStore {
     }
     const profile = await this.getOrCreateProfile(identity);
     const account = await this.accountProgress(identity.userId);
-    const merged = mergeGuestIntoAccount(account, snapshot);
-    await sb.from("profiles").update({ xp: merged.xp, level: levelFromXp(merged.xp).level, streak: merged.streak, is_guest: false, anonymous_id: anonymousId }).eq("user_id", identity.userId);
-    for (const id of merged.achievements) {
-      await sb.from("player_achievements").upsert({ user_id: identity.userId, achievement_id: id });
-    }
-    await sb.from("guest_migrations").insert({
-      anonymous_id: anonymousId,
-      user_id: identity.userId,
-      xp_before: account.xp,
-      xp_after: merged.xp,
+    const { data: guestScores } = await sb.from("scores").select("*").eq("anonymous_id", anonymousId).is("user_id", null);
+    const merged = mergeGuestIntoAccount(account, {
+      xp: 0,
+      achievements: [],
+      scores: (guestScores ?? []).map((s: { id: string; game_id: string; mode: string; score: number; created_at: string; verified_status: VerifiedStatus; metadata: Record<string, number | string | boolean> }) => ({
+        id: s.id,
+        gameId: s.game_id,
+        mode: s.mode,
+        score: s.score,
+        at: new Date(s.created_at).getTime(),
+        verified: s.verified_status,
+        metadata: s.metadata ?? {},
+      })),
     });
+    const { error } = await sb.rpc("merge_guest_progress", {
+      p_user_id: identity.userId,
+      p_anonymous_id: anonymousId,
+      p_xp: merged.xp,
+      p_level: levelFromXp(merged.xp).level,
+      p_streak: merged.streak,
+      p_achievements: merged.achievements,
+      p_quest_progress: merged.questProgress,
+      p_quest_completed: merged.questCompleted,
+      p_offline_runs: (input.offlineRuns ?? []).map((run) => ({
+        gameId: run.gameId,
+        mode: run.mode,
+        score: run.score,
+        metadata: run.metadata,
+        startedAt: run.startedAt,
+        endedAt: run.endedAt,
+        localSessionId: run.localSessionId,
+        gameVersion: run.gameVersion,
+      })),
+    });
+    if (error) return { error: "merge_failed" };
     return { ok: true as const, alreadyMerged: false, profile: { ...profile, xp: merged.xp, achievements: merged.achievements } };
   }
 
-  async getIdempotency(key: string) {
+  async getIdempotency(scope: string, key: string) {
     const sb = admin();
-    const { data } = await sb.from("idempotency_keys").select("status, response").eq("key", key).maybeSingle();
+    const { data } = await sb.from("idempotency_keys").select("status, response").eq("scope", scope).eq("key", key).maybeSingle();
     if (!data) return null;
     return { status: data.status, response: data.response };
   }
 
-  async putIdempotency(key: string, status: number, response: unknown) {
+  async putIdempotency(scope: string, key: string, endpoint: string, status: number, response: unknown, identity: Identity) {
     const sb = admin();
-    await sb.from("idempotency_keys").upsert({ key, endpoint: "api", status, response });
+    await sb.from("idempotency_keys").upsert({
+      scope,
+      key,
+      endpoint,
+      status,
+      response,
+      user_id: identity.userId,
+      anonymous_id: identity.anonymousId,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    });
   }
 
   async accountProgress(userId: string) {

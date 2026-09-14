@@ -23,8 +23,8 @@ function csp(n: string, dev: boolean) {
     .filter(Boolean)
     .join(" ");
   const script = dev
-    ? `'self' 'nonce-${n}' 'strict-dynamic' 'unsafe-eval' 'unsafe-inline'`
-    : `'self' 'nonce-${n}' 'strict-dynamic' 'unsafe-inline'`;
+    ? `'self' 'nonce-${n}' 'strict-dynamic' 'unsafe-eval'`
+    : `'self' 'nonce-${n}' 'strict-dynamic'`;
   return [
     `default-src 'self'`,
     `script-src ${script}`,
@@ -47,6 +47,7 @@ export async function middleware(req: NextRequest) {
   const n = nonce();
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-nonce", n);
+  requestHeaders.set("x-request-id", crypto.randomUUID());
   const dev = process.env.NODE_ENV !== "production";
   requestHeaders.set("Content-Security-Policy", csp(n, dev));
 

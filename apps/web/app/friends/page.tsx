@@ -25,6 +25,18 @@ export default function FriendsPage() {
       >
         Copy invite
       </button>
+      {player.pendingInvite && !player.friends.some((f) => f.username === player.pendingInvite) ? (
+        <div className="mt-6 max-w-xl rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4 py-4">
+          <p className="text-[15px]">{player.pendingInvite} invited you.</p>
+          {player.isGuest ? (
+            <p className="mt-1 text-[13px] text-[var(--text-dim)]">Save progress to add them as a friend.</p>
+          ) : (
+            <button type="button" className="mt-3 text-[13px] underline" onClick={() => void store.addPendingFriend()}>
+              Add friend
+            </button>
+          )}
+        </div>
+      ) : null}
       <ul className="mt-8 max-w-xl space-y-2">
         {player.friends.length === 0 ? (
           <li className="text-[14px] text-[var(--text-dim)]">Games are better with rivals.</li>

@@ -1,5 +1,6 @@
 import { LeaderboardQuerySchema, assertMode } from "@gamesweb/database";
 import { jsonError, jsonOk } from "@/lib/api/errors";
+import { getIdentity } from "@/lib/api/identity";
 import { getBackend } from "@/lib/backend";
 
 export async function GET(req: Request) {
@@ -17,17 +18,14 @@ export async function GET(req: Request) {
   const backend = getBackend();
   if (!backend) return jsonError("NOT_CONFIGURED", "Backend is not configured.", 503);
 
-  const rows = await backend.leaderboard(parsed.data.game, parsed.data.mode, parsed.data.limit);
+  const identity = await getIdentity();
+  const rank = await backend.personalRank(identity, parsed.data.game, parsed.data.mode);
   return jsonOk(
     {
       gameId: parsed.data.game,
       mode: parsed.data.mode,
-      rows,
+      personalRank: rank,
     },
-    {
-      headers: {
-        "Cache-Control": "public, s-maxage=15, stale-while-revalidate=30",
-      },
-    },
+    { headers: { "Cache-Control": "private, no-store" } },
   );
 }

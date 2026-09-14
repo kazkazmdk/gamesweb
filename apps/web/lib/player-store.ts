@@ -1,6 +1,8 @@
-import { analytics } from "@gamesweb/analytics";
+import { analytics, setAnalyticsContext } from "@gamesweb/analytics";
 import { brand, levelFromXp, storageKeys, xpRewards } from "@gamesweb/config";
 import { validateScore, type VerifiedStatus } from "@gamesweb/database";
+import { applyServerProgression } from "./player/progression-client";
+import { isValidInviteRef } from "./player/invite";
 import {
   allAchievements,
   dailyQuests,
@@ -80,6 +82,8 @@ export type PlayerSnapshot = {
   gamesPlayedToday: number;
   pendingSavePrompt: boolean;
   backend: "local" | "supabase";
+  pendingInvite: string | null;
+  syncStatus: "idle" | "saving" | "saved" | "offline" | "review";
 };
 
 const defaultAudio: AudioSettings = { master: 0.8, music: 0.45, sfx: 0.7, muted: false };
@@ -125,6 +129,8 @@ function emptyPlayer(id?: string): PlayerSnapshot {
     gamesPlayedToday: 0,
     pendingSavePrompt: false,
     backend: "local",
+    pendingInvite: null,
+    syncStatus: "idle",
   };
 }
 
@@ -155,6 +161,8 @@ export const SSR_PLAYER: PlayerSnapshot = {
   gamesPlayedToday: 0,
   pendingSavePrompt: false,
   backend: "local",
+  pendingInvite: null,
+  syncStatus: "idle",
 };
 
 type Listener = () => void;
@@ -176,6 +184,7 @@ class PlayerStore {
   private sessionId = uid();
   private ready = false;
   private queue: SyncOp[] = [];
+  private presenceTimer: number | null = null;
 
   subscribe(fn: Listener) {
     this.listeners.add(fn);
@@ -213,10 +222,12 @@ class PlayerStore {
       guest: this.snapshot.isGuest,
       level: levelFromXp(this.snapshot.xp).level,
     });
-    analytics.track("platform_loaded", { device: deviceClass() });
+    setAnalyticsContext({ player_session_id: this.sessionId, device: deviceClass() });
+    analytics.track("platform_loaded", { device: deviceClass(), player_session_id: this.sessionId });
     this.emit();
     void this.flush();
     void this.hydrateRemote();
+    this.startPresenceHeartbeat();
   }
 
   private rollDay() {
@@ -331,6 +342,7 @@ class PlayerStore {
       if (this.snapshot.isGuest) this.snapshot.pendingSavePrompt = true;
     }
     this.enqueue("score", { row, sessionId, gameId, payload, durationMs });
+    this.snapshot.syncStatus = typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "saving";
     this.persist();
     this.emit();
     void this.pushScore(gameId, payload, sessionId, durationMs, row);
@@ -360,10 +372,13 @@ class PlayerStore {
       });
       if (!res.ok) {
         analytics.track("score_rejected", { gameId, code: res.error.code });
-        if (res.status === 503) this.snapshot.backend = "local";
+        if (res.status === 503) {
+          this.snapshot.backend = "local";
+          this.snapshot.syncStatus = "offline";
+          this.toast({ kind: "info", title: "Saved locally" });
+        }
         if (res.error.code === "SESSION_MISSING") {
           const retry = await playerApi.submitScore({
-            sessionId,
             gameId,
             gameVersion: getManifest(gameId)?.version ?? "1.0.0",
             mode: payload.mode,
@@ -373,28 +388,43 @@ class PlayerStore {
             endedAt: Date.now(),
             metadata: payload.metadata,
             offline: true,
+            offlineSubmission: true,
+            localSessionId: sessionId,
             idempotencyKey: `score-offline:${sessionId}`,
           });
-          if (retry.ok) row.verified = retry.data.verification.status as VerifiedStatus;
+          if (retry.ok) {
+            row.verified = retry.data.verification.status as VerifiedStatus;
+            this.applyServerProgression(retry.data.progressionDiff);
+            this.snapshot.syncStatus = retry.data.verification.status === "unverified" ? "review" : "saved";
+          }
         }
         this.persist();
         this.emit();
         return;
       }
-      this.snapshot.backend = this.snapshot.backend;
       row.verified = res.data.verification.status as VerifiedStatus;
       if (res.data.verification.status === "flagged") {
         analytics.track("score_flagged", { gameId });
+        this.snapshot.syncStatus = "review";
+      } else if (res.data.verification.status === "unverified") {
+        this.snapshot.syncStatus = "review";
+      } else {
+        this.snapshot.syncStatus = "saved";
       }
-      const diff = res.data.progressionDiff;
-      for (const id of diff.achievements) {
-        if (!this.snapshot.achievements.includes(id)) this.snapshot.achievements = [...this.snapshot.achievements, id];
-      }
+      this.applyServerProgression(res.data.progressionDiff);
       this.persist();
       this.emit();
     } catch {
       analytics.track("sync_failed", { kind: "score" });
+      this.snapshot.syncStatus = "offline";
+      this.toast({ kind: "info", title: "Saved locally" });
+      this.persist();
+      this.emit();
     }
+  }
+
+  applyServerProgression(diff: { newXp: number; newLevel: number; achievements: string[]; questsCompleted: string[]; xpEarned: number }) {
+    this.snapshot = applyServerProgression(this.snapshot, diff);
   }
 
   async unlock(key: string) {
@@ -527,7 +557,6 @@ class PlayerStore {
                   startedAt: Date.parse(res.data.startedAt) || Date.now(),
                   version: res.data.gameVersion,
                 };
-                this.snapshot.backend = this.snapshot.backend;
               } else if (res.status === 503) {
                 this.snapshot.backend = "local";
               }
@@ -593,7 +622,6 @@ class PlayerStore {
             hooks.onHud(nums);
           }
           if (event.name === "game_retry") analytics.track("game_retry", { gameId });
-          if (event.name === "gameplay_started") analytics.track("gameplay_started", { gameId });
         },
       },
       pause: { request: () => hooks.onPause() },
@@ -640,22 +668,22 @@ class PlayerStore {
   }
 
   consumeRef(ref: string) {
-    if (!ref || ref === this.snapshot.username) return;
-    if (this.snapshot.friends.some((f) => f.username === ref)) return;
-    this.snapshot.friends = [
-      ...this.snapshot.friends,
-      {
-        id: uid(),
-        username: ref,
-        displayName: ref,
-        avatar: "orb-3",
-        status: "pending-out",
-        presence: "offline",
-      },
-    ];
+    if (!isValidInviteRef(ref, this.snapshot.username)) return;
+    this.snapshot.pendingInvite = ref;
     this.persist();
     this.emit();
-    if (!this.snapshot.isGuest) void playerApi.friendRequest(ref);
+  }
+
+  async addPendingFriend() {
+    const ref = this.snapshot.pendingInvite;
+    if (!ref || this.snapshot.isGuest) return;
+    const res = await playerApi.friendRequest(ref);
+    if (res.ok) {
+      this.snapshot.pendingInvite = null;
+      this.persist();
+      this.emit();
+      void this.hydrateRemote();
+    }
   }
 
   acceptFriend(id: string) {
@@ -694,20 +722,19 @@ class PlayerStore {
     const me = await playerApi.me();
     if (!me.ok) throw new Error("me");
     analytics.track("guest_merge_started");
-    const merge = await playerApi.merge(this.snapshot.id, {
-      xp: this.snapshot.xp,
-      achievements: this.snapshot.achievements,
-      scores: this.snapshot.scores,
-      saves: this.snapshot.saves,
-      questProgress: this.snapshot.questProgress,
-      questCompleted: this.snapshot.questCompleted,
-      stats: this.snapshot.stats,
-      history: this.snapshot.history,
-      username: this.snapshot.username,
-      displayName: this.snapshot.displayName,
-      avatar: this.snapshot.avatar,
-      streak: this.snapshot.streak,
-    });
+    const offlineRuns = this.snapshot.scores
+      .filter((s) => s.verified === "unverified")
+      .slice(0, 40)
+      .map((s) => ({
+        gameId: s.gameId,
+        mode: s.mode,
+        score: s.score,
+        durationMs: 0,
+        startedAt: s.at,
+        endedAt: s.at,
+        metadata: s.metadata,
+      }));
+    const merge = await playerApi.merge({ offlineRuns });
     if (!merge.ok && merge.status !== 503) throw new Error("merge");
     this.snapshot = {
       ...this.snapshot,
@@ -717,9 +744,8 @@ class PlayerStore {
       displayName: me.data.displayName,
       avatar: me.data.avatar,
       pendingSavePrompt: false,
-      backend: merge.ok ? "supabase" : this.snapshot.backend,
     };
-    if (merge.ok) this.snapshot.xp = Math.max(this.snapshot.xp, merge.data.xp);
+    if (merge.ok) this.snapshot.xp = merge.data.xp;
     analytics.identify(me.data.id, { username: me.data.username, guest: false });
     analytics.track("signup_completed");
     analytics.track("guest_merged");
@@ -762,8 +788,8 @@ class PlayerStore {
       const health = await fetch("/api/health");
       if (health.status === 503) this.snapshot.backend = "local";
       else if (health.ok) {
-        const info = (await health.json()) as { backend?: string };
-        this.snapshot.backend = info.backend === "supabase" ? "supabase" : "local";
+        const info = (await health.json()) as { persistence?: string };
+        this.snapshot.backend = info.persistence === "durable" ? "supabase" : "local";
       }
       for (const g of GAME_MANIFESTS) {
         const mode = g.id === "velocity-run" ? "course-1" : g.id === "swarm-protocol" ? "survival" : "circuit";
@@ -779,18 +805,33 @@ class PlayerStore {
           this.snapshot.backend = "local";
         }
       }
-      if (!this.snapshot.isGuest) {
+      const me = await playerApi.me();
+      if (me.ok && !me.data.isGuest) {
+        this.snapshot.authId = me.data.id;
+        this.snapshot.isGuest = false;
+        this.snapshot.username = me.data.username;
+        this.snapshot.displayName = me.data.displayName;
+        this.snapshot.avatar = me.data.avatar;
+        this.snapshot.xp = me.data.xp;
+        this.snapshot.achievements = me.data.achievements;
+        this.snapshot.questCompleted = me.data.questCompleted ?? this.snapshot.questCompleted;
+        this.snapshot.questProgress = me.data.questProgress ?? this.snapshot.questProgress;
+        this.snapshot.streak = me.data.streak ?? this.snapshot.streak;
+        this.snapshot.settings = { ...this.snapshot.settings, shareActivity: me.data.shareActivity };
+        analytics.identify(me.data.id, { username: me.data.username, guest: false });
         const friends = await playerApi.friends();
         if (friends.ok) {
-          this.snapshot.friends = friends.data.rows.map((f) => ({
-            id: f.userId,
-            username: f.username,
-            displayName: f.displayName,
-            avatar: f.avatar,
-            status: f.status === "pending-in" || f.status === "pending-out" || f.status === "accepted" ? f.status : "accepted",
-            presence: f.presence === "playing" || f.presence === "online" ? f.presence : "offline",
-            gameId: f.gameId,
-          }));
+          this.snapshot.friends = friends.data.rows
+            .filter((f) => f.status === "pending-in" || f.status === "pending-out" || f.status === "accepted")
+            .map((f) => ({
+              id: f.userId,
+              username: f.username,
+              displayName: f.displayName,
+              avatar: f.avatar,
+              status: f.status as Friend["status"],
+              presence: f.presence === "playing" || f.presence === "online" ? f.presence : "offline",
+              gameId: f.gameId,
+            }));
         }
       }
       this.persist();
@@ -800,7 +841,18 @@ class PlayerStore {
     }
   }
 
+  private startPresenceHeartbeat() {
+    if (typeof window === "undefined") return;
+    if (this.presenceTimer) window.clearInterval(this.presenceTimer);
+    const beat = () => {
+      if (this.snapshot.isGuest || !this.snapshot.settings.shareActivity) return;
+      void playerApi.presence("online", null);
+    };
+    this.presenceTimer = window.setInterval(beat, 45_000);
+  }
+
   private async presencePlaying(gameId: string) {
+    if (!this.snapshot.settings.shareActivity) return;
     void playerApi.presence("playing", gameId);
   }
 

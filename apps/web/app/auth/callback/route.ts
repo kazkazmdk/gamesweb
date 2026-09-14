@@ -4,17 +4,19 @@ import { cookies } from "next/headers";
 import { appUrl, supabasePublishableKey, supabaseUrl } from "@/lib/env";
 import { slog } from "@/lib/api/log";
 
+function safePath(raw: string | null): string {
+  if (!raw) return "/";
+  if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\") || raw.includes("://")) return "/";
+  return raw;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type");
+  const next = safePath(searchParams.get("next"));
   const origin = appUrl();
-  const safeNext = next.startsWith("/") ? next : "/";
-
-  if (!code) {
-    slog("auth_failure", { reason: "missing_code" });
-    return NextResponse.redirect(`${origin}/auth?error=missing_code`);
-  }
 
   const url = supabaseUrl();
   const key = supabasePublishableKey();
@@ -34,10 +36,22 @@ export async function GET(request: Request) {
     },
   });
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error) {
-    slog("auth_failure", { reason: "exchange" });
-    return NextResponse.redirect(`${origin}/auth?error=exchange`);
+  let errorName: string | null = null;
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) errorName = "exchange";
+  } else if (tokenHash && type) {
+    const otpType = type as "email" | "magiclink" | "recovery" | "invite" | "email_change" | "signup";
+    const { error } = await supabase.auth.verifyOtp({ type: otpType, token_hash: tokenHash });
+    if (error) errorName = "verify";
+  } else {
+    slog("auth_failure", { reason: "missing_code" });
+    return NextResponse.redirect(`${origin}/auth?error=missing_link`);
+  }
+
+  if (errorName) {
+    slog("auth_failure", { reason: errorName });
+    return NextResponse.redirect(`${origin}/auth?error=${errorName}`);
   }
 
   const {
@@ -48,5 +62,5 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/auth?error=session`);
   }
 
-  return NextResponse.redirect(`${origin}/auth/complete?next=${encodeURIComponent(safeNext)}`);
+  return NextResponse.redirect(`${origin}/auth/complete?next=${encodeURIComponent(next)}`);
 }

@@ -24,6 +24,8 @@ export async function GET() {
       streak: profile.streak,
       shareActivity: profile.shareActivity,
       achievements: profile.achievements,
+      questCompleted: profile.questCompleted,
+      questProgress: profile.questProgress,
     },
     { headers: { "Cache-Control": "private, no-store" } },
   );
