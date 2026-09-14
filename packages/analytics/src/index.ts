@@ -4,10 +4,13 @@ export const ANALYTICS_EVENTS = [
   "game_selected",
   "game_load_started",
   "game_loaded",
+  "game_boot_failed",
   "gameplay_started",
   "gameplay_ended",
   "game_retry",
   "score_submitted",
+  "score_rejected",
+  "score_flagged",
   "personal_best",
   "achievement_unlocked",
   "quest_progressed",
@@ -19,7 +22,16 @@ export const ANALYTICS_EVENTS = [
   "game_shared",
   "signup_started",
   "signup_completed",
+  "auth_failed",
+  "auth_completed",
   "guest_merged",
+  "guest_merge_started",
+  "guest_merge_completed",
+  "guest_merge_failed",
+  "sync_failed",
+  "api_error",
+  "fps_degraded",
+  "web_vital",
   "search_used",
   "recommendation_clicked",
 ] as const;
@@ -114,7 +126,7 @@ export function createPostHogAdapter(): AnalyticsAdapter {
         api_key: key,
         event,
         distinct_id: distinctId,
-        properties: { ...props, $lib: "gamesweb" },
+        properties: sanitize(props),
         timestamp: new Date().toISOString(),
       }),
       keepalive: true,
@@ -136,8 +148,31 @@ export function createPostHogAdapter(): AnalyticsAdapter {
   };
 }
 
+const BLOCKED_KEYS = /email|token|password|cookie|authorization|secret|save|payload/i;
+
+function sanitize(props?: AnalyticsProps): AnalyticsProps {
+  const out: AnalyticsProps = { $lib: "gamesweb" };
+  if (!props) return out;
+  for (const [key, value] of Object.entries(props)) {
+    if (BLOCKED_KEYS.test(key)) continue;
+    if (typeof value === "string" && value.includes("@") && value.includes(".")) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
 export function bootAnalytics() {
   if (typeof window === "undefined") return;
   const key = readEnv("NEXT_PUBLIC_POSTHOG_KEY");
+  const production = readEnv("NODE_ENV") === "production" || readEnv("VERCEL_ENV") === "production";
+  if (!key && production) {
+    initAnalytics({
+      track: () => undefined,
+      identify: () => undefined,
+      reset: () => undefined,
+      page: () => undefined,
+    });
+    return;
+  }
   initAnalytics(key ? createPostHogAdapter() : createConsoleAdapter());
 }

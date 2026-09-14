@@ -11,9 +11,9 @@ import {
   type GameManifest,
   type PlatformSDK,
   type PlayerView,
-  type QuestDefinition,
   type ScorePayload,
 } from "@gamesweb/game-sdk";
+import { playerApi } from "./player-api";
 
 export type StoredScore = {
   id: string;
@@ -159,13 +159,23 @@ export const SSR_PLAYER: PlayerSnapshot = {
 
 type Listener = () => void;
 
+type SyncOp = {
+  opId: string;
+  type: string;
+  payload: Record<string, unknown>;
+  retryCount: number;
+  ts: number;
+  idempotencyKey: string;
+};
+
 class PlayerStore {
   snapshot: PlayerSnapshot = SSR_PLAYER;
   toasts: Toast[] = [];
+  remoteBoards: Record<string, Array<{ name: string; score: number; isYou: boolean; verified?: boolean }>> = {};
   private listeners = new Set<Listener>();
   private sessionId = uid();
   private ready = false;
-  private queue: Array<Record<string, unknown>> = [];
+  private queue: SyncOp[] = [];
 
   subscribe(fn: Listener) {
     this.listeners.add(fn);
@@ -193,7 +203,7 @@ class PlayerStore {
         this.snapshot = emptyPlayer();
       }
       const q = localStorage.getItem(storageKeys.syncQueue);
-      if (q) this.queue = JSON.parse(q) as Array<Record<string, unknown>>;
+      if (q) this.queue = JSON.parse(q) as SyncOp[];
     } catch {
       this.snapshot = emptyPlayer();
     }
@@ -206,6 +216,7 @@ class PlayerStore {
     analytics.track("platform_loaded", { device: deviceClass() });
     this.emit();
     void this.flush();
+    void this.hydrateRemote();
   }
 
   private rollDay() {
@@ -319,10 +330,71 @@ class PlayerStore {
       if (this.snapshot.pbCount >= 3) await this.unlock("on-fire");
       if (this.snapshot.isGuest) this.snapshot.pendingSavePrompt = true;
     }
-    this.enqueue({ type: "score", row, sessionId });
+    this.enqueue("score", { row, sessionId, gameId, payload, durationMs });
     this.persist();
     this.emit();
+    void this.pushScore(gameId, payload, sessionId, durationMs, row);
     return { personalBest: improved, previous: Number.isFinite(prev) ? prev : 0 };
+  }
+
+  private async pushScore(
+    gameId: string,
+    payload: ScorePayload,
+    sessionId: string,
+    durationMs: number,
+    row: StoredScore,
+  ) {
+    try {
+      const res = await playerApi.submitScore({
+        sessionId,
+        gameId,
+        gameVersion: getManifest(gameId)?.version ?? "1.0.0",
+        mode: payload.mode,
+        score: payload.score,
+        durationMs,
+        startedAt: Date.now() - durationMs,
+        endedAt: Date.now(),
+        metadata: payload.metadata,
+        offline: typeof navigator !== "undefined" && !navigator.onLine,
+        idempotencyKey: `score:${sessionId}`,
+      });
+      if (!res.ok) {
+        analytics.track("score_rejected", { gameId, code: res.error.code });
+        if (res.status === 503) this.snapshot.backend = "local";
+        if (res.error.code === "SESSION_MISSING") {
+          const retry = await playerApi.submitScore({
+            sessionId,
+            gameId,
+            gameVersion: getManifest(gameId)?.version ?? "1.0.0",
+            mode: payload.mode,
+            score: payload.score,
+            durationMs,
+            startedAt: Date.now() - durationMs,
+            endedAt: Date.now(),
+            metadata: payload.metadata,
+            offline: true,
+            idempotencyKey: `score-offline:${sessionId}`,
+          });
+          if (retry.ok) row.verified = retry.data.verification.status as VerifiedStatus;
+        }
+        this.persist();
+        this.emit();
+        return;
+      }
+      this.snapshot.backend = this.snapshot.backend;
+      row.verified = res.data.verification.status as VerifiedStatus;
+      if (res.data.verification.status === "flagged") {
+        analytics.track("score_flagged", { gameId });
+      }
+      const diff = res.data.progressionDiff;
+      for (const id of diff.achievements) {
+        if (!this.snapshot.achievements.includes(id)) this.snapshot.achievements = [...this.snapshot.achievements, id];
+      }
+      this.persist();
+      this.emit();
+    } catch {
+      analytics.track("sync_failed", { kind: "score" });
+    }
   }
 
   async unlock(key: string) {
@@ -437,15 +509,40 @@ class PlayerStore {
 
   createPlatform(gameId: string, hooks: { onPause: () => void; onHud?: (p: Record<string, number>) => void }): PlatformSDK {
     let session = { id: uid(), gameId, startedAt: Date.now(), version: getManifest(gameId)?.version ?? "1.0.0" };
+    let sessionReady: Promise<void> = Promise.resolve();
     return {
       init: () => undefined,
       session: {
         start: () => {
           session = { id: uid(), gameId, startedAt: Date.now(), version: getManifest(gameId)?.version ?? "1.0.0" };
           analytics.track("gameplay_started", { gameId, sessionId: session.id });
+          void this.presencePlaying(gameId);
+          sessionReady = playerApi
+            .startSession({ gameId, gameVersion: session.version, device: deviceClass() })
+            .then((res) => {
+              if (res.ok) {
+                session = {
+                  id: res.data.sessionId,
+                  gameId,
+                  startedAt: Date.parse(res.data.startedAt) || Date.now(),
+                  version: res.data.gameVersion,
+                };
+                this.snapshot.backend = this.snapshot.backend;
+              } else if (res.status === 503) {
+                this.snapshot.backend = "local";
+              }
+            })
+            .catch(() => {
+              this.snapshot.backend = "local";
+            });
           return session;
         },
         end: async (result) => {
+          try {
+            await sessionReady;
+          } catch {
+            /* local session */
+          }
           const durationMs = Date.now() - session.startedAt;
           this.onRunEnd({
             gameId,
@@ -474,6 +571,9 @@ class PlayerStore {
         set: async (save) => {
           this.snapshot.saves[gameId] = save;
           this.persist();
+          if (!this.snapshot.isGuest) {
+            void playerApi.putSave(gameId, save.version, save.payload);
+          }
         },
       },
       player: { get: () => this.view() },
@@ -509,17 +609,11 @@ class PlayerStore {
       if (!cur || (lower ? r.score < cur.score : r.score > cur.score)) best.set("you", r);
     }
     const you = best.get("you");
-    const list = you
-      ? [{ name: this.snapshot.displayName, score: you.score, isYou: true }]
-      : [];
-    if (process.env.NEXT_PUBLIC_SHOW_SEED_DATA === "true") {
-      list.push(
-        { name: "RIVAL_01", score: seedScore(gameId, 1), isYou: false },
-        { name: "RIVAL_02", score: seedScore(gameId, 2), isYou: false },
-      );
-    }
-    list.sort((a, b) => (lower ? a.score - b.score : b.score - a.score));
-    return list.slice(0, 20);
+    const local = you ? [{ name: this.snapshot.displayName, score: you.score, isYou: true }] : [];
+    const remote = this.remoteBoards[`${gameId}:${mode ?? ""}`] ?? [];
+    const merged = [...remote.filter((r) => !r.isYou), ...local];
+    merged.sort((a, b) => (lower ? a.score - b.score : b.score - a.score));
+    return merged.slice(0, 20);
   }
 
   search(q: string) {
@@ -555,27 +649,32 @@ class PlayerStore {
         username: ref,
         displayName: ref,
         avatar: "orb-3",
-        status: "pending-in",
+        status: "pending-out",
         presence: "offline",
       },
     ];
     this.persist();
     this.emit();
+    if (!this.snapshot.isGuest) void playerApi.friendRequest(ref);
   }
 
   acceptFriend(id: string) {
+    const friend = this.snapshot.friends.find((f) => f.id === id);
     this.snapshot.friends = this.snapshot.friends.map((f) =>
       f.id === id ? { ...f, status: "accepted" as const, presence: "online" as const } : f,
     );
     analytics.track("friend_added");
     this.persist();
     this.emit();
+    if (friend && !this.snapshot.isGuest) void playerApi.friendAction(friend.id, "accept");
   }
 
   removeFriend(id: string) {
+    const friend = this.snapshot.friends.find((f) => f.id === id);
     this.snapshot.friends = this.snapshot.friends.filter((f) => f.id !== id);
     this.persist();
     this.emit();
+    if (friend && !this.snapshot.isGuest) void playerApi.friendAction(friend.id, "remove");
   }
 
   dismissSavePrompt() {
@@ -584,10 +683,54 @@ class PlayerStore {
     this.emit();
   }
 
-  async mergeAccount(authId: string, username: string) {
-    const guest = this.snapshot;
+  async updateProfileRemote(patch?: { shareActivity?: boolean; displayName?: string }) {
+    await playerApi.updateProfile({
+      displayName: patch?.displayName ?? this.snapshot.displayName,
+      shareActivity: patch?.shareActivity ?? this.snapshot.settings.shareActivity,
+    });
+  }
+
+  async completeAuth() {
+    const me = await playerApi.me();
+    if (!me.ok) throw new Error("me");
+    analytics.track("guest_merge_started");
+    const merge = await playerApi.merge(this.snapshot.id, {
+      xp: this.snapshot.xp,
+      achievements: this.snapshot.achievements,
+      scores: this.snapshot.scores,
+      saves: this.snapshot.saves,
+      questProgress: this.snapshot.questProgress,
+      questCompleted: this.snapshot.questCompleted,
+      stats: this.snapshot.stats,
+      history: this.snapshot.history,
+      username: this.snapshot.username,
+      displayName: this.snapshot.displayName,
+      avatar: this.snapshot.avatar,
+      streak: this.snapshot.streak,
+    });
+    if (!merge.ok && merge.status !== 503) throw new Error("merge");
     this.snapshot = {
-      ...guest,
+      ...this.snapshot,
+      authId: me.data.id,
+      isGuest: false,
+      username: me.data.username,
+      displayName: me.data.displayName,
+      avatar: me.data.avatar,
+      pendingSavePrompt: false,
+      backend: merge.ok ? "supabase" : this.snapshot.backend,
+    };
+    if (merge.ok) this.snapshot.xp = Math.max(this.snapshot.xp, merge.data.xp);
+    analytics.identify(me.data.id, { username: me.data.username, guest: false });
+    analytics.track("signup_completed");
+    analytics.track("guest_merged");
+    this.persist();
+    this.emit();
+    void this.hydrateRemote();
+  }
+
+  async mergeAccount(authId: string, username: string) {
+    this.snapshot = {
+      ...this.snapshot,
       authId,
       isGuest: false,
       username,
@@ -595,47 +738,92 @@ class PlayerStore {
       pendingSavePrompt: false,
     };
     analytics.track("guest_merged", { authId });
-    analytics.track("signup_completed");
     analytics.identify(authId, { username });
     this.persist();
     this.emit();
   }
 
-  private enqueue(op: Record<string, unknown>) {
-    this.queue.push({ ...op, at: Date.now() });
+  private enqueue(type: string, payload: Record<string, unknown>) {
+    const opId = uid();
+    this.queue.push({
+      opId,
+      type,
+      payload,
+      retryCount: 0,
+      ts: Date.now(),
+      idempotencyKey: `${type}:${String(payload.sessionId ?? opId)}`,
+    });
     this.persist();
     void this.flush();
+  }
+
+  async hydrateRemote() {
+    try {
+      const health = await fetch("/api/health");
+      if (health.status === 503) this.snapshot.backend = "local";
+      else if (health.ok) {
+        const info = (await health.json()) as { backend?: string };
+        this.snapshot.backend = info.backend === "supabase" ? "supabase" : "local";
+      }
+      for (const g of GAME_MANIFESTS) {
+        const mode = g.id === "velocity-run" ? "course-1" : g.id === "swarm-protocol" ? "survival" : "circuit";
+        const board = await playerApi.leaderboard(g.id, mode);
+        if (board.ok) {
+          this.remoteBoards[`${g.id}:${mode}`] = board.data.rows.map((r) => ({
+            name: r.displayName,
+            score: r.score,
+            isYou: r.username === this.snapshot.username,
+            verified: r.verified,
+          }));
+        } else if (board.status === 503) {
+          this.snapshot.backend = "local";
+        }
+      }
+      if (!this.snapshot.isGuest) {
+        const friends = await playerApi.friends();
+        if (friends.ok) {
+          this.snapshot.friends = friends.data.rows.map((f) => ({
+            id: f.userId,
+            username: f.username,
+            displayName: f.displayName,
+            avatar: f.avatar,
+            status: f.status === "pending-in" || f.status === "pending-out" || f.status === "accepted" ? f.status : "accepted",
+            presence: f.presence === "playing" || f.presence === "online" ? f.presence : "offline",
+            gameId: f.gameId,
+          }));
+        }
+      }
+      this.persist();
+      this.emit();
+    } catch {
+      analytics.track("sync_failed", { kind: "hydrate" });
+    }
+  }
+
+  private async presencePlaying(gameId: string) {
+    void playerApi.presence("playing", gameId);
   }
 
   async flush() {
     if (!this.queue.length) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    if (!url) {
-      this.snapshot.backend = "local";
-      return;
-    }
     const pending = [...this.queue];
     this.queue = [];
     try {
-      const res = await fetch("/api/player/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ player: this.snapshot, ops: pending }),
-      });
-      if (!res.ok) this.queue = [...pending, ...this.queue];
-      else this.snapshot.backend = "supabase";
+      const res = await playerApi.sync(pending);
+      if (!res.ok) {
+        if (res.status === 503) this.snapshot.backend = "local";
+        else analytics.track("sync_failed", { kind: "flush" });
+        this.queue = [...pending.map((p) => ({ ...p, retryCount: p.retryCount + 1 })), ...this.queue];
+      } else {
+        /* memory backend still applied ops */
+      }
     } catch {
+      analytics.track("sync_failed", { kind: "flush" });
       this.queue = [...pending, ...this.queue];
     }
     this.persist();
   }
-}
-
-function seedScore(gameId: string, n: number) {
-  if (gameId === "velocity-run") return 40000 + n * 3500;
-  if (gameId === "swarm-protocol") return 18000 - n * 2400;
-  return 42000 - n * 6000;
 }
 
 export function deviceClass() {

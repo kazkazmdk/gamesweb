@@ -10,14 +10,14 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
-  const configured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const configured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY));
+  const local = store.snapshot.backend === "local" || !configured;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     analytics.track("signup_started");
     if (!configured) {
-      const name = email.split("@")[0]?.replace(/[^a-z0-9]/gi, "").slice(0, 16) || "player";
-      await store.mergeAccount(crypto.randomUUID(), name);
+      setError("");
       setSent(true);
       return;
     }
@@ -27,10 +27,15 @@ export default function AuthPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      if (!res.ok) throw new Error("auth failed");
+      const data = (await res.json()) as { ok?: boolean; mode?: string; error?: { message: string } };
+      if (!res.ok || data.ok === false) {
+        analytics.track("auth_failed");
+        throw new Error(data.error?.message ?? "auth failed");
+      }
       setSent(true);
     } catch {
-      setError("Couldn't reach auth. Your local progress is still saved.");
+      analytics.track("auth_failed");
+      setError("Couldn't reach auth. Your local progress is still saved on this device.");
     }
   }
 
@@ -40,9 +45,14 @@ export default function AuthPage() {
       <p className="mt-3 text-[15px] text-[var(--text-dim)]">
         {brand.productName} keeps this device in sync first. An account is only for carrying records elsewhere.
       </p>
+      {local ? (
+        <p className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-[13px] text-[var(--text-dim)]">
+          Local development mode. Accounts need a configured Supabase project. Guest progress stays on this browser.
+        </p>
+      ) : null}
       {sent ? (
         <p className="mt-8 text-[15px]">
-          {configured ? "Check your email for a sign-in link. Guest runs merge on first login." : "Progress locked to this name on this device."}
+          {configured ? "Check your email for a sign-in link. Guest runs merge on first login." : "No account was created. Keep playing as a guest on this device."}
         </p>
       ) : (
         <form onSubmit={onSubmit} className="mt-8 space-y-4">
@@ -56,8 +66,8 @@ export default function AuthPage() {
               className="mt-1 h-12 w-full rounded-xl border border-[var(--line)] bg-transparent px-3"
             />
           </label>
-          <button type="submit" className="h-12 w-full rounded-full bg-[var(--text)] text-[var(--bg)]">
-            Continue
+          <button type="submit" className="h-12 w-full rounded-full bg-[var(--text)] text-[var(--bg)]" disabled={!configured}>
+            {configured ? "Continue" : "Unavailable in local mode"}
           </button>
           {error ? <p className="text-[13px] text-[var(--danger)]">{error}</p> : null}
         </form>

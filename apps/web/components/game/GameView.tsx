@@ -83,7 +83,9 @@ export function GameView({ slug }: { slug: string }) {
       };
     }
     let cleanupRo: () => void = () => undefined;
-    void boot();
+    void boot().catch(() => {
+      analytics.track("game_boot_failed", { gameId: game!.id });
+    });
     return () => {
       dead = true;
       window.clearInterval(t);

@@ -1,0 +1,136 @@
+import type {
+  AccountProgress,
+  DeviceClass,
+  FriendshipStatus,
+  GuestSnapshot,
+  LeaderboardEntry,
+  PresenceStatus,
+  ProgressionDiff,
+  VerifiedStatus,
+} from "@gamesweb/database";
+import type { Identity } from "@/lib/api/identity";
+
+export type StoredSession = {
+  id: string;
+  userId: string | null;
+  anonymousId: string | null;
+  gameId: string;
+  gameVersion: string;
+  device: DeviceClass;
+  startedAt: number;
+  endedAt: number | null;
+  durationMs: number | null;
+  score: number | null;
+  result: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type StoredScore = {
+  id: string;
+  sessionId: string;
+  userId: string | null;
+  anonymousId: string | null;
+  gameId: string;
+  mode: string;
+  score: number;
+  metadata: Record<string, number | string | boolean>;
+  createdAt: number;
+  verified: VerifiedStatus;
+};
+
+export type StoredProfile = {
+  userId: string;
+  anonymousId: string | null;
+  username: string;
+  displayName: string;
+  avatar: string;
+  xp: number;
+  streak: number;
+  isGuest: boolean;
+  shareActivity: boolean;
+  achievements: string[];
+  questProgress: Record<string, number>;
+  questCompleted: string[];
+  stats: Record<string, number>;
+  pbCount: number;
+  uniqueGamesToday: string[];
+  gamesPlayedToday: number;
+  dayKey: string;
+  playedGameIds: string[];
+};
+
+export type StoredFriend = {
+  requesterId: string;
+  addresseeId: string;
+  status: FriendshipStatus;
+  createdAt: number;
+};
+
+export type StoredPresence = {
+  userId: string;
+  status: PresenceStatus;
+  gameId: string | null;
+  updatedAt: number;
+};
+
+export type StoredSave = {
+  userId: string;
+  gameId: string;
+  version: string;
+  payload: Record<string, unknown>;
+  updatedAt: number;
+};
+
+export type ScoreWriteResult = {
+  score: StoredScore;
+  progression: ProgressionDiff;
+  alreadyApplied: boolean;
+};
+
+export type BackendStore = {
+  kind: "memory" | "supabase";
+  startSession(input: {
+    identity: Identity;
+    gameId: string;
+    gameVersion: string;
+    device: DeviceClass;
+  }): Promise<StoredSession>;
+  getSession(id: string): Promise<StoredSession | null>;
+  submitScore(input: {
+    identity: Identity;
+    session: StoredSession;
+    mode: string;
+    score: number;
+    durationMs: number;
+    result?: string;
+    metadata: Record<string, number | string | boolean>;
+    verified: VerifiedStatus;
+    offline?: boolean;
+  }): Promise<ScoreWriteResult>;
+  leaderboard(gameId: string, mode: string, limit: number): Promise<LeaderboardEntry[]>;
+  personalRank(identity: Identity, gameId: string, mode: string): Promise<number | null>;
+  upsertPresence(identity: Identity, status: PresenceStatus, gameId: string | null): Promise<void>;
+  listPresence(identity: Identity): Promise<Array<StoredPresence & { username: string; displayName: string; avatar: string }>>;
+  sendFriendRequest(identity: Identity, username: string): Promise<{ ok: true } | { error: string }>;
+  friendAction(identity: Identity, userId: string, action: "accept" | "decline" | "remove" | "block"): Promise<{ ok: true } | { error: string }>;
+  listFriends(identity: Identity): Promise<
+    Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatar: string;
+      status: "pending-out" | "pending-in" | "accepted" | "blocked";
+      presence: PresenceStatus;
+      gameId?: string;
+    }>
+  >;
+  searchUsers(identity: Identity, q: string): Promise<Array<{ username: string; displayName: string; avatar: string }>>;
+  getSave(identity: Identity, gameId: string): Promise<StoredSave | null>;
+  putSave(identity: Identity, save: Omit<StoredSave, "userId"> & { userId?: string }): Promise<StoredSave | { error: string }>;
+  getOrCreateProfile(identity: Identity): Promise<StoredProfile>;
+  updateProfile(identity: Identity, patch: Partial<Pick<StoredProfile, "username" | "displayName" | "avatar" | "shareActivity">>): Promise<StoredProfile | { error: string }>;
+  mergeGuest(identity: Identity, anonymousId: string, snapshot: GuestSnapshot): Promise<{ ok: true; profile: StoredProfile; alreadyMerged: boolean } | { error: string }>;
+  getIdempotency(key: string): Promise<{ status: number; response: unknown } | null>;
+  putIdempotency(key: string, status: number, response: unknown): Promise<void>;
+  accountProgress(userId: string): Promise<AccountProgress>;
+};

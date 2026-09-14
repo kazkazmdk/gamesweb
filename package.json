@@ -7,9 +7,15 @@
     "build": "pnpm --filter @gamesweb/web build",
     "start": "pnpm --filter @gamesweb/web start",
     "lint": "pnpm --filter @gamesweb/web lint",
-    "typecheck": "pnpm --filter @gamesweb/web typecheck"
+    "typecheck": "pnpm --filter @gamesweb/web typecheck",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.0",
+    "vitest": "3.2.4"
   }
 }

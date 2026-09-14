@@ -15,7 +15,12 @@ export default function SettingsPage() {
           <input
             className="mt-1 h-11 w-full rounded-xl border border-[var(--line)] bg-transparent px-3"
             value={player.displayName}
-            onChange={(e) => store.update({ displayName: e.target.value.slice(0, 24) })}
+              onChange={(e) => {
+                store.update({ displayName: e.target.value.slice(0, 24) });
+              }}
+              onBlur={() => {
+                if (!player.isGuest) void store.updateProfileRemote();
+              }}
           />
         </label>
         <fieldset>
@@ -64,7 +69,10 @@ export default function SettingsPage() {
           <input
             type="checkbox"
             checked={s.shareActivity}
-            onChange={(e) => store.update({ settings: { ...s, shareActivity: e.target.checked } })}
+              onChange={(e) => {
+                store.update({ settings: { ...s, shareActivity: e.target.checked } });
+                if (!player.isGuest) void store.updateProfileRemote({ shareActivity: e.target.checked });
+              }}
           />
           Share activity with friends
         </label>

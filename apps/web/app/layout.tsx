@@ -1,7 +1,7 @@
 import { brand } from "@gamesweb/config";
-import { GAME_MANIFESTS } from "@gamesweb/game-sdk";
 import type { Metadata, Viewport } from "next";
 import { Figtree, Syne } from "next/font/google";
+import { headers } from "next/headers";
 import { AppShell } from "@/components/shell/AppShell";
 import { PlayerProvider } from "@/lib/player";
 import "./globals.css";
@@ -38,8 +38,6 @@ export const metadata: Metadata = {
     title: brand.productName,
     description: brand.description,
   },
-  robots: { index: true, follow: true },
-  alternates: { canonical: "/" },
 };
 
 export const viewport: Viewport = {
@@ -49,20 +47,25 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebApplication",
     name: brand.productName,
     applicationCategory: "GameApplication",
     operatingSystem: "Web",
-    offers: GAME_MANIFESTS.map((g) => ({ "@type": "Offer", name: g.title })),
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+    },
   };
 
   return (
     <html lang="en" className={`${body.variable} ${display.variable}`}>
       <body className="ambient antialiased">
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         <div className="grain" aria-hidden />
         <PlayerProvider>
           <AppShell>{children}</AppShell>

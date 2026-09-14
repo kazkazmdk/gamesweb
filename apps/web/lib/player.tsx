@@ -1,6 +1,6 @@
 "use client";
 
-import { bootAnalytics } from "@gamesweb/analytics";
+import { bootAnalytics, analytics } from "@gamesweb/analytics";
 import { createContext, useContext, useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { store, SSR_PLAYER, type PlayerSnapshot, type Toast } from "./player-store";
 
@@ -14,6 +14,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (ref) store.consumeRef(ref);
     const onOnline = () => void store.flush();
     window.addEventListener("online", onOnline);
+    if ("PerformanceObserver" in window) {
+      try {
+        const po = new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            if (entry.name === "first-contentful-paint") {
+              analytics.track("web_vital", { name: "FCP", value: Math.round(entry.startTime) });
+            }
+          }
+        });
+        po.observe({ type: "paint", buffered: true });
+      } catch {
+        /* ignore */
+      }
+    }
     return () => window.removeEventListener("online", onOnline);
   }, []);
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;

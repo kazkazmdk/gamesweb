@@ -18,18 +18,8 @@ export function GameHub({ game }: { game: GameManifest }) {
   const board = store.leaderboard(game.id, mode);
   const friends = player.friends.filter((f) => f.gameId === game.id);
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "VideoGame",
-    name: game.title,
-    description: game.description,
-    genre: game.genre,
-    gamePlatform: "Web Browser",
-  };
-
   return (
     <article>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <section className="relative min-h-[70vh] overflow-hidden">
         <GameArt slug={game.slug} className="absolute inset-0 h-full w-full" />
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)] via-[color-mix(in_srgb,var(--bg)_25%,transparent)] to-transparent" />
@@ -51,6 +41,22 @@ export function GameHub({ game }: { game: GameManifest }) {
 
       <div className="grid gap-10 px-5 py-10 md:grid-cols-[1.3fr_.8fr] md:px-10">
         <div className="space-y-8">
+          <section>
+            <h2 className="text-[13px] uppercase tracking-[0.18em] text-[var(--text-faint)]">The game</h2>
+            <p className="mt-3 max-w-2xl text-[15px] text-[var(--text-dim)]">{game.description}</p>
+          </section>
+          <section>
+            <h2 className="text-[13px] uppercase tracking-[0.18em] text-[var(--text-faint)]">Features</h2>
+            <ul className="mt-3 flex flex-wrap gap-2 text-[13px]">
+              {game.tags.map((t) => (
+                <li key={t} className="rounded-full border border-[var(--line)] px-3 py-1">
+                  {t}
+                </li>
+              ))}
+              <li className="rounded-full border border-[var(--line)] px-3 py-1">{game.sessionHint}</li>
+              <li className="rounded-full border border-[var(--line)] px-3 py-1">{game.supportedDevices.join(" · ")}</li>
+            </ul>
+          </section>
           <section>
             <h2 className="text-[13px] uppercase tracking-[0.18em] text-[var(--text-faint)]">How to play</h2>
             <ul className="mt-3 space-y-2 text-[15px] text-[var(--text-dim)]">

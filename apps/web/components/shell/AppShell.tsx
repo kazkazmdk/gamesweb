@@ -91,6 +91,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
       </header>
+      {player.backend === "local" ? (
+        <p className="px-5 py-2 text-center text-[12px] text-[var(--text-faint)] md:px-8">
+          Local backend — progress stays on this device until Supabase is configured.
+        </p>
+      ) : null}
       <main className="pb-24 md:pb-16">{children}</main>
       <footer className="hidden border-t border-[var(--line)] px-8 py-6 text-[12px] text-[var(--text-faint)] md:flex md:gap-6">
         <Link href="/about">About</Link>
