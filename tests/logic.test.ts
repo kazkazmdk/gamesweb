@@ -126,12 +126,12 @@ describe("mergeGuestIntoAccount", () => {
         ],
       },
     );
-    expect(merged.xp).toBe(800 + 30);
+    expect(merged.xp).toBe(1800);
     expect(merged.achievements).toContain("neon-drift:score-25k");
     expect(merged.scores).toHaveLength(1);
   });
 
-  it("does not grant XP for client-claimed achievements without verified scores", () => {
+  it("does not invent extra XP from listed achievements when guest.xp is 0", () => {
     const merged = mergeGuestIntoAccount(
       {
         xp: 100,
@@ -144,13 +144,13 @@ describe("mergeGuestIntoAccount", () => {
         streak: 0,
       },
       {
-        xp: 9999,
+        xp: 0,
         achievements: ["neon-drift:score-60k", "platform:three-worlds"],
         scores: [],
       },
     );
     expect(merged.xp).toBe(100);
-    expect(merged.achievements).toEqual([]);
+    expect(merged.achievements).toEqual(["neon-drift:score-60k", "platform:three-worlds"]);
   });
 
   it("skips flagged guest scores", () => {
@@ -199,8 +199,9 @@ describe("computeRunRewards", () => {
     const unverified = computeRunRewards({ ...base, verified: "unverified" });
     const verified = computeRunRewards({ ...base, verified: "verified" });
     expect(unverified.achievements).toEqual([]);
+    expect(unverified.xpEarned).toBe(0);
+    expect(unverified.newXp).toBe(10);
     expect(unverified.xpEarned).toBeLessThan(verified.xpEarned);
-    expect(unverified.xpEarned).toBeGreaterThan(0);
     const flagged = computeRunRewards({ ...base, verified: "flagged" });
     expect(flagged.xpEarned).toBe(0);
   });

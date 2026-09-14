@@ -806,32 +806,41 @@ class PlayerStore {
         }
       }
       const me = await playerApi.me();
-      if (me.ok && !me.data.isGuest) {
-        this.snapshot.authId = me.data.id;
-        this.snapshot.isGuest = false;
-        this.snapshot.username = me.data.username;
-        this.snapshot.displayName = me.data.displayName;
-        this.snapshot.avatar = me.data.avatar;
-        this.snapshot.xp = me.data.xp;
-        this.snapshot.achievements = me.data.achievements;
-        this.snapshot.questCompleted = me.data.questCompleted ?? this.snapshot.questCompleted;
-        this.snapshot.questProgress = me.data.questProgress ?? this.snapshot.questProgress;
-        this.snapshot.streak = me.data.streak ?? this.snapshot.streak;
-        this.snapshot.settings = { ...this.snapshot.settings, shareActivity: me.data.shareActivity };
-        analytics.identify(me.data.id, { username: me.data.username, guest: false });
-        const friends = await playerApi.friends();
-        if (friends.ok) {
-          this.snapshot.friends = friends.data.rows
-            .filter((f) => f.status === "pending-in" || f.status === "pending-out" || f.status === "accepted")
-            .map((f) => ({
-              id: f.userId,
-              username: f.username,
-              displayName: f.displayName,
-              avatar: f.avatar,
-              status: f.status as Friend["status"],
-              presence: f.presence === "playing" || f.presence === "online" ? f.presence : "offline",
-              gameId: f.gameId,
-            }));
+      if (me.ok) {
+        const serverHasProgress = me.data.xp > 0 || (me.data.achievements?.length ?? 0) > 0;
+        if (!me.data.isGuest) {
+          this.snapshot.authId = me.data.id;
+          this.snapshot.isGuest = false;
+          this.snapshot.username = me.data.username;
+          this.snapshot.displayName = me.data.displayName;
+          this.snapshot.avatar = me.data.avatar;
+          this.snapshot.xp = me.data.xp;
+          this.snapshot.achievements = me.data.achievements;
+          this.snapshot.questCompleted = me.data.questCompleted ?? this.snapshot.questCompleted;
+          this.snapshot.questProgress = me.data.questProgress ?? this.snapshot.questProgress;
+          this.snapshot.streak = me.data.streak ?? this.snapshot.streak;
+          this.snapshot.settings = { ...this.snapshot.settings, shareActivity: me.data.shareActivity };
+          analytics.identify(me.data.id, { username: me.data.username, guest: false });
+          const friends = await playerApi.friends();
+          if (friends.ok) {
+            this.snapshot.friends = friends.data.rows
+              .filter((f) => f.status === "pending-in" || f.status === "pending-out" || f.status === "accepted")
+              .map((f) => ({
+                id: f.userId,
+                username: f.username,
+                displayName: f.displayName,
+                avatar: f.avatar,
+                status: f.status as Friend["status"],
+                presence: f.presence === "playing" || f.presence === "online" ? f.presence : "offline",
+                gameId: f.gameId,
+              }));
+          }
+        } else if (serverHasProgress) {
+          this.snapshot.xp = me.data.xp;
+          this.snapshot.achievements = me.data.achievements;
+          this.snapshot.questCompleted = me.data.questCompleted ?? this.snapshot.questCompleted;
+          this.snapshot.questProgress = me.data.questProgress ?? this.snapshot.questProgress;
+          this.snapshot.streak = me.data.streak ?? this.snapshot.streak;
         }
       }
       this.persist();

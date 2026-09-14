@@ -39,6 +39,22 @@ export class MemoryBackend implements BackendStore {
   migrations = new Map<string, string>();
   idempotency = new Map<string, { status: number; response: unknown }>();
   usernameIndex = new Map<string, string>();
+  private locks = new Map<string, Promise<void>>();
+
+  private async withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.locks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const next = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.locks.set(key, prev.then(() => next));
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }
 
   async startSession(input: {
     identity: Identity;
@@ -77,6 +93,10 @@ export class MemoryBackend implements BackendStore {
     return identity.userId ?? `guest:${identity.anonymousId}`;
   }
 
+  async getGuestProgress(anonymousId: string): Promise<StoredProfile> {
+    return this.getOrCreateProfile({ userId: null, anonymousId, email: null });
+  }
+
   async getOrCreateProfile(identity: Identity): Promise<StoredProfile> {
     const key = this.profileKey(identity);
     const existing = this.profiles.get(key);
@@ -110,6 +130,11 @@ export class MemoryBackend implements BackendStore {
   }
 
   async submitScore(input: SubmitScoreInput): Promise<ScoreWriteResult> {
+    const progressKey = `profile:${this.profileKey(input.identity)}`;
+    return this.withLock(progressKey, () => this.submitScoreLocked(input));
+  }
+
+  private async submitScoreLocked(input: SubmitScoreInput): Promise<ScoreWriteResult> {
     if (input.session) {
       if (assertSessionOwnership(input.session, input.identity) !== "ok") {
         throw Object.assign(new Error("forbidden"), { code: "FORBIDDEN" });
@@ -151,7 +176,7 @@ export class MemoryBackend implements BackendStore {
         ? Number.POSITIVE_INFINITY
         : 0;
 
-    const rewards = computeRunRewards({
+    const proposed = computeRunRewards({
       gameId: resolvedGameId,
       mode: input.mode,
       score: input.score,
@@ -172,16 +197,25 @@ export class MemoryBackend implements BackendStore {
       questCompleted: profile.questCompleted,
     });
 
-    profile.xp = rewards.newXp;
-    profile.achievements = [...new Set([...profile.achievements, ...rewards.achievements])];
-    profile.questProgress = rewards.questProgress;
-    profile.questCompleted = [...new Set([...profile.questCompleted, ...rewards.questsCompleted])];
-    profile.gamesPlayedToday += 1;
-    if (!profile.uniqueGamesToday.includes(resolvedGameId)) {
-      profile.uniqueGamesToday.push(resolvedGameId);
+    const xpEarned = Math.max(0, Math.min(2500, proposed.xpEarned));
+    profile.xp += xpEarned;
+    const newLevel = levelFromXp(profile.xp).level;
+    profile.achievements = [...new Set([...profile.achievements, ...proposed.achievements])];
+    profile.questProgress = proposed.questProgress;
+    profile.questCompleted = [...new Set([...profile.questCompleted, ...proposed.questsCompleted])];
+    if (input.verified === "verified") {
+      profile.gamesPlayedToday += 1;
+      if (!profile.uniqueGamesToday.includes(resolvedGameId)) {
+        profile.uniqueGamesToday.push(resolvedGameId);
+      }
+      if (!profile.playedGameIds.includes(resolvedGameId)) profile.playedGameIds.push(resolvedGameId);
+      if (proposed.pbImproved) profile.pbCount += 1;
+      profile.stats = {
+        ...profile.stats,
+        gamesPlayed: (profile.stats.gamesPlayed ?? 0) + 1,
+        pbCount: profile.pbCount,
+      };
     }
-    if (!profile.playedGameIds.includes(resolvedGameId)) profile.playedGameIds.push(resolvedGameId);
-    if (rewards.pbImproved) profile.pbCount += 1;
 
     const score: StoredScore = {
       id: crypto.randomUUID(),
@@ -210,11 +244,11 @@ export class MemoryBackend implements BackendStore {
       score,
       alreadyApplied: false,
       progression: {
-        xpEarned: rewards.xpEarned,
-        newLevel: rewards.newLevel,
-        newXp: rewards.newXp,
-        achievements: rewards.achievements,
-        questsCompleted: rewards.questsCompleted,
+        xpEarned,
+        newLevel,
+        newXp: profile.xp,
+        achievements: proposed.achievements,
+        questsCompleted: proposed.questsCompleted,
       },
     };
   }
@@ -325,28 +359,51 @@ export class MemoryBackend implements BackendStore {
     return { ok: true as const };
   }
 
-  async friendAction(identity: Identity, userId: string, action: "accept" | "decline" | "remove" | "block") {
+  async friendAction(
+    identity: Identity,
+    userId: string,
+    action: "accept" | "decline" | "remove" | "block" | "unblock",
+  ) {
+    if (!identity.userId) return { error: "auth_required" };
     const me = await this.getOrCreateProfile(identity);
+    const pair = (f: StoredFriend) =>
+      (f.requesterId === me.userId && f.addresseeId === userId) ||
+      (f.requesterId === userId && f.addresseeId === me.userId);
+
     if (action === "block") {
-      this.friends = this.friends.filter(
-        (f) => !(f.requesterId === me.userId && f.addresseeId === userId) && !(f.requesterId === userId && f.addresseeId === me.userId),
-      );
-      this.friends.push({ requesterId: me.userId, addresseeId: userId, status: "blocked", createdAt: Date.now() });
+      this.friends = this.friends.filter((f) => !(pair(f) && (f.status === "pending" || f.status === "accepted")));
+      const mine = this.friends.find((f) => f.requesterId === me.userId && f.addresseeId === userId && f.status === "blocked");
+      if (!mine) {
+        this.friends.push({ requesterId: me.userId, addresseeId: userId, status: "blocked", createdAt: Date.now() });
+      }
       return { ok: true as const };
     }
-    const row = this.friends.find(
-      (f) =>
-        (f.requesterId === me.userId && f.addresseeId === userId) ||
-        (f.requesterId === userId && f.addresseeId === me.userId),
-    );
+
+    if (action === "unblock") {
+      const mine = this.friends.find((f) => f.requesterId === me.userId && f.addresseeId === userId && f.status === "blocked");
+      if (!mine) return { error: "not_found" };
+      this.friends = this.friends.filter((f) => f !== mine);
+      return { ok: true as const };
+    }
+
+    const row = this.friends.find(pair);
     if (!row) return { error: "not_found" };
     if (row.status === "blocked") return { error: "blocked" };
+
     if (action === "accept") {
-      if (row.addresseeId !== me.userId) return { error: "forbidden" };
+      if (row.status !== "pending" || row.requesterId !== userId || row.addresseeId !== me.userId) {
+        return { error: "forbidden" };
+      }
       row.status = "accepted";
       return { ok: true as const };
     }
-    if (action === "decline" || action === "remove") {
+    if (action === "decline") {
+      if (row.status !== "pending" || row.addresseeId !== me.userId) return { error: "forbidden" };
+      this.friends = this.friends.filter((f) => f !== row);
+      return { ok: true as const };
+    }
+    if (action === "remove") {
+      if (row.status !== "accepted") return { error: "forbidden" };
       this.friends = this.friends.filter((f) => f !== row);
       return { ok: true as const };
     }
@@ -437,6 +494,15 @@ export class MemoryBackend implements BackendStore {
   async mergeGuest(identity: Identity, input: { offlineRuns?: OfflineRun[] } = {}) {
     if (!identity.userId) return { error: "auth_required" };
     const anonymousId = identity.anonymousId;
+    return this.withLock(`profile:${identity.userId}`, () =>
+      this.withLock(`profile:guest:${anonymousId}`, () => this.mergeGuestLocked(identity, input)),
+    );
+  }
+
+  private async mergeGuestLocked(identity: Identity, input: { offlineRuns?: OfflineRun[] } = {}) {
+    if (!identity.userId) return { error: "auth_required" };
+    const userId = identity.userId;
+    const anonymousId = identity.anonymousId;
     if (this.migrations.has(anonymousId)) {
       return { ok: true as const, alreadyMerged: true, profile: await this.getOrCreateProfile(identity) };
     }
@@ -473,8 +539,8 @@ export class MemoryBackend implements BackendStore {
         streak: profile.streak,
       },
       {
-        xp: 0,
-        achievements: [],
+        xp: guestProfile?.xp ?? 0,
+        achievements: guestProfile?.achievements ?? [],
         scores: guestScores.map((s) => ({
           id: s.id,
           gameId: s.gameId,
@@ -533,7 +599,7 @@ export class MemoryBackend implements BackendStore {
       this.scores.set(id, {
         id,
         sessionId: null,
-        userId: identity.userId,
+        userId,
         anonymousId,
         gameId: run.gameId,
         mode: run.mode,
@@ -546,7 +612,7 @@ export class MemoryBackend implements BackendStore {
     }
 
     if (guestProfile) this.profiles.delete(guestKey);
-    this.migrations.set(anonymousId, identity.userId);
+    this.migrations.set(anonymousId, userId);
     return { ok: true as const, alreadyMerged: false, profile };
   }
 

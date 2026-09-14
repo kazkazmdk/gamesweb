@@ -49,7 +49,7 @@ export const FriendRequestSchema = z.object({
 
 export const FriendActionSchema = z.object({
   userId: z.string().uuid(),
-  action: z.enum(["accept", "decline", "remove", "block"]),
+  action: z.enum(["accept", "decline", "remove", "block", "unblock"]),
 });
 
 export const ProfileUpdateSchema = z.object({

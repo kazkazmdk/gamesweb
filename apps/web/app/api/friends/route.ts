@@ -40,7 +40,17 @@ export async function POST(req: Request) {
   const action = FriendActionSchema.safeParse(parsed.data);
   if (action.success) {
     const result = await backend.friendAction(identity, action.data.userId, action.data.action);
-    if ("error" in result) return jsonError("CONFLICT", "Friend action failed.", 409);
+    if ("error" in result) {
+      const map: Record<string, [number, "NOT_FOUND" | "FORBIDDEN" | "UNAUTHORIZED" | "CONFLICT", string]> = {
+        not_found: [404, "NOT_FOUND", "Relationship not found."],
+        forbidden: [403, "FORBIDDEN", "Friend action is not allowed."],
+        blocked: [403, "FORBIDDEN", "Cannot change this relationship."],
+        auth_required: [401, "UNAUTHORIZED", "Sign in to manage friends."],
+        duplicate: [409, "CONFLICT", "Request already exists."],
+      };
+      const hit = map[result.error] ?? [409, "CONFLICT", "Friend action failed."] as const;
+      return jsonError(hit[1], hit[2], hit[0]);
+    }
     return jsonOk({ ok: true });
   }
 
@@ -51,15 +61,16 @@ export async function POST(req: Request) {
   }
   const result = await backend.sendFriendRequest(identity, request.data.username);
   if ("error" in result) {
-    const map: Record<string, [number, string]> = {
-      not_found: [404, "Player not found."],
-      self: [400, "You cannot friend yourself."],
-      duplicate: [409, "Request already exists."],
-      blocked: [403, "Cannot send this request."],
-      auth_required: [401, "Sign in to add friends."],
+    const map: Record<string, [number, "NOT_FOUND" | "INVALID_PAYLOAD" | "CONFLICT" | "FORBIDDEN" | "UNAUTHORIZED", string]> = {
+      not_found: [404, "NOT_FOUND", "Player not found."],
+      self: [400, "INVALID_PAYLOAD", "You cannot friend yourself."],
+      duplicate: [409, "CONFLICT", "Request already exists."],
+      blocked: [403, "FORBIDDEN", "Cannot send this request."],
+      forbidden: [403, "FORBIDDEN", "Friend action is not allowed."],
+      auth_required: [401, "UNAUTHORIZED", "Sign in to add friends."],
     };
-    const hit = map[result.error] ?? [400, "Friend request failed."];
-    return jsonError(hit[0] === 404 ? "NOT_FOUND" : hit[0] === 401 ? "UNAUTHORIZED" : "CONFLICT", hit[1], hit[0]);
+    const hit = map[result.error] ?? ([409, "CONFLICT", "Friend action failed."] as const);
+    return jsonError(hit[1], hit[2], hit[0]);
   }
   return jsonOk({ ok: true });
 }

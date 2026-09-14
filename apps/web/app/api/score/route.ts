@@ -106,6 +106,9 @@ export async function POST(req: Request) {
       scoreId: result.score.id,
       sessionId: session?.id ?? "offline",
       verification: check.status,
+      xpEarned: result.progression.xpEarned,
+      newXp: result.progression.newXp,
+      alreadyApplied: result.alreadyApplied,
     });
     await backend.putIdempotency(scope, idem, "score", 200, payload, identity);
     return jsonOk(payload);

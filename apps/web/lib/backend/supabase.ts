@@ -3,7 +3,7 @@ import {
   assertSessionOwnership,
   computeRunRewards,
   lowerIsBetter,
-  mergeGuestIntoAccount,
+  reconstructAchievementsFromScores,
   PRESENCE_STALE_MS,
   type LeaderboardEntry,
   type VerifiedStatus,
@@ -18,6 +18,57 @@ function admin() {
   const client = createSupabaseAdmin();
   if (!client) throw new Error("supabase_admin_missing");
   return client;
+}
+
+function emptyGuestProfile(anonymousId: string): StoredProfile {
+  return {
+    userId: `guest:${anonymousId}`,
+    anonymousId,
+    username: `guest_${anonymousId.replace(/-/g, "").slice(0, 6)}`,
+    displayName: "Player",
+    avatar: "orb-0",
+    xp: 0,
+    streak: 0,
+    isGuest: true,
+    shareActivity: true,
+    achievements: [],
+    questProgress: {},
+    questCompleted: [],
+    stats: {},
+    pbCount: 0,
+    uniqueGamesToday: [],
+    gamesPlayedToday: 0,
+    dayKey: utcDayKey(),
+    playedGameIds: [],
+  };
+}
+
+function guestFromRow(anonymousId: string, data: {
+  xp: number;
+  streak: number;
+  quest_progress: Record<string, number> | null;
+  quest_completed: string[] | null;
+  stats: Record<string, unknown> | null;
+  achievements: string[] | null;
+  migrated_at: string | null;
+}): StoredProfile {
+  const raw = data.stats ?? {};
+  const played = Array.isArray(raw.playedGameIds) ? (raw.playedGameIds as string[]) : [];
+  const stats: Record<string, number> = {
+    gamesPlayed: Number(raw.gamesPlayed ?? 0),
+    pbCount: Number(raw.pbCount ?? 0),
+  };
+  return {
+    ...emptyGuestProfile(anonymousId),
+    xp: data.xp,
+    streak: data.streak,
+    achievements: data.achievements ?? [],
+    questProgress: data.quest_progress ?? {},
+    questCompleted: data.quest_completed ?? [],
+    stats,
+    pbCount: stats.pbCount,
+    playedGameIds: played.filter((id) => typeof id === "string").slice(0, 8),
+  };
 }
 
 async function loadProfileRow(userId: string): Promise<StoredProfile | null> {
@@ -113,28 +164,16 @@ export class SupabaseBackend implements BackendStore {
     } satisfies StoredSession;
   }
 
+  async getGuestProgress(anonymousId: string): Promise<StoredProfile> {
+    const sb = admin();
+    const { data } = await sb.from("guest_progress").select("*").eq("anonymous_id", anonymousId).maybeSingle();
+    if (!data || data.migrated_at) return emptyGuestProfile(anonymousId);
+    return guestFromRow(anonymousId, data);
+  }
+
   async getOrCreateProfile(identity: Identity): Promise<StoredProfile> {
     if (!identity.userId) {
-      return {
-        userId: `guest:${identity.anonymousId}`,
-        anonymousId: identity.anonymousId,
-        username: `guest_${identity.anonymousId.replace(/-/g, "").slice(0, 6)}`,
-        displayName: "Player",
-        avatar: "orb-0",
-        xp: 0,
-        streak: 1,
-        isGuest: true,
-        shareActivity: true,
-        achievements: [],
-        questProgress: {},
-        questCompleted: [],
-        stats: {},
-        pbCount: 0,
-        uniqueGamesToday: [],
-        gamesPlayedToday: 0,
-        dayKey: utcDayKey(),
-        playedGameIds: [],
-      };
+      return this.getGuestProgress(identity.anonymousId);
     }
     const existing = await loadProfileRow(identity.userId);
     if (existing) return existing;
@@ -199,18 +238,20 @@ export class SupabaseBackend implements BackendStore {
     const scores = (prevRows ?? []).map((r: { score: number }) => r.score);
     const pbBefore = scores.length ? (lower ? Math.min(...scores) : Math.max(...scores)) : lower ? Number.POSITIVE_INFINITY : 0;
 
-    const { data: today } = input.identity.userId
-      ? await sb
+    const todayQuery = input.identity.userId
+      ? sb.from("scores").select("game_id, created_at").eq("user_id", input.identity.userId).gte("created_at", `${utcDayKey()}T00:00:00Z`)
+      : sb
           .from("scores")
           .select("game_id, created_at")
-          .eq("user_id", input.identity.userId)
-          .gte("created_at", `${utcDayKey()}T00:00:00Z`)
-      : { data: [] as Array<{ game_id: string }> };
+          .eq("anonymous_id", input.identity.anonymousId)
+          .is("user_id", null)
+          .gte("created_at", `${utcDayKey()}T00:00:00Z`);
+    const { data: today } = await todayQuery;
 
     const uniqueGamesToday = [...new Set((today ?? []).map((r: { game_id: string }) => r.game_id))];
-    const played = [...new Set((today ?? []).map((r: { game_id: string }) => r.game_id))];
+    const played = [...new Set([...(profile.playedGameIds ?? []), ...uniqueGamesToday])];
 
-    const rewards = computeRunRewards({
+    const proposed = computeRunRewards({
       gameId: resolvedGameId,
       mode: input.mode,
       score: input.score,
@@ -231,6 +272,18 @@ export class SupabaseBackend implements BackendStore {
       questCompleted: profile.questCompleted,
     });
 
+    const relativeProgression = {
+      xpEarned: Math.max(0, Math.min(2500, proposed.xpEarned)),
+      achievementsToUnlock: proposed.achievements.slice(0, 32),
+      questProgressUpdates: proposed.questProgress,
+      questsCompleted: proposed.questsCompleted.slice(0, 32),
+      pbImproved: proposed.pbImproved,
+      statsDelta: {
+        gamesPlayed: input.verified === "verified" ? 1 : 0,
+        pbCount: proposed.pbImproved ? 1 : 0,
+      },
+    };
+
     if (input.session) {
       const { data: rpc, error: rpcError } = await sb.rpc("finalize_game_run", {
         p_session_id: input.session.id,
@@ -242,13 +295,7 @@ export class SupabaseBackend implements BackendStore {
         p_result: input.result ?? "finish",
         p_verified: input.verified,
         p_metadata: input.metadata,
-        p_progression: {
-          newXp: rewards.newXp,
-          newLevel: rewards.newLevel,
-          achievements: rewards.achievements,
-          questsCompleted: rewards.questsCompleted,
-          questProgress: rewards.questProgress,
-        },
+        p_progression: relativeProgression,
         p_flag_reasons: input.flagReasons ?? [],
         p_game_version: input.gameVersion ?? input.session.gameVersion,
         p_build_sha: input.buildSha ?? commitSha(),
@@ -257,7 +304,16 @@ export class SupabaseBackend implements BackendStore {
         p_client_ended_at: input.clientEndedAt ? new Date(input.clientEndedAt).toISOString() : null,
       });
       if (rpcError) throw new Error(rpcError.message.includes("forbidden") ? "forbidden" : "score_insert_failed");
-      const payload = rpc as { alreadyApplied?: boolean; scoreId?: string };
+      const payload = rpc as {
+        alreadyApplied?: boolean;
+        scoreId?: string;
+        xpEarned?: number;
+        newXp?: number;
+        newLevel?: number;
+        achievementsApplied?: string[];
+        questsCompleted?: string[];
+      };
+      const newXp = typeof payload.newXp === "number" ? payload.newXp : profile.xp;
       return {
         alreadyApplied: Boolean(payload.alreadyApplied),
         score: {
@@ -274,11 +330,11 @@ export class SupabaseBackend implements BackendStore {
           offlineSubmission: Boolean(input.offline),
         },
         progression: {
-          xpEarned: payload.alreadyApplied ? 0 : rewards.xpEarned,
-          newLevel: rewards.newLevel,
-          newXp: rewards.newXp,
-          achievements: payload.alreadyApplied ? [] : rewards.achievements,
-          questsCompleted: payload.alreadyApplied ? [] : rewards.questsCompleted,
+          xpEarned: payload.alreadyApplied ? 0 : (payload.xpEarned ?? relativeProgression.xpEarned),
+          newLevel: payload.newLevel ?? levelFromXp(newXp).level,
+          newXp,
+          achievements: payload.alreadyApplied ? [] : (payload.achievementsApplied ?? proposed.achievements),
+          questsCompleted: payload.alreadyApplied ? [] : (payload.questsCompleted ?? proposed.questsCompleted),
         },
       };
     }
@@ -322,11 +378,11 @@ export class SupabaseBackend implements BackendStore {
         offlineSubmission: true,
       },
       progression: {
-        xpEarned: rewards.xpEarned,
-        newLevel: rewards.newLevel,
-        newXp: rewards.newXp,
-        achievements: rewards.achievements,
-        questsCompleted: rewards.questsCompleted,
+        xpEarned: 0,
+        newLevel: levelFromXp(profile.xp).level,
+        newXp: profile.xp,
+        achievements: [],
+        questsCompleted: [],
       },
     };
   }
@@ -433,31 +489,75 @@ export class SupabaseBackend implements BackendStore {
     return { ok: true as const };
   }
 
-  async friendAction(identity: Identity, userId: string, action: "accept" | "decline" | "remove" | "block") {
+  async friendAction(
+    identity: Identity,
+    userId: string,
+    action: "accept" | "decline" | "remove" | "block" | "unblock",
+  ) {
     if (!identity.userId) return { error: "auth_required" };
     const sb = admin();
+    const me = identity.userId;
+    const pairOr = `and(requester_id.eq.${me},addressee_id.eq.${userId}),and(requester_id.eq.${userId},addressee_id.eq.${me})`;
+
     if (action === "block") {
-      await sb.from("friendships").delete().or(
-        `and(requester_id.eq.${identity.userId},addressee_id.eq.${userId}),and(requester_id.eq.${userId},addressee_id.eq.${identity.userId})`,
-      );
-      await sb.from("friendships").insert({ requester_id: identity.userId, addressee_id: userId, status: "blocked" });
+      await sb.from("friendships").delete().in("status", ["pending", "accepted"]).or(pairOr);
+      const { error } = await sb.from("friendships").upsert({
+        requester_id: me,
+        addressee_id: userId,
+        status: "blocked",
+      });
+      if (error) return { error: "duplicate" };
       return { ok: true as const };
     }
+
+    if (action === "unblock") {
+      const { data } = await sb
+        .from("friendships")
+        .delete()
+        .eq("requester_id", me)
+        .eq("addressee_id", userId)
+        .eq("status", "blocked")
+        .select("requester_id");
+      if (!data?.length) return { error: "not_found" };
+      return { ok: true as const };
+    }
+
     if (action === "accept") {
       const { data } = await sb
         .from("friendships")
         .update({ status: "accepted" })
         .eq("requester_id", userId)
-        .eq("addressee_id", identity.userId)
+        .eq("addressee_id", me)
         .eq("status", "pending")
         .select("requester_id");
       if (!data?.length) return { error: "not_found" };
       return { ok: true as const };
     }
-    await sb.from("friendships").delete().or(
-      `and(requester_id.eq.${identity.userId},addressee_id.eq.${userId}),and(requester_id.eq.${userId},addressee_id.eq.${identity.userId})`,
-    );
-    return { ok: true as const };
+
+    if (action === "decline") {
+      const { data } = await sb
+        .from("friendships")
+        .delete()
+        .eq("requester_id", userId)
+        .eq("addressee_id", me)
+        .eq("status", "pending")
+        .select("requester_id");
+      if (!data?.length) return { error: "forbidden" };
+      return { ok: true as const };
+    }
+
+    if (action === "remove") {
+      const { data } = await sb
+        .from("friendships")
+        .delete()
+        .or(pairOr)
+        .eq("status", "accepted")
+        .select("requester_id");
+      if (!data?.length) return { error: "forbidden" };
+      return { ok: true as const };
+    }
+
+    return { error: "invalid" };
   }
 
   async listFriends(identity: Identity) {
@@ -581,35 +681,9 @@ export class SupabaseBackend implements BackendStore {
     if (!identity.userId) return { error: "auth_required" };
     const anonymousId = identity.anonymousId;
     const sb = admin();
-    const { data: existing } = await sb.from("guest_migrations").select("anonymous_id").eq("anonymous_id", anonymousId).maybeSingle();
-    if (existing) {
-      return { ok: true as const, alreadyMerged: true, profile: await this.getOrCreateProfile(identity) };
-    }
-    const profile = await this.getOrCreateProfile(identity);
-    const account = await this.accountProgress(identity.userId);
-    const { data: guestScores } = await sb.from("scores").select("*").eq("anonymous_id", anonymousId).is("user_id", null);
-    const merged = mergeGuestIntoAccount(account, {
-      xp: 0,
-      achievements: [],
-      scores: (guestScores ?? []).map((s: { id: string; game_id: string; mode: string; score: number; created_at: string; verified_status: VerifiedStatus; metadata: Record<string, number | string | boolean> }) => ({
-        id: s.id,
-        gameId: s.game_id,
-        mode: s.mode,
-        score: s.score,
-        at: new Date(s.created_at).getTime(),
-        verified: s.verified_status,
-        metadata: s.metadata ?? {},
-      })),
-    });
-    const { error } = await sb.rpc("merge_guest_progress", {
+    const { data: rpc, error } = await sb.rpc("merge_guest_progress", {
       p_user_id: identity.userId,
       p_anonymous_id: anonymousId,
-      p_xp: merged.xp,
-      p_level: levelFromXp(merged.xp).level,
-      p_streak: merged.streak,
-      p_achievements: merged.achievements,
-      p_quest_progress: merged.questProgress,
-      p_quest_completed: merged.questCompleted,
       p_offline_runs: (input.offlineRuns ?? []).map((run) => ({
         gameId: run.gameId,
         mode: run.mode,
@@ -622,7 +696,25 @@ export class SupabaseBackend implements BackendStore {
       })),
     });
     if (error) return { error: "merge_failed" };
-    return { ok: true as const, alreadyMerged: false, profile: { ...profile, xp: merged.xp, achievements: merged.achievements } };
+    const payload = rpc as { alreadyMerged?: boolean; newXp?: number };
+    const account = await this.accountProgress(identity.userId);
+    const extra = reconstructAchievementsFromScores(account.scores);
+    if (extra.length) {
+      await sb.from("player_achievements").upsert(
+        extra.map((achievement_id) => ({ user_id: identity.userId, achievement_id })),
+        { onConflict: "user_id,achievement_id", ignoreDuplicates: true },
+      );
+    }
+    const profile = await this.getOrCreateProfile(identity);
+    return {
+      ok: true as const,
+      alreadyMerged: Boolean(payload.alreadyMerged),
+      profile: {
+        ...profile,
+        xp: typeof payload.newXp === "number" ? payload.newXp : profile.xp,
+        achievements: [...new Set([...profile.achievements, ...extra])],
+      },
+    };
   }
 
   async getIdempotency(scope: string, key: string) {

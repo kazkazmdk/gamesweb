@@ -52,14 +52,11 @@ export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
   const pbImproved = isPersonalBest(ctx.gameId, ctx.score, ctx.pbBefore);
 
   if (ctx.verified === "unverified") {
-    const scale = Math.min(1, ctx.durationMs / (xpRewards.minRunSecondsForFullXp * 1000));
-    const xp = Math.round(Math.max(4, xpRewards.runComplete * 0.25 * scale));
-    const newXp = ctx.existingXp + xp;
-    const lv = levelFromXp(newXp);
+    const lv = levelFromXp(ctx.existingXp);
     return {
-      xpEarned: xp,
+      xpEarned: 0,
       newLevel: lv.level,
-      newXp,
+      newXp: ctx.existingXp,
       achievements: [],
       questsCompleted: [],
       questProgress: ctx.questProgress,

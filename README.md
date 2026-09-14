@@ -52,12 +52,17 @@ Never put the secret key in `NEXT_PUBLIC_*`. Production (`VERCEL_ENV=production`
 Code path implemented, **not integration-tested against a live Gamesweb Supabase project in this environment.**
 
 1. Create a project.
-2. Apply `supabase/migrations/0001_init.sql`, `0002_hardening.sql`, then `0003_quality_hardening.sql`.
+2. Apply `supabase/migrations/0001_init.sql`, `0002_hardening.sql`, `0003_quality_hardening.sql`, then `0004_authoritative_progression.sql`.
 3. Auth → URL configuration: add `https://<domain>/auth/callback` and local `http://localhost:3000/auth/callback`.
 4. Enable email magic link. The app uses `@supabase/ssr` `signInWithOtp` + `exchangeCodeForSession` (and `verifyOtp` for `token_hash` links).
 5. Optional: run `supabase/seed.sql` only in development.
+6. Optional live checks: `pnpm test:supabase` (no-ops with exit 0 unless URL + publishable + secret keys are set).
 
-RLS is enabled. Public clients can read catalogs and `public_profiles` / `public_scores`. Private tables are owner-only. Writes from the app go through Next.js with the secret key after identity checks.
+RLS is enabled. **GRANTS** are the write boundary: `anon` and `authenticated` have SELECT on catalogs, `public_profiles` / `public_scores`, and owner-only private rows. They do **not** have INSERT/UPDATE/DELETE on `profiles`, scores, sessions, achievements, quests, stats, friendships, presence, saves, cosmetics, guest migrations, idempotency keys, or `guest_progress`. Browser clients cannot `update({ xp: 999999 })` on their own profile. Writes go through Next.js with the secret key.
+
+`guest_progress` has no anon/authenticated SELECT. Guest identity is the `gw_guest` cookie on Next, never a Supabase anon client.
+
+CSP: Next hydration and Phaser still require a `'unsafe-inline'` script fallback alongside the nonce + `strict-dynamic` policy. Do not remove it before a dedicated CSP pass; it is documented, not accidental.
 
 ## Auth and guest merge
 
@@ -68,10 +73,10 @@ Merge rules:
 - Guest identity is the **server cookie**, never `body.anonymousId`.
 - Client snapshots / claimed achievements / claimed XP are not authority.
 - Server-side guest `game_sessions` and `scores` (same `anonymous_id`) transfer to `user_id`.
-- Achievements are reconstructed from **verified** scores.
-- XP is **not** `guest.xp + account.xp`. The account keeps its XP and gains XP only for newly reconstructed achievements.
-- Optional `offlineRuns` import as **unverified** guest data (no competitive rewards).
-- Each `anonymous_id` merges at most once (`guest_migrations`), inside `merge_guest_progress`.
+- Server-side `guest_progress` (XP, quests, stats, achievement projection) transfers in the same transaction.
+- **XP source:** `guest_progress.xp` is authoritative for the guest side (awarded run-by-run in `finalize_game_run`). Merge does `account.xp + guest.xp` once. Reconstructed achievements are unioned and do **not** add XP again.
+- Optional `offlineRuns` import as **unverified** guest data (0 competitive XP).
+- Each `anonymous_id` merges at most once (`guest_migrations` + row locks + advisory lock). `guest_progress.migrated_at` is set on success.
 
 ## Scores
 
@@ -84,9 +89,11 @@ Merge rules:
 
 Offline submissions do not invent a session with submit-time as start. They insert as `unverified` (`offline_submission = true`).
 
-Verified runs get full XP / PB / achievements / quests / leaderboard. Unverified runs get minimal run XP only. Flagged runs get 0.
+Verified runs get full XP / PB / achievements / quests / leaderboard. Unverified and offline runs persist the score and return `newXp = existingXp` (0 competitive XP). Flagged runs get 0. The client must not show a reward that was not committed.
 
-`finalize_game_run` writes score + session close + progression atomically when the RPC is applied.
+`finalize_game_run` locks the profile or `guest_progress` row `FOR UPDATE`, applies **relative** `xpEarned` to current XP, and returns the committed `{ scoreId, alreadyApplied, xpEarned, newXp, newLevel, achievementsApplied, questsCompleted }`. Node never writes an absolute `newXp` as authority. Two concurrent verified runs add; they do not last-write-wins.
+
+Idempotency keys carry `expires_at` (~7 days). There is no janitor in this beta; a future cron can `delete from idempotency_keys where expires_at < now()`.
 
 Public `GET /api/leaderboard` is cacheable and has **no** `personalRank`. Rank is `GET /api/leaderboard/me` (`private, no-store`).
 
@@ -118,6 +125,8 @@ pnpm test:e2e
 - Merge cannot ingest another player's cookie or a client-made XP snapshot.
 - Admin/service-role queries still authorize from the server session, not client-supplied user ids.
 - Production without Redis fails closed on rate limits and refuses to boot.
+- `anon` / `authenticated` cannot write XP, scores, achievements, quests, stats, or sessions.
+- Social: `remove` only deletes `accepted`. `unblock` only deletes a `blocked` row created by the caller. The blocked user cannot delete the other's block.
 
 ## Known limitations
 
@@ -127,7 +136,8 @@ pnpm test:e2e
 - Memory backend is single-process; do not use it as production persistence.
 - Anti-cheat is heuristic validation, not a trusted client.
 - Phaser games remain mechanically the launch versions.
+- `pnpm test:supabase` is the live grant/RLS script; without credentials it skips.
 
 ## Rollback
 
-Migration `0003_quality_hardening.sql` is additive. To roll back RPCs: drop `finalize_game_run`, `merge_guest_progress`, `best_verified_scores`, `personal_verified_rank`. Idempotency primary key becomes `(scope, key)` — restore from backup if you must revert that table.
+Migration `0004_authoritative_progression.sql` is additive. To roll back: drop `guest_progress`, restore `finalize_game_run` / `merge_guest_progress` from `0003`, and re-evaluate table GRANTs. Do not drop `guest_migrations`.

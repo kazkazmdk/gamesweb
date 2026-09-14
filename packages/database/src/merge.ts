@@ -48,9 +48,15 @@ export function achievementXp(id: string): number {
 }
 
 /**
- * Guest → account merge.
- * Client-claimed achievements/XP/quests are ignored. Competitive progress is
- * reconstructed from verified scores only. Unverified rows transfer as unverified.
+ * Guest → account merge (server snapshots only).
+ *
+ * XP rule: guest_progress.xp is authoritative for the guest side. It already
+ * includes run / achievement / quest XP awarded atomically per finalize.
+ * newXp = account.xp + guest.xp. Reconstructed achievements are unioned as a
+ * projection and must not add XP again.
+ *
+ * Callers must pass server guest_progress (or the memory guest profile), never
+ * a client-claimed snapshot. The merge API rejects body.anonymousId / snapshot.
  */
 export function mergeGuestIntoAccount(account: AccountProgress, guest: GuestSnapshot): AccountProgress {
   const seen = new Set(account.scores.map((s) => s.id));
@@ -66,13 +72,9 @@ export function mergeGuestIntoAccount(account: AccountProgress, guest: GuestSnap
   }
 
   const reconstructed = reconstructAchievementsFromScores(scores);
-  const accountSet = new Set(account.achievements);
-  const added = reconstructed.filter((id) => !accountSet.has(id));
-  const achievements = [...accountSet, ...added];
+  const achievements = [...new Set([...account.achievements, ...reconstructed, ...(guest.achievements ?? [])])];
 
-  let xp = account.xp;
-  for (const id of added) xp += achievementXp(id);
-  xp = Math.min(xp, 5_000_000);
+  const xp = Math.min(account.xp + Math.max(0, guest.xp), 5_000_000);
 
   const saves = { ...account.saves };
   for (const [gameId, save] of Object.entries(guest.saves ?? {})) {

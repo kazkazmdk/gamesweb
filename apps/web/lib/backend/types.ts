@@ -134,8 +134,13 @@ export type BackendStore = {
   personalRank(identity: Identity, gameId: string, mode: string): Promise<number | null>;
   upsertPresence(identity: Identity, status: PresenceStatus, gameId: string | null): Promise<void>;
   listPresence(identity: Identity): Promise<Array<StoredPresence & { username: string; displayName: string; avatar: string }>>;
+  getGuestProgress(anonymousId: string): Promise<StoredProfile>;
   sendFriendRequest(identity: Identity, username: string): Promise<{ ok: true } | { error: string }>;
-  friendAction(identity: Identity, userId: string, action: "accept" | "decline" | "remove" | "block"): Promise<{ ok: true } | { error: string }>;
+  friendAction(
+    identity: Identity,
+    userId: string,
+    action: "accept" | "decline" | "remove" | "block" | "unblock",
+  ): Promise<{ ok: true } | { error: string }>;
   listFriends(identity: Identity): Promise<
     Array<{
       userId: string;

@@ -77,7 +77,13 @@ describe("memory backend", () => {
     const second = await store.mergeGuest(authed);
     expect(first).toMatchObject({ ok: true, alreadyMerged: false });
     expect(second).toMatchObject({ ok: true, alreadyMerged: true });
-    if ("profile" in first) expect(first.profile.achievements).toContain("neon-drift:score-25k");
+    if ("profile" in first) {
+      expect(first.profile.achievements).toContain("neon-drift:score-25k");
+      expect(first.profile.xp).toBeGreaterThan(0);
+    }
+    const after = await store.getOrCreateProfile(authed);
+    const third = await store.mergeGuest(authed);
+    if ("profile" in third) expect(third.profile.xp).toBe(after.xp);
   });
 
   it("rejects guest B submitting guest A session", async () => {
@@ -133,6 +139,151 @@ describe("memory backend", () => {
     expect(friends.some((f) => f.userId === other.userId && f.status === "accepted")).toBe(false);
     expect(friends.some((f) => f.status === "blocked")).toBe(false);
   });
+
+  it("accumulates guest XP across two verified runs", async () => {
+    const store = new MemoryBackend();
+    const guest = { userId: null, anonymousId: "guest-xp-acc", email: null };
+    const run = async () => {
+      const session = await store.startSession({ identity: guest, gameId: "neon-drift", gameVersion: "1.0.0", device: "desktop" });
+      return store.submitScore({
+        identity: guest,
+        session,
+        gameId: "neon-drift",
+        mode: "circuit",
+        score: 12000,
+        durationMs: 40000,
+        metadata: { laps: 1, combo: 1, wallHits: 0 },
+        verified: "verified",
+      });
+    };
+    const first = await run();
+    expect(first.progression.xpEarned).toBeGreaterThan(0);
+    const second = await run();
+    expect(second.progression.newXp).toBe(first.progression.newXp + second.progression.xpEarned);
+    const me = await store.getGuestProgress("guest-xp-acc");
+    expect(me.xp).toBe(second.progression.newXp);
+    expect(me.xp).toBeGreaterThan(first.progression.newXp);
+  });
+
+  it("merges guest XP onto the account exactly once", async () => {
+    const store = new MemoryBackend();
+    const guest = { userId: null, anonymousId: "guest-merge-xp", email: null };
+    const session = await store.startSession({ identity: guest, gameId: "neon-drift", gameVersion: "1.0.0", device: "desktop" });
+    const run = await store.submitScore({
+      identity: guest,
+      session,
+      gameId: "neon-drift",
+      mode: "circuit",
+      score: 12000,
+      durationMs: 40000,
+      metadata: { laps: 1, combo: 1, wallHits: 0 },
+      verified: "verified",
+    });
+    const authed = {
+      userId: "33333333-3333-4333-8333-333333333333",
+      anonymousId: "guest-merge-xp",
+      email: null,
+    };
+    const accountXp = (await store.getOrCreateProfile(authed)).xp;
+    const first = await store.mergeGuest(authed);
+    const second = await store.mergeGuest(authed);
+    expect(first).toMatchObject({ ok: true, alreadyMerged: false });
+    expect(second).toMatchObject({ ok: true, alreadyMerged: true });
+    if ("profile" in first && "profile" in second) {
+      expect(first.profile.xp).toBe(accountXp + run.progression.newXp);
+      expect(second.profile.xp).toBe(first.profile.xp);
+    }
+  });
+
+  it("persists unverified scores with zero competitive XP", async () => {
+    const store = new MemoryBackend();
+    const guest = { userId: null, anonymousId: "guest-offline", email: null };
+    const before = await store.getGuestProgress("guest-offline");
+    const session = await store.startSession({ identity: guest, gameId: "neon-drift", gameVersion: "1.0.0", device: "desktop" });
+    const result = await store.submitScore({
+      identity: guest,
+      session,
+      gameId: "neon-drift",
+      mode: "circuit",
+      score: 18000,
+      durationMs: 40000,
+      metadata: { laps: 1, combo: 1, wallHits: 0 },
+      verified: "unverified",
+      offline: true,
+    });
+    expect(result.progression.xpEarned).toBe(0);
+    expect(result.progression.newXp).toBe(before.xp);
+    const me = await store.getGuestProgress("guest-offline");
+    expect(me.xp).toBe(result.progression.newXp);
+  });
+
+  it("adds concurrent verified run rewards instead of last-write-wins", async () => {
+    const store = new MemoryBackend();
+    const user = { userId: "44444444-4444-4444-8444-444444444444", anonymousId: "conc", email: null };
+    await store.getOrCreateProfile(user);
+    const mk = async () => {
+      const session = await store.startSession({ identity: user, gameId: "neon-drift", gameVersion: "1.0.0", device: "desktop" });
+      return store.submitScore({
+        identity: user,
+        session,
+        gameId: "neon-drift",
+        mode: "circuit",
+        score: 12100,
+        durationMs: 40000,
+        metadata: { laps: 1, combo: 1, wallHits: 0 },
+        verified: "verified",
+      });
+    };
+    const sequential = new MemoryBackend();
+    await sequential.getOrCreateProfile(user);
+    const s1 = await (async () => {
+      const session = await sequential.startSession({ identity: user, gameId: "neon-drift", gameVersion: "1.0.0", device: "desktop" });
+      return sequential.submitScore({
+        identity: user,
+        session,
+        gameId: "neon-drift",
+        mode: "circuit",
+        score: 12100,
+        durationMs: 40000,
+        metadata: { laps: 1, combo: 1, wallHits: 0 },
+        verified: "verified",
+      });
+    })();
+    const s2 = await (async () => {
+      const session = await sequential.startSession({ identity: user, gameId: "neon-drift", gameVersion: "1.0.0", device: "desktop" });
+      return sequential.submitScore({
+        identity: user,
+        session,
+        gameId: "neon-drift",
+        mode: "circuit",
+        score: 12100,
+        durationMs: 40000,
+        metadata: { laps: 1, combo: 1, wallHits: 0 },
+        verified: "verified",
+      });
+    })();
+    const [a, b] = await Promise.all([mk(), mk()]);
+    const conc = await store.getOrCreateProfile(user);
+    expect(conc.xp).toBe(s2.progression.newXp);
+    expect(a.progression.xpEarned + b.progression.xpEarned).toBe(s1.progression.xpEarned + s2.progression.xpEarned);
+    expect(conc.xp).toBe(s1.progression.xpEarned + s2.progression.xpEarned);
+  });
+
+  it("lets only the block owner unblock, and blocks cannot be removed by the target", async () => {
+    const store = new MemoryBackend();
+    const a = identity;
+    const b = { userId: "55555555-5555-4555-8555-555555555555", anonymousId: "blocked-target", email: null };
+    await store.getOrCreateProfile(a);
+    await store.getOrCreateProfile(b);
+    await store.sendFriendRequest(a, (await store.getOrCreateProfile(b)).username);
+    await store.friendAction(b, a.userId!, "accept");
+    await store.friendAction(a, b.userId!, "block");
+    expect(await store.friendAction(b, a.userId!, "remove")).toMatchObject({ error: "blocked" });
+    expect(await store.friendAction(b, a.userId!, "unblock")).toMatchObject({ error: "not_found" });
+    expect(await store.sendFriendRequest(b, (await store.getOrCreateProfile(a)).username)).toMatchObject({ error: "blocked" });
+    expect(await store.friendAction(a, b.userId!, "unblock")).toMatchObject({ ok: true });
+    expect(await store.sendFriendRequest(b, (await store.getOrCreateProfile(a)).username)).toMatchObject({ ok: true });
+  });
 });
 
 describe("rls sql", () => {
@@ -157,6 +308,24 @@ describe("quality hardening sql", () => {
     expect(sql).toContain("grant execute on function public.finalize_game_run");
     expect(sql).toContain("to service_role;");
     expect(sql).not.toMatch(/grant execute on function public\.finalize_game_run\([^)]+\) to anon/i);
+  });
+});
+
+describe("authoritative progression sql", () => {
+  it("revokes browser writes and adds guest_progress plus relative finalize", () => {
+    const sql = readFileSync(new URL("../supabase/migrations/0004_authoritative_progression.sql", import.meta.url), "utf8");
+    expect(sql).toContain("create table if not exists public.guest_progress");
+    expect(sql).toContain("revoke all on table public.profiles from public, anon, authenticated");
+    expect(sql).toContain("drop policy if exists \"profiles_update_own\"");
+    expect(sql).toContain("xpEarned");
+    expect(sql).toContain("for update");
+    expect(sql).toContain("guest_progress.xp");
+    expect(sql).toContain("grant execute on function public.finalize_game_run");
+    expect(sql).toContain("to service_role");
+    expect(sql).not.toMatch(/grant execute on function public\.finalize_game_run\([^)]+\) to anon/i);
+    expect(sql).toContain("pg_advisory_xact_lock");
+    expect(sql).toContain("status = 'accepted'");
+    expect(sql).toContain("Future cron");
   });
 });
 
