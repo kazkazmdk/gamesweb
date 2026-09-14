@@ -6,7 +6,7 @@ async function verifiedRun(
   request: {
     post: (url: string, opts: { headers: Record<string, string>; data: unknown }) => Promise<{ ok: () => boolean; json: () => Promise<Record<string, unknown>>; status: () => number }>;
   },
-  score = 18000,
+  score = 12000,
 ) {
   const sessionRes = await request.post("/api/session", {
     headers: { Origin: origin, "Content-Type": "application/json" },
@@ -14,6 +14,7 @@ async function verifiedRun(
   });
   expect(sessionRes.ok()).toBeTruthy();
   const session = await sessionRes.json();
+  const durationMs = 8000;
   const scoreRes = await request.post("/api/score", {
     headers: { Origin: origin, "Content-Type": "application/json" },
     data: {
@@ -22,14 +23,17 @@ async function verifiedRun(
       gameVersion: "1.0.0",
       mode: "circuit",
       score,
-      durationMs: 40000,
-      startedAt: Date.now() - 40000,
+      durationMs,
+      startedAt: Date.now() - durationMs,
       endedAt: Date.now(),
       metadata: { laps: 1, combo: 2, wallHits: 0 },
     },
   });
   expect(scoreRes.ok()).toBeTruthy();
-  return scoreRes.json();
+  const body = await scoreRes.json();
+  const verification = body.verification as { status?: string };
+  expect(verification.status).toBe("verified");
+  return body;
 }
 
 test("guest XP increases after a verified run and hydrates on /me", async ({ browser }) => {
@@ -72,8 +76,8 @@ test("same session twice awards XP once", async ({ browser }) => {
     gameVersion: "1.0.0",
     mode: "circuit",
     score: 15500,
-    durationMs: 40000,
-    startedAt: Date.now() - 40000,
+    durationMs: 8000,
+    startedAt: Date.now() - 8000,
     endedAt: Date.now(),
     metadata: { laps: 1, combo: 2, wallHits: 0 },
     idempotencyKey: `score:${session.sessionId}`,
@@ -86,9 +90,10 @@ test("same session twice awards XP once", async ({ browser }) => {
     headers: { Origin: origin, "Content-Type": "application/json" },
     data: payload,
   })).json();
+  expect(first.verification.status).toBe("verified");
+  expect(first.progressionDiff.xpEarned).toBeGreaterThan(0);
   expect(second.alreadyApplied).toBe(true);
-  expect(second.progressionDiff.xpEarned).toBe(0);
-  expect(second.progressionDiff.newXp).toBe(first.progressionDiff.newXp);
+  expect(second.scoreId).toBe(first.scoreId);
   const me = await (await ctx.request.get("/api/player/me")).json();
   expect(me.xp).toBe(first.progressionDiff.newXp);
   await ctx.close();
