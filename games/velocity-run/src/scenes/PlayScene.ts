@@ -3,7 +3,7 @@ import { clamp, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLo
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { velocityRunManifest } from "@gamesweb/game-sdk";
 import { COURSES, medalFor, nextMedalTarget, type Course, type Rect } from "../systems/courses";
-import { aabb, Runner } from "../systems/movement";
+import { aabb, MOVE, Runner } from "../systems/movement";
 import {
   GhostRecorder,
   ghostEnabled,
@@ -141,6 +141,7 @@ export class VelocityPlayScene extends Phaser.Scene {
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
       this.ensureAudio();
       if (this.handleChromeTap(p.x, p.y)) return;
+      if (!p.wasTouch) return;
       if (p.x < this.scale.width * 0.36) {
         this.touchMove = -1;
         this.movePointerId = p.id;
@@ -163,7 +164,6 @@ export class VelocityPlayScene extends Phaser.Scene {
       }
     });
 
-    this.platform.session.start();
     this.platform.events.emit({ name: "gameplay_started", props: { gameId: "velocity-run", course: this.course.id } });
     this.fitCam(this.scale.width, this.scale.height);
     this.scale.on("resize", (gs: Phaser.Structs.Size) => {
@@ -232,7 +232,6 @@ export class VelocityPlayScene extends Phaser.Scene {
         this.splitIndex = 0;
         this.splits = [];
         this.recorder.reset();
-        this.platform.session.start();
       }
       return;
     }
@@ -250,6 +249,7 @@ export class VelocityPlayScene extends Phaser.Scene {
     if (!this.running && (move !== 0 || jumpDown)) {
       this.running = true;
       this.startMs = this.time.now;
+      this.platform.session.start();
       this.shownHint = false;
       try {
         localStorage.setItem("gw:velocity-tutorial", "1");
@@ -263,13 +263,13 @@ export class VelocityPlayScene extends Phaser.Scene {
     if (!this.ended) {
       const wasGround = this.runner.grounded;
       this.runner.grounded = false;
+      if (wasGround) this.runner.coyote = this.time.now + MOVE.coyoteMs;
       this.runner.input(dt, move, jumpDown, jumpHeld, jumpReleased, down, this.time.now);
       this.collide();
       if (this.runner.grounded && !wasGround) {
         this.parts.burst(this.runner.x + 8, this.runner.y + 28, 6, this.course.theme.accent, 70, 200);
         this.synth.tone(220 + Math.random() * 30, 0.035, "triangle", 0.028, 0.08);
       }
-      if (wasGround && !this.runner.grounded) this.runner.coyote = this.time.now + 110;
       if (down && this.runner.vy > 80) void this.platform.achievement.unlock("fast-fall");
       if (this.running) this.timeMs = this.time.now - this.startMs;
       this.recorder.tick(dt, this.timeMs, this.runner.x, this.runner.y);
@@ -318,7 +318,7 @@ export class VelocityPlayScene extends Phaser.Scene {
       } else if (dy > 0) {
         r.y += py;
         r.bonk();
-      } else {
+      } else if (r.vy >= 0) {
         r.land(s.y - r.h);
       }
     }

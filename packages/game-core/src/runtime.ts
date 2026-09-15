@@ -17,6 +17,9 @@ export type GwDebugState = {
   trackId?: string;
   courseId?: string;
   combo?: number;
+  speed?: number;
+  throttle?: number;
+  frozen?: boolean;
 };
 
 export type GwDebugCommands = {

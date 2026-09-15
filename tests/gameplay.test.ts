@@ -3,6 +3,7 @@ import { driftGain } from "../games/neon-drift/src/systems/scoring.ts";
 import { TRACKS, buildTrack, queryTrack, startPose } from "../games/neon-drift/src/systems/track.ts";
 import { Car, smoothstep } from "../games/neon-drift/src/systems/vehicle.ts";
 import { COURSES, medalFor, nextMedalTarget } from "../games/velocity-run/src/systems/courses.ts";
+import { MOVE, Runner } from "../games/velocity-run/src/systems/movement.ts";
 import { VELOCITY_MEDALS } from "../packages/database/src/constants.ts";
 import {
   applyUpgrade,
@@ -68,6 +69,31 @@ describe("neon vehicle grip", () => {
     const angle = car.angle;
     car.step(0.016);
     expect(Math.abs(car.angle - angle)).toBeLessThan(0.05);
+  });
+
+  it("moves and yaws under throttle and steer", () => {
+    const car = new Car();
+    car.reset(100, 100, 0);
+    const x = car.x;
+    const a = car.angle;
+    car.throttle = 1;
+    car.steer = 1;
+    for (let i = 0; i < 45; i += 1) car.step(0.016);
+    expect(Math.abs(car.x - x) + Math.abs(car.angle - a)).toBeGreaterThan(2);
+  });
+});
+
+describe("velocity jump", () => {
+  it("jumps when grounded is cleared the same frame", () => {
+    const r = new Runner();
+    r.reset(80, 672);
+    r.grounded = true;
+    const now = 400;
+    const wasGround = r.grounded;
+    r.grounded = false;
+    if (wasGround) r.coyote = now + MOVE.coyoteMs;
+    r.input(0.016, 0, true, true, false, false, now);
+    expect(r.vy).toBeLessThan(0);
   });
 });
 

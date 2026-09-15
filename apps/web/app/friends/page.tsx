@@ -38,7 +38,7 @@ export default function FriendsPage() {
       ) : null}
 
       {player.friends.length === 0 ? (
-        <p className="mt-8 text-[14px] text-[var(--text-dim)]">No friends yet</p>
+        <p className="mt-8 text-[15px] text-[var(--text-dim)]">No friends yet. Invite someone to chase your Neon score.</p>
       ) : (
         <div className="mt-10 max-w-xl space-y-10">
           <Group title="Playing now" empty="No friends playing. Invite someone to chase a score." friends={playing} store={store} />

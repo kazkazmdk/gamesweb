@@ -266,7 +266,7 @@ export class DriftPlayScene extends Phaser.Scene {
       this.publishDebug(delta);
       return;
     }
-    if (this.juice.isFrozen(this.time.now)) {
+    if (!this.testDrive && this.juice.isFrozen(this.time.now)) {
       this.draw(dt);
       this.publishDebug(delta);
       return;
@@ -536,10 +536,14 @@ export class DriftPlayScene extends Phaser.Scene {
         longFrames: this.longFrames,
         combo: Math.floor(this.score.combo),
         trackId: this.def.id,
+        speed: this.car.speed,
+        throttle: this.testDrive?.throttle ?? this.car.throttle,
+        frozen: this.juice.isFrozen(this.time.now),
       },
       {
         finishRun: () => this.finish("finish"),
         setDrive: (throttle: number, steer: number) => {
+          this.paused = false;
           this.testDrive = { throttle, steer };
         },
       },
