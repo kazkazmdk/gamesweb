@@ -545,7 +545,7 @@ class PlayerStore {
     return ids.map((id) => getManifest(id)).filter((g): g is GameManifest => Boolean(g));
   }
 
-  createPlatform(gameId: string, hooks: { onPause: () => void; onHud?: (p: Record<string, number>) => void }): PlatformSDK {
+  createPlatform(gameId: string, hooks: { onPause: () => void; onHud?: (p: Record<string, number>) => void; onReady?: () => void }): PlatformSDK {
     let session = { id: uid(), gameId, startedAt: Date.now(), version: getManifest(gameId)?.version ?? "1.0.0" };
     let sessionReady: Promise<void> = Promise.resolve();
     return {
@@ -622,6 +622,10 @@ class PlayerStore {
       },
       events: {
         emit: (event) => {
+          if (event.name === "game_ready") {
+            hooks.onReady?.();
+            analytics.track("game_ready", { gameId, ...event.props });
+          }
           if (event.name === "hud" && hooks.onHud && event.props) {
             const nums: Record<string, number> = {};
             for (const [k, v] of Object.entries(event.props)) {
@@ -810,7 +814,7 @@ class PlayerStore {
         this.snapshot.backend = info.persistence === "durable" ? "supabase" : "local";
       }
       for (const g of GAME_MANIFESTS) {
-        const mode = g.id === "velocity-run" ? "course-1" : g.id === "swarm-protocol" ? "survival" : "circuit";
+        const mode = g.id === "velocity-run" ? "course-1" : g.id === "swarm-protocol" ? "survival" : "foundation";
         const board = await playerApi.leaderboard(g.id, mode);
         if (board.ok) {
           this.remoteBoards[`${g.id}:${mode}`] = board.data.rows.map((r) => ({

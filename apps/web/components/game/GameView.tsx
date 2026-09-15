@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
-import { loadPlayIndex } from "@/lib/platform/modes";
+import { loadPlayIndex, neonBoardMode } from "@/lib/platform/modes";
 import { formatScore } from "@/lib/player-store";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import type Phaser from "phaser";
@@ -22,7 +22,7 @@ export function GameView({ slug }: { slug: string }) {
   const [boot, setBoot] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [loadPct, setLoadPct] = useState(12);
-  const [bootError, setBootError] = useState(false);
+  const [bootError, setBootError] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const [result, setResult] = useState<null | {
     score: number;
@@ -31,11 +31,11 @@ export function GameView({ slug }: { slug: string }) {
     durationMs: number;
     metadata?: Record<string, number | string | boolean>;
   }>(null);
-  const [hud, setHud] = useState<Record<string, number>>({});
   const [intense, setIntense] = useState(false);
   const historyLen = useRef(player.history.length);
   const runEndedAt = useRef(0);
   const retries = useRef(0);
+  const loadedRef = useRef(false);
 
   useAccent(game?.accent);
 
@@ -43,14 +43,21 @@ export function GameView({ slug }: { slug: string }) {
     if (!game) return;
     analytics.track("game_selected", { gameId: game.id });
     analytics.track("game_load_started", { gameId: game.id });
-    setBootError(false);
+    setBootError(null);
+    setLoaded(false);
+    loadedRef.current = false;
     const t = window.setInterval(() => setLoadPct((p) => Math.min(92, p + 8)), 120);
     let dead = false;
+    let stage: "import" | "mount" | "create" | "first-frame" = "import";
     const platform: PlatformSDK = store.createPlatform(game.id, {
       onPause: () => setPaused(true),
-      onHud: (p) => {
-        setHud(p);
-        setIntense((p.combo ?? 0) > 4 || (p.score ?? 0) > 0);
+      onReady: () => {
+        if (dead) return;
+        stage = "first-frame";
+        setLoaded(true);
+        loadedRef.current = true;
+        setLoadPct(100);
+        analytics.track("game_loaded", { gameId: game.id });
       },
     });
 
@@ -59,16 +66,22 @@ export function GameView({ slug }: { slug: string }) {
       if (!parent) return;
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       let instance: Phaser.Game | null = null;
+      stage = "import";
+      const daily = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("daily") === "1";
       if (game!.id === "neon-drift") {
         const mod = await import("@gamesweb/neon-drift");
-        instance = mod.mountNeonDrift(parent, platform);
+        stage = "mount";
+        instance = mod.mountNeonDrift(parent, platform, daily, loadPlayIndex("neon-drift"));
       } else if (game!.id === "velocity-run") {
         const mod = await import("@gamesweb/velocity-run");
+        stage = "mount";
         instance = mod.mountVelocityRun(parent, platform, loadPlayIndex("velocity-run"));
       } else {
         const mod = await import("@gamesweb/swarm-protocol");
+        stage = "mount";
         instance = mod.mountSwarmProtocol(parent, platform);
       }
+      stage = "create";
       if (dead) {
         instance.destroy(true);
         return;
@@ -82,20 +95,25 @@ export function GameView({ slug }: { slug: string }) {
       const ro = new ResizeObserver(fit);
       ro.observe(parent);
       phaser.current = instance;
-      setLoaded(true);
-      analytics.track("game_loaded", { gameId: game!.id });
       cleanupRo = () => {
         ro.disconnect();
       };
     }
     let cleanupRo: () => void = () => undefined;
-    void boot().catch(() => {
-      setBootError(true);
-      analytics.track("game_boot_failed", { gameId: game!.id });
+    const watchdog = window.setTimeout(() => {
+      if (dead || loadedRef.current) return;
+      setBootError(`timeout:${stage}`);
+      analytics.track("game_boot_failed", { gameId: game.id, stage, message: `timeout:${stage}` });
+    }, 12_000);
+    void boot().catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : "boot_failed";
+      setBootError(`${stage}:${message.slice(0, 80)}`);
+      analytics.track("game_boot_failed", { gameId: game.id, stage, message: message.slice(0, 160) });
     });
     return () => {
       dead = true;
       window.clearInterval(t);
+      window.clearTimeout(watchdog);
       cleanupRo();
       phaser.current?.destroy(true);
       phaser.current = null;
@@ -169,11 +187,14 @@ export function GameView({ slug }: { slug: string }) {
 
   const gameId = game.id;
 
-  const pb = store.personalBest(
-    gameId,
-    gameId === "velocity-run" ? "course-1" : gameId === "swarm-protocol" ? "survival" : "circuit",
-    gameId === "velocity-run",
-  );
+  const daily = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("daily") === "1";
+  const pbMode =
+    gameId === "velocity-run"
+      ? (["course-1", "course-2", "course-3"][loadPlayIndex("velocity-run")] ?? "course-1")
+      : gameId === "swarm-protocol"
+        ? "survival"
+        : neonBoardMode(loadPlayIndex("neon-drift"), daily);
+  const pb = store.personalBest(gameId, pbMode, gameId === "velocity-run");
   const friendsHere = player.friends.filter((f) => f.status === "accepted" && f.gameId === gameId);
 
   function resume() {
@@ -199,6 +220,7 @@ export function GameView({ slug }: { slug: string }) {
     phaser.current?.destroy(true);
     phaser.current = null;
     setLoaded(false);
+    loadedRef.current = false;
     setLoadPct(10);
     setBoot((n) => n + 1);
   }
@@ -248,12 +270,16 @@ export function GameView({ slug }: { slug: string }) {
           <div className="w-[min(360px,90vw)] text-center">
             <p className="display text-[36px]">Game failed to load</p>
             <p className="mt-2 text-[13px] text-white/55">The world did not boot. Your progress is still on this device.</p>
+            {process.env.NODE_ENV !== "production" ? (
+              <p className="mt-2 font-mono text-[11px] text-white/40">{bootError}</p>
+            ) : null}
             <button
               type="button"
               className="mt-6 rounded-full bg-white px-5 py-3 text-[14px] text-black"
               onClick={() => {
-                setBootError(false);
+                setBootError(null);
                 setLoaded(false);
+                loadedRef.current = false;
                 setLoadPct(10);
                 setBoot((n) => n + 1);
               }}
@@ -403,7 +429,17 @@ function Results({
         <p className="text-[12px] uppercase tracking-[0.18em] text-white/45">{result}</p>
         <p className="display mt-2 text-[48px]">{formatScore(gameId, score)}</p>
         {pbDelta !== null ? (
-          <p className={`mt-1 text-[14px] ${pbDelta >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+          <p
+            className={`mt-1 text-[14px] ${
+              gameId === "velocity-run"
+                ? pbDelta <= 0
+                  ? "text-emerald-300"
+                  : "text-rose-300"
+                : pbDelta >= 0
+                  ? "text-emerald-300"
+                  : "text-rose-300"
+            }`}
+          >
             {gameId === "velocity-run"
               ? pbDelta <= 0
                 ? `PB ${ (pbDelta / 1000).toFixed(3)}s`

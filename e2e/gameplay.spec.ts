@@ -1,0 +1,104 @@
+import { expect, test, type Page } from "@playwright/test";
+
+type GwDebug = {
+  gameId: string;
+  ready: boolean;
+  runState: string;
+  playerX: number;
+  playerY: number;
+  playerAngle?: number;
+  score: number;
+  paused: boolean;
+  timeMs?: number;
+  kills?: number;
+  level?: number;
+};
+
+async function debugOf(page: Page): Promise<GwDebug | null> {
+  return page.evaluate(() => (window as unknown as { __GW_DEBUG__?: GwDebug }).__GW_DEBUG__ ?? null);
+}
+
+async function waitReady(page: Page, gameId: string) {
+  await page.goto(`/play/${gameId}`);
+  await page.locator("canvas").click({ position: { x: 40, y: 40 }, timeout: 20_000 });
+  await expect
+    .poll(async () => {
+      const d = await debugOf(page);
+      return d?.ready && d.gameId === gameId ? d.gameId : null;
+    }, { timeout: 20_000 })
+    .toBe(gameId);
+}
+
+test("neon drift steers, scores, pauses, and retries", async ({ page }) => {
+  await waitReady(page, "neon-drift");
+  const before = await debugOf(page);
+  expect(before?.runState).toBe("playing");
+  await page.keyboard.down("ArrowUp");
+  await page.keyboard.down("ArrowRight");
+  await page.waitForTimeout(700);
+  const moving = await debugOf(page);
+  expect(moving).toBeTruthy();
+  expect(Math.abs((moving!.playerAngle ?? 0) - (before!.playerAngle ?? 0)) + Math.abs(moving!.playerX - before!.playerX)).toBeGreaterThan(2);
+  await page.keyboard.up("ArrowRight");
+  await page.keyboard.up("ArrowUp");
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+  await page.getByRole("button", { name: "Resume" }).click();
+  await expect(page.getByRole("button", { name: "Resume" })).toHaveCount(0);
+
+  const mid = await debugOf(page);
+  await page.keyboard.press("r");
+  await page.waitForTimeout(250);
+  const after = await debugOf(page);
+  expect(after?.score ?? 0).toBeLessThanOrEqual(mid?.score ?? 0);
+  expect(after?.runState).toBe("playing");
+});
+
+test("velocity run moves, jumps, dies, and starts a new attempt", async ({ page }) => {
+  await waitReady(page, "velocity-run");
+  const before = await debugOf(page);
+  await page.keyboard.down("KeyD");
+  await page.waitForTimeout(400);
+  const moved = await debugOf(page);
+  expect(moved!.playerX).toBeGreaterThan(before!.playerX);
+  await page.keyboard.up("KeyD");
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(120);
+  const jumped = await debugOf(page);
+  expect(jumped!.playerY).not.toBe(moved!.playerY);
+
+  const deathsBefore = jumped!.sessionDeaths ?? jumped!.deaths ?? 0;
+  await page.evaluate(() => {
+    (window as unknown as { __GW_DEBUG_CMD__?: { killPlayer?: () => void } }).__GW_DEBUG_CMD__?.killPlayer?.();
+  });
+  await expect
+    .poll(async () => (await debugOf(page))?.sessionDeaths ?? 0)
+    .toBeGreaterThan(deathsBefore);
+  await page.waitForTimeout(200);
+  const next = await debugOf(page);
+  expect(next?.timeMs ?? 0).toBeLessThan(50);
+  expect(next?.runState).toBe("playing");
+});
+
+test("swarm protocol moves, levels, and takes an upgrade", async ({ page }) => {
+  await waitReady(page, "swarm-protocol");
+  const before = await debugOf(page);
+  await page.keyboard.down("KeyW");
+  await page.waitForTimeout(400);
+  const moved = await debugOf(page);
+  expect(Math.abs(moved!.playerY - before!.playerY) + Math.abs(moved!.playerX - before!.playerX)).toBeGreaterThan(4);
+  await page.keyboard.up("KeyW");
+
+  await page.evaluate(() => {
+    const cmd = (window as unknown as { __GW_DEBUG_CMD__?: { grantXp?: (n: number) => void } }).__GW_DEBUG_CMD__;
+    cmd?.grantXp?.(400);
+  });
+  await expect.poll(async () => (await debugOf(page))?.runState).toBe("choosing");
+  await page.evaluate(() => {
+    (window as unknown as { __GW_DEBUG_CMD__?: { pickUpgrade?: (i: number) => void } }).__GW_DEBUG_CMD__?.pickUpgrade?.(0);
+  });
+  await expect.poll(async () => (await debugOf(page))?.runState).toBe("playing");
+  const after = await debugOf(page);
+  expect(after!.level ?? 1).toBeGreaterThanOrEqual(2);
+});

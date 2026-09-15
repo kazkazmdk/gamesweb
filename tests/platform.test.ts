@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { activityFromHistory, challengeViewModel, friendsBoard, playerStatsFromSnapshot } from "../apps/web/lib/platform/adapters";
 import { formatCountdown, formatPlayScore, formatRank, greeting, hasRecord } from "../apps/web/lib/platform/format";
-import { boardModeOptions, defaultBoardMode, isCompactCatalog, playModeOptions } from "../apps/web/lib/platform/modes";
+import { boardModeOptions, defaultBoardMode, isCompactCatalog, neonBoardMode, playModeOptions } from "../apps/web/lib/platform/modes";
 import type { PlayerSnapshot } from "../apps/web/lib/player-store";
 
 const player = {
@@ -34,9 +34,18 @@ describe("catalog and modes", () => {
     expect(isCompactCatalog(3)).toBe(true);
     expect(isCompactCatalog(12)).toBe(false);
   });
-  it("does not mix neon tracks into score boards", () => {
-    expect(boardModeOptions("neon-drift").map((m) => m.id)).toEqual(["circuit", "daily"]);
+  it("keeps neon play tracks and board modes aligned", () => {
+    expect(boardModeOptions("neon-drift").map((m) => m.id)).toEqual([
+      "foundation",
+      "technical",
+      "velocity",
+      "daily",
+      "circuit",
+    ]);
     expect(playModeOptions("neon-drift").map((m) => m.label)).toContain("Hairpin District");
+    expect(neonBoardMode(1)).toBe("technical");
+    expect(neonBoardMode(0, true)).toBe("daily");
+    expect(defaultBoardMode("neon-drift")).toBe("foundation");
     expect(defaultBoardMode("velocity-run")).toBe("course-1");
   });
 });

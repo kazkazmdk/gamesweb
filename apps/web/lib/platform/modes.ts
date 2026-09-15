@@ -19,13 +19,23 @@ export const VELOCITY_COURSES: ModeOption[] = [
 ];
 
 const BOARD_LABELS: Record<string, string> = {
-  circuit: "Circuit",
+  foundation: "Harbour Loop",
+  technical: "Hairpin District",
+  velocity: "Ridge Sweep",
   daily: "Daily",
+  circuit: "Circuit",
   "course-1": "Gate A",
   "course-2": "Needle",
   "course-3": "Rushline",
   survival: "Survival",
 };
+
+export const NEON_BOARD_MODES = ["foundation", "technical", "velocity"] as const;
+
+export function neonBoardMode(index: number, daily = false) {
+  if (daily) return "daily";
+  return NEON_BOARD_MODES[index] ?? "foundation";
+}
 
 export function playModeOptions(gameId: string): ModeOption[] {
   if (gameId === "neon-drift") return NEON_TRACKS;

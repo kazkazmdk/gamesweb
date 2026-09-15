@@ -58,6 +58,17 @@ describe("validateScore", () => {
     expect(v.status).toBe("verified");
   });
 
+  it("accepts neon track board modes", () => {
+    const v = validateScore({
+      ...base,
+      gameId: "neon-drift",
+      mode: "technical",
+      score: 18000,
+      metadata: { laps: 1, combo: 3, wallHits: 1 },
+    });
+    expect(v.status).toBe("verified");
+  });
+
   it("flags an impossible neon-drift pace", () => {
     const v = validateScore({
       ...base,

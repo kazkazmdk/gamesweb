@@ -4,6 +4,7 @@ export const ANALYTICS_EVENTS = [
   "game_selected",
   "game_load_started",
   "game_loaded",
+  "game_ready",
   "game_boot_failed",
   "gameplay_started",
   "gameplay_ended",
