@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { driftGain } from "../games/neon-drift/src/systems/scoring.ts";
 import { TRACKS, buildTrack, queryTrack, startPose } from "../games/neon-drift/src/systems/track.ts";
+import { readDriveInput } from "../games/neon-drift/src/systems/input.ts";
 import { Car, smoothstep } from "../games/neon-drift/src/systems/vehicle.ts";
 import { COURSES, medalFor, nextMedalTarget } from "../games/velocity-run/src/systems/courses.ts";
 import { MOVE, Runner } from "../games/velocity-run/src/systems/movement.ts";
@@ -80,6 +81,26 @@ describe("neon vehicle grip", () => {
     car.steer = 1;
     for (let i = 0; i < 45; i += 1) car.step(0.016);
     expect(Math.abs(car.x - x) + Math.abs(car.angle - a)).toBeGreaterThan(2);
+  });
+});
+
+describe("neon drive input", () => {
+  it("does not crash when extra pointers are missing", () => {
+    const keys = {
+      up: { isDown: true },
+      right: { isDown: false },
+      left: { isDown: false },
+      down: { isDown: false },
+      space: { isDown: false },
+    } as unknown as Record<string, { isDown: boolean }>;
+    const input = {
+      activePointer: { isDown: false, wasTouch: false, x: 0, y: 0 },
+      pointer1: undefined,
+      pointer2: undefined,
+    };
+    const drive = readDriveInput(keys as never, input as never, 1280, 720);
+    expect(drive.throttle).toBe(1);
+    expect(drive.touch).toBe(false);
   });
 });
 

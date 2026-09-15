@@ -20,6 +20,7 @@ export type GwDebugState = {
   speed?: number;
   throttle?: number;
   frozen?: boolean;
+  tick?: number;
 };
 
 export type GwDebugCommands = {

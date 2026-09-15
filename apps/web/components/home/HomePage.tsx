@@ -107,28 +107,6 @@ export default function HomePage() {
               Game Hub
             </QuickAction>
           </div>
-
-          <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-4 md:mt-8 md:gap-y-5">
-            <Metric label="PB" value={ctx.pbLabel ?? "—"} />
-            <Metric label="Mode" value={ctx.modeLabel} />
-            {ctx.friendBest?.scoreLabel ? (
-              <Metric label="Friend best" value={`${ctx.friendBest.name} ${ctx.friendBest.scoreLabel}`} />
-            ) : null}
-            {ctx.daily ? <Metric label="Daily" value={`${ctx.daily.current} / ${ctx.daily.target}`} /> : null}
-          </dl>
-
-          <div className="mt-5 hidden max-w-lg md:block">
-            <GameModeSelector
-              label={game.id === "neon-drift" ? "Track" : game.id === "velocity-run" ? "Course" : "Mode"}
-              options={modes}
-              value={String(playIndex)}
-              onChange={(id) => {
-                const index = Number(id);
-                setPlayIndex(index);
-                savePlayIndex(game.id, index);
-              }}
-            />
-          </div>
         </div>
 
         <div
@@ -167,6 +145,28 @@ export default function HomePage() {
               </button>
             );
           })}
+        </div>
+
+        <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-4 md:order-3 md:mt-8 md:gap-y-5">
+          <Metric label="PB" value={ctx.pbLabel ?? "—"} />
+          <Metric label="Mode" value={ctx.modeLabel} />
+          {ctx.friendBest?.scoreLabel ? (
+            <Metric label="Friend best" value={`${ctx.friendBest.name} ${ctx.friendBest.scoreLabel}`} />
+          ) : null}
+          {ctx.daily ? <Metric label="Daily" value={`${ctx.daily.current} / ${ctx.daily.target}`} /> : null}
+        </dl>
+
+        <div className="mt-5 hidden max-w-lg md:order-4 md:block">
+          <GameModeSelector
+            label={game.id === "neon-drift" ? "Track" : game.id === "velocity-run" ? "Course" : "Mode"}
+            options={modes}
+            value={String(playIndex)}
+            onChange={(id) => {
+              const index = Number(id);
+              setPlayIndex(index);
+              savePlayIndex(game.id, index);
+            }}
+          />
         </div>
       </div>
     </div>

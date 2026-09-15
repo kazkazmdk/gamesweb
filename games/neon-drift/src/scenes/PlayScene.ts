@@ -69,6 +69,7 @@ export class DriftPlayScene extends Phaser.Scene {
   private lastComboFloor = 1;
   private fpsAcc = 0;
   private frames = 0;
+  private ticks = 0;
   private quality: "high" | "low" = "high";
   private debug = false;
   private sectorHits = 0;
@@ -160,22 +161,23 @@ export class DriftPlayScene extends Phaser.Scene {
     }
 
     const kb = this.input.keyboard!;
+    const code = Phaser.Input.Keyboard.KeyCodes;
     this.keys = {
-      up: kb.addKey("W"),
-      up2: kb.addKey("UP"),
-      down: kb.addKey("S"),
-      down2: kb.addKey("DOWN"),
-      left: kb.addKey("A"),
-      left2: kb.addKey("LEFT"),
-      right: kb.addKey("D"),
-      right2: kb.addKey("RIGHT"),
-      space: kb.addKey("SPACE"),
-      r: kb.addKey("R"),
-      esc: kb.addKey("ESC"),
-      g: kb.addKey("G"),
-      one: kb.addKey("ONE"),
-      two: kb.addKey("TWO"),
-      three: kb.addKey("THREE"),
+      up: kb.addKey(code.W),
+      up2: kb.addKey(code.UP),
+      down: kb.addKey(code.S),
+      down2: kb.addKey(code.DOWN),
+      left: kb.addKey(code.A),
+      left2: kb.addKey(code.LEFT),
+      right: kb.addKey(code.D),
+      right2: kb.addKey(code.RIGHT),
+      space: kb.addKey(code.SPACE),
+      r: kb.addKey(code.R),
+      esc: kb.addKey(code.ESC),
+      g: kb.addKey(code.G),
+      one: kb.addKey(code.ONE),
+      two: kb.addKey(code.TWO),
+      three: kb.addKey(code.THREE),
     };
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
@@ -232,6 +234,7 @@ export class DriftPlayScene extends Phaser.Scene {
 
   update(_: number, delta: number) {
     const dt = Math.min(0.033, delta / 1000);
+    this.ticks += 1;
     this.frames += 1;
     this.fpsAcc += delta;
     if (this.fpsAcc > 1000) {
@@ -291,6 +294,7 @@ export class DriftPlayScene extends Phaser.Scene {
     }
 
     this.car.step(dt);
+    this.publishDebug(delta);
     const q = queryTrack(this.samples, this.car.x, this.car.y);
     this.car.surface = q.surface;
 
@@ -447,6 +451,7 @@ export class DriftPlayScene extends Phaser.Scene {
   }
 
   private draw(dt: number) {
+    this.gfx.clear();
     drawWorld(this.gfx, this.def, this.samples, this.quality);
     drawMarks(this.gfx, this.marks, dt);
     if (this.showGhost && this.tape) {
@@ -539,6 +544,7 @@ export class DriftPlayScene extends Phaser.Scene {
         speed: this.car.speed,
         throttle: this.testDrive?.throttle ?? this.car.throttle,
         frozen: this.juice.isFrozen(this.time.now),
+        tick: this.ticks,
       },
       {
         finishRun: () => this.finish("finish"),
