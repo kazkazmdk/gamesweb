@@ -1,31 +1,51 @@
 import Phaser from "phaser";
-import { FloatingTextPool, Juice, ParticlePool, Synth, clamp } from "@gamesweb/game-core";
+import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { neonDriftManifest } from "@gamesweb/game-sdk";
+import { CAMERA, NEON, VEHICLE } from "../config";
+import { createCam, stepCamera, type Cam } from "../systems/camera";
+import {
+  ghostEnabled,
+  GhostRecorder,
+  ghostPose,
+  loadGhost,
+  saveGhost,
+  setGhostEnabled,
+  type GhostTape,
+} from "../systems/ghost";
+import { readDriveInput } from "../systems/input";
 import { DriftScore } from "../systems/scoring";
-import { buildTrack, queryTrack, startPose, type TrackSample } from "../systems/track";
+import {
+  buildTrack,
+  loadTrackIndex,
+  queryTrack,
+  saveTrackIndex,
+  startPose,
+  TRACKS,
+  type TrackDef,
+  type TrackSample,
+} from "../systems/track";
 import { Car } from "../systems/vehicle";
-
-function axis(v: number, half: number, world: number) {
-  if (world <= half * 2) return world / 2;
-  return clamp(v, half, world - half);
-}
+import { drawCar, drawGhost, drawHudChrome, drawMarks, drawWorld, type Mark } from "./render";
 
 type ResultKind = "crash" | "finish" | "time";
 
 export class DriftPlayScene extends Phaser.Scene {
   private platform!: PlatformSDK;
   private car = new Car();
+  private def!: TrackDef;
   private samples: TrackSample[] = [];
   private score = new DriftScore();
   private juice = new Juice();
-  private parts = new ParticlePool(280);
-  private floaters = new FloatingTextPool(20);
-  private synth = new Synth();
+  private parts!: ParticlePool;
+  private floaters = new FloatingTextPool(18);
+  private synth!: Synth;
   private gfx!: Phaser.GameObjects.Graphics;
   private overlay!: Phaser.GameObjects.Graphics;
   private hud!: Phaser.GameObjects.Text;
   private hint!: Phaser.GameObjects.Text;
+  private deltaTxt!: Phaser.GameObjects.Text;
+  private floaterGfx: Phaser.GameObjects.Text[] = [];
   private paused = false;
   private ended = false;
   private lap = 0;
@@ -34,34 +54,26 @@ export class DriftPlayScene extends Phaser.Scene {
   private runStart = 0;
   private reverse = false;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
-  private touchSteer = 0;
-  private touchThrottle = 1;
-  private touchBrake = false;
-  private camX = 0;
-  private camY = 0;
-  private marks: Array<{ x: number; y: number; a: number; life: number }> = [];
+  private cam!: Cam;
+  private marks: Mark[] = [];
   private wallHits = 0;
   private cleanLap = true;
   private shownHint = true;
   private nearArmed = true;
   private audioReady = false;
-  private lastSkid = 0;
-
-  private fitCam(w: number, h: number) {
-    this.cameras.resize(w, h);
-    this.cameras.main.setViewport(0, 0, w, h);
-    this.cameras.main.setSize(w, h);
-    this.cameras.main.setZoom(1.22);
-  }
-
-  private ensureAudio() {
-    if (this.audioReady) return;
-    this.audioReady = true;
-    void this.synth.resume().then(() => {
-      this.synth.startEngine();
-      this.synth.startBed("drift");
-    });
-  }
+  private showGhost = true;
+  private recorder = new GhostRecorder();
+  private tape: GhostTape | null = null;
+  private retries = 0;
+  private endedAt = 0;
+  private lastComboFloor = 1;
+  private fpsAcc = 0;
+  private frames = 0;
+  private quality: "high" | "low" = "high";
+  private debug = false;
+  private sectorHits = 0;
+  private lastBoost = false;
+  private streakClean = true;
 
   constructor() {
     super("neon-drift-play");
@@ -70,7 +82,9 @@ export class DriftPlayScene extends Phaser.Scene {
   create() {
     this.platform = this.game.registry.get("platform") as PlatformSDK;
     this.reverse = Boolean(this.game.registry.get("dailyVariant"));
-    this.samples = buildTrack(this.reverse);
+    const idx = this.reverse ? 0 : Number(this.game.registry.get("trackIndex") ?? loadTrackIndex());
+    this.def = TRACKS[idx] ?? TRACKS[0];
+    this.samples = buildTrack(this.def, this.reverse);
     const pose = startPose(this.samples);
     this.car.reset(pose.x, pose.y, pose.angle);
     this.score.reset();
@@ -81,31 +95,61 @@ export class DriftPlayScene extends Phaser.Scene {
     this.crossed = false;
     this.wallHits = 0;
     this.cleanLap = true;
+    this.streakClean = true;
     this.runStart = this.time.now;
-    this.camX = pose.x;
-    this.camY = pose.y;
+    this.cam = createCam(pose.x, pose.y);
     this.marks = [];
-    this.cameras.main.setBackgroundColor("#0b0a0c");
+    this.recorder.reset();
+    this.showGhost = ghostEnabled();
+    this.tape = loadGhost(this.def.id, this.reverse ? "daily" : "circuit");
+    this.debug = this.game.registry.get("debug") === true && process.env.NODE_ENV !== "production";
+    const mobile = this.sys.game.device.input.touch;
+    this.parts = new ParticlePool(mobile ? 140 : 260);
+    this.quality = mobile ? "low" : "high";
+    this.synth = (this.game.registry.get("synth") as Synth | undefined) ?? new Synth();
+    this.game.registry.set("synth", this.synth);
+    const settings = this.platform.audio.getSettings();
+    this.synth.setSettings(settings);
+
+    this.cameras.main.setBackgroundColor(this.def.theme.sky);
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hud = this.add
-      .text(28, 54, "", {
+      .text(24, 52, "", { fontFamily: "ui-sans-serif, system-ui, sans-serif", fontSize: "17px", color: "#f3f1ec" })
+      .setScrollFactor(0)
+      .setDepth(21);
+    this.deltaTxt = this.add
+      .text(this.scale.width / 2, 86, "", {
         fontFamily: "ui-sans-serif, system-ui, sans-serif",
         fontSize: "18px",
         color: "#f3f1ec",
       })
+      .setOrigin(0.5, 0)
       .setScrollFactor(0)
-      .setDepth(21);
+      .setDepth(21)
+      .setAlpha(0);
     this.hint = this.add
-      .text(this.scale.width / 2, this.scale.height - 72, "WASD / ARROWS TO DRIVE", {
+      .text(this.scale.width / 2, this.scale.height - 78, this.hintCopy(), {
         fontFamily: "ui-sans-serif, system-ui, sans-serif",
         fontSize: "14px",
         color: "#f3f1ec",
+        align: "center",
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(21)
-      .setAlpha(0.85);
+      .setAlpha(this.shouldTutorial() ? 0.9 : 0);
+    this.shownHint = this.shouldTutorial();
+    this.floaterGfx = [];
+    for (let i = 0; i < 10; i += 1) {
+      this.floaterGfx.push(
+        this.add
+          .text(0, 0, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "13px", color: "#e35aa0" })
+          .setOrigin(0.5)
+          .setDepth(18)
+          .setAlpha(0),
+      );
+    }
 
     const kb = this.input.keyboard!;
     this.keys = {
@@ -120,35 +164,53 @@ export class DriftPlayScene extends Phaser.Scene {
       space: kb.addKey("SPACE"),
       r: kb.addKey("R"),
       esc: kb.addKey("ESC"),
+      g: kb.addKey("G"),
+      one: kb.addKey("ONE"),
+      two: kb.addKey("TWO"),
+      three: kb.addKey("THREE"),
     };
 
-    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      this.ensureAudio();
-      this.touchSteer = p.x < this.scale.width * 0.5 ? -1 : 1;
-      if (p.y > this.scale.height * 0.78 && p.x > this.scale.width * 0.38 && p.x < this.scale.width * 0.62) {
-        this.touchBrake = true;
-        this.touchSteer = 0;
-      }
-    });
-    this.input.on("pointerup", () => {
-      this.touchSteer = 0;
-      this.touchBrake = false;
-    });
-
+    this.input.on("pointerdown", () => this.ensureAudio());
     this.platform.session.start();
-    this.platform.events.emit({ name: "gameplay_started", props: { gameId: "neon-drift" } });
+    this.platform.events.emit({ name: "gameplay_started", props: { gameId: "neon-drift", track: this.def.id } });
     this.fitCam(this.scale.width, this.scale.height);
-    this.scale.on("resize", (gs: Phaser.Structs.Size) => this.fitCam(gs.width, gs.height));
-
+    this.scale.on("resize", (gs: Phaser.Structs.Size) => {
+      this.fitCam(gs.width, gs.height);
+      this.hint.setPosition(this.scale.width / 2, this.scale.height - 78);
+      this.deltaTxt.setPosition(this.scale.width / 2, 86);
+    });
     this.game.events.on("platform-pause", this.onPause, this);
     this.game.events.on("platform-resume", this.onResume, this);
-    this.scale.on("resize", this.layout, this);
-    this.layout();
   }
 
-  private layout = () => {
-    this.hint.setPosition(this.scale.width / 2, this.scale.height - 72);
-  };
+  private hintCopy() {
+    const touch = this.sys.game.device.input.touch;
+    return touch ? "STEER  ·  HOLD BRAKE TO SLIDE  ·  R RESTART" : "STEER  ·  SPACE TO DRIFT  ·  R RESTART";
+  }
+
+  private shouldTutorial() {
+    if (typeof localStorage === "undefined") return true;
+    return localStorage.getItem(NEON.tutorialKey) !== "1";
+  }
+
+  private fitCam(w: number, h: number) {
+    this.cameras.resize(w, h);
+    this.cameras.main.setViewport(0, 0, w, h);
+    this.cameras.main.setSize(w, h);
+    this.cameras.main.setZoom(this.cam?.zoom ?? CAMERA.zoomSlow);
+  }
+
+  private ensureAudio() {
+    if (this.audioReady) return;
+    this.audioReady = true;
+    void this.synth.resume().then(() => {
+      this.synth.startEngine();
+      if (!this.game.registry.get("bedOn")) {
+        this.synth.startBed("drift");
+        this.game.registry.set("bedOn", true);
+      }
+    });
+  }
 
   private onPause = () => {
     this.paused = true;
@@ -159,13 +221,30 @@ export class DriftPlayScene extends Phaser.Scene {
 
   update(_: number, delta: number) {
     const dt = Math.min(0.033, delta / 1000);
+    this.frames += 1;
+    this.fpsAcc += delta;
+    if (this.fpsAcc > 1000) {
+      const fps = this.frames / (this.fpsAcc / 1000);
+      if (fps < 46) this.quality = "low";
+      else if (fps > 56) this.quality = this.sys.game.device.input.touch ? "low" : "high";
+      this.fpsAcc = 0;
+      this.frames = 0;
+    }
+
     if (Phaser.Input.Keyboard.JustDown(this.keys.r)) {
-      this.retry();
+      if (!this.ended) this.retry();
       return;
     }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.esc)) {
-      this.platform.pause.request();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.g)) {
+      this.showGhost = !this.showGhost;
+      setGhostEnabled(this.showGhost);
     }
+    if (!this.reverse) {
+      if (Phaser.Input.Keyboard.JustDown(this.keys.one)) this.switchTrack(0);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.two)) this.switchTrack(1);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.three)) this.switchTrack(2);
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.keys.esc)) this.platform.pause.request();
     if (this.paused || this.ended) {
       this.draw(0);
       return;
@@ -175,18 +254,21 @@ export class DriftPlayScene extends Phaser.Scene {
       return;
     }
 
-    const left = this.keys.left.isDown || this.keys.left2.isDown || this.touchSteer < 0;
-    const right = this.keys.right.isDown || this.keys.right2.isDown || this.touchSteer > 0;
-    const accel = this.keys.up.isDown || this.keys.up2.isDown || this.input.pointer1.isDown;
-    const brake = this.keys.down.isDown || this.keys.down2.isDown || this.touchBrake;
-    this.car.steer = (Number(right) - Number(left)) as number;
-    this.car.handbrake = this.keys.space.isDown;
-    if (brake) this.car.throttle = -1;
-    else if (accel || this.input.activePointer.isDown) this.car.throttle = 1;
-    else this.car.throttle = this.input.activePointer.wasTouch ? 0.7 : 0;
+    const drive = readDriveInput(this.keys, this.input, this.scale.width, this.scale.height);
+    this.car.steer = drive.steer;
+    this.car.throttle = drive.throttle;
+    this.car.handbrake = drive.handbrake;
+    this.car.assist = drive.touch ? VEHICLE.touchSteerAssist : 0;
 
-    if (this.car.throttle !== 0 || this.car.steer !== 0) {
-      this.shownHint = false;
+    if (this.car.throttle !== 0 || this.car.steer !== 0 || this.car.handbrake) {
+      if (this.shownHint) {
+        this.shownHint = false;
+        try {
+          localStorage.setItem(NEON.tutorialKey, "1");
+        } catch {
+          /* noop */
+        }
+      }
       this.ensureAudio();
     }
 
@@ -194,21 +276,23 @@ export class DriftPlayScene extends Phaser.Scene {
     const q = queryTrack(this.samples, this.car.x, this.car.y);
     this.car.surface = q.surface;
 
-    if (q.dist > q.half + 26) {
+    if (q.dist > q.half + 24) {
+      const impactN = clamp(this.car.speed / VEHICLE.maxSpeed, 0.2, 1);
       this.car.bounce(-q.nx, -q.ny, 10);
       this.wallHits += 1;
       this.cleanLap = false;
-      this.juice.screenShake(7, 120);
-      this.juice.hitStop(40);
-      this.synth.crash();
-      this.parts.burst(this.car.x, this.car.y, 14, 0xf3f1ec, 180, 280);
-      if (this.car.speed > 380) {
+      this.streakClean = false;
+      this.juice.screenShake(5 + impactN * 6, 90);
+      this.juice.hitStop(28);
+      this.synth.impact(impactN);
+      this.parts.burst(this.car.x, this.car.y, this.quality === "high" ? 12 : 8, 0xf3f1ec, 160, 240);
+      if (this.car.speed > 390) {
         this.finish("crash");
         return;
       }
     }
 
-    const near = q.dist > q.half * 0.72 && q.dist < q.half && this.car.drifting;
+    const near = q.dist > q.half * 0.7 && q.dist < q.half && this.car.drifting;
     this.score.tick(dt, {
       drifting: this.car.drifting,
       speed: this.car.speed,
@@ -217,49 +301,90 @@ export class DriftPlayScene extends Phaser.Scene {
       boost: q.surface === "boost",
     });
 
-    if (this.car.drifting) {
-      void this.platform.achievement.unlock("first-slide");
-      if (this.score.combo >= 5) void this.platform.achievement.unlock("combo-5");
-    }
+    if (this.car.drifting) void this.platform.achievement.unlock("first-slide");
+    if (this.score.combo >= 5) void this.platform.achievement.unlock("combo-5");
     if (near && this.nearArmed) {
       this.nearArmed = false;
-      this.floaters.spawn(this.car.x, this.car.y - 30, "NEAR", "#e35aa0");
+      this.score.nearMisses += 1;
+      this.floaters.spawn(this.car.x, this.car.y - 28, "NEAR", "#e35aa0");
       void this.platform.achievement.unlock("near-miss");
-      this.juice.cameraPunch(0.8);
+      this.juice.cameraPunch(0.7);
     }
     if (!near) this.nearArmed = true;
-    if (q.surface === "boost") void this.platform.achievement.unlock("boost-gate");
+    if (q.surface === "boost" && !this.lastBoost) {
+      this.synth.boostWhoosh();
+      this.score.perfectGates += 1;
+      void this.platform.achievement.unlock("boost-gate");
+    }
+    this.lastBoost = q.surface === "boost";
     if (q.surface === "asphalt" && this.car.speed > 200) void this.platform.achievement.unlock("grass-survive");
 
-    if (this.car.drifting && this.car.speed > 160) {
-      this.marks.push({ x: this.car.x, y: this.car.y, a: this.car.angle, life: 3.2 });
-      if (this.marks.length > 220) this.marks.shift();
-      this.parts.emit({
-        x: this.car.x - Math.cos(this.car.angle) * 12,
-        y: this.car.y - Math.sin(this.car.angle) * 12,
-        vx: -this.car.vx * 0.12 + (Math.random() - 0.5) * 20,
-        vy: -this.car.vy * 0.12 + (Math.random() - 0.5) * 20,
-        life: 380,
-        size: 3,
-        color: 0xc9c4bf,
-        drag: 0.94,
+    const comboFloor = Math.floor(this.score.combo);
+    if (comboFloor > this.lastComboFloor) {
+      this.synth.comboSting(comboFloor);
+      this.floaters.spawn(this.car.x, this.car.y - 36, `${comboFloor}x`, "#f3f1ec");
+    }
+    this.lastComboFloor = comboFloor;
+
+    if (this.car.driftAmount > 0.12 && this.car.speed > 110) {
+      this.marks.push({
+        x: this.car.x,
+        y: this.car.y,
+        a: this.car.angle,
+        life: 2.6 + this.car.driftAmount,
+        slip: this.car.driftAmount,
       });
-      if (this.time.now - this.lastSkid > 70) {
-        this.synth.skid(Math.min(1, Math.abs(this.car.slip) * 2));
-        this.lastSkid = this.time.now;
+      if (this.marks.length > (this.quality === "high" ? 260 : 110)) this.marks.shift();
+      if (this.quality === "high" || this.frames % 2 === 0) {
+        this.parts.emit({
+          x: this.car.x - Math.cos(this.car.angle) * 14,
+          y: this.car.y - Math.sin(this.car.angle) * 14,
+          vx: -this.car.vx * 0.1 + (Math.random() - 0.5) * 18,
+          vy: -this.car.vy * 0.1 + (Math.random() - 0.5) * 18,
+          life: 280 + this.car.driftAmount * 120,
+          size: 2 + this.car.driftAmount * 3,
+          color: 0xc9c4bf,
+          drag: 0.93,
+        });
       }
     }
+
+    if (this.car.speed > 280 && this.quality === "high") {
+      const side = Math.atan2(this.car.vy, this.car.vx) + Math.PI / 2;
+      this.parts.emit({
+        x: this.car.x + Math.cos(side) * (8 + Math.random() * 18),
+        y: this.car.y + Math.sin(side) * (8 + Math.random() * 18),
+        vx: -this.car.vx * 0.2,
+        vy: -this.car.vy * 0.2,
+        life: 180,
+        size: 1.4,
+        color: this.def.theme.accent,
+        drag: 0.9,
+      });
+    }
+
+    this.synth.setSkid(this.car.driftAmount * Math.min(1, this.car.speed / 420));
+    this.synth.engineRpm(clamp(this.car.speed / VEHICLE.maxSpeed, 0, 1), Math.max(0, this.car.throttle));
 
     let dp = q.progress - this.lastProgress;
     if (dp < -0.5) dp += 1;
     if (dp > 0.5) dp -= 1;
+    const sector = q.nearest.sector;
+    if (sector !== this.score.lastSector && dp > 0) {
+      const snap = this.score.closeSector(this.score.lastSector);
+      if (this.streakClean) this.score.cleanSectors += 1;
+      this.streakClean = true;
+      this.showSectorDelta(this.score.lastSector, snap.score);
+      this.score.lastSector = sector;
+      this.sectorHits += 1;
+    }
     if (q.progress < 0.08 && this.lastProgress > 0.8 && !this.crossed) {
       this.lap += 1;
       this.crossed = true;
       if (this.cleanLap) void this.platform.achievement.unlock("no-crash-lap");
       this.cleanLap = true;
-      this.synth.uiConfirm();
-      if (this.lap >= 2) {
+      this.synth.gateChime();
+      if (this.lap >= NEON.lapsToFinish) {
         this.finish("finish");
         return;
       }
@@ -267,20 +392,19 @@ export class DriftPlayScene extends Phaser.Scene {
     if (q.progress > 0.2) this.crossed = false;
     this.lastProgress = q.progress;
 
-    const targetX = this.car.x + this.car.vx * 0.18;
-    const targetY = this.car.y + this.car.vy * 0.18;
-    this.camX += (targetX - this.camX) * (1 - Math.exp(-dt * 6));
-    this.camY += (targetY - this.camY) * (1 - Math.exp(-dt * 6));
-    this.camX = axis(this.camX, this.scale.width / 2, 3200);
-    this.camY = axis(this.camY, this.scale.height / 2, 2200);
-    const shaken = this.juice.applyCamera({ x: this.camX, y: this.camY }, this.time.now);
+    const elapsed = this.time.now - this.runStart;
+    this.recorder.tick(dt, elapsed, this.car.x, this.car.y, this.car.angle);
+
+    stepCamera(this.cam, this.car, dt, this.scale.width, this.scale.height, this.def.worldW, this.def.worldH);
+    const shaken = this.juice.applyCamera({ x: this.cam.x, y: this.cam.y }, this.time.now);
+    this.cameras.main.setZoom(this.cam.zoom);
+    this.cameras.main.setRotation(this.cam.yaw);
     this.cameras.main.centerOn(shaken.x, shaken.y);
 
     this.parts.update(dt);
     this.floaters.update(dt);
-    this.synth.engineRpm(clamp(this.car.speed / 640, 0, 1));
 
-    if (this.time.now - this.runStart > 120000) {
+    if (elapsed > NEON.runTimeoutMs) {
       this.finish("time");
       return;
     }
@@ -292,126 +416,153 @@ export class DriftPlayScene extends Phaser.Scene {
     });
   }
 
+  private showSectorDelta(index: number, gained: number) {
+    const pb = this.tape?.sectors[index] ?? 0;
+    const d = gained - pb;
+    const sign = d >= 0 ? "+" : "";
+    this.deltaTxt.setText(`SECTOR ${index + 1}  ${sign}${Math.round(d).toLocaleString()}`);
+    this.deltaTxt.setColor(d >= 0 ? "#8dffc1" : "#ff8aa0");
+    this.deltaTxt.setAlpha(1);
+    this.tweens.add({ targets: this.deltaTxt, alpha: 0, delay: 1400, duration: 420 });
+    this.synth.gateChime();
+  }
+
   private draw(dt: number) {
-    const g = this.gfx;
-    g.clear();
-    g.fillStyle(0x121114, 1);
-    g.fillRect(0, 0, 3200, 2200);
-
-    for (let i = 0; i < this.samples.length; i += 1) {
-      const s = this.samples[i];
-      const inner = this.samples[(i + 1) % this.samples.length];
-      g.fillStyle(s.boost ? 0x5a2a44 : 0x2a2a2e, 1);
-      const w = s.width * 0.5 + 18;
-      g.fillTriangle(s.x + s.nx * w, s.y + s.ny * w, s.x - s.nx * w, s.y - s.ny * w, inner.x + inner.nx * w, inner.y + inner.ny * w);
-      g.fillTriangle(s.x - s.nx * w, s.y - s.ny * w, inner.x - inner.nx * w, inner.y - inner.ny * w, inner.x + inner.nx * w, inner.y + inner.ny * w);
+    drawWorld(this.gfx, this.def, this.samples, this.quality);
+    drawMarks(this.gfx, this.marks, dt);
+    if (this.showGhost && this.tape) {
+      drawGhost(this.gfx, ghostPose(this.tape.samples, this.time.now - this.runStart), this.def.theme.accent);
     }
-    for (let i = 0; i < this.samples.length; i += 1) {
-      const s = this.samples[i];
-      const inner = this.samples[(i + 1) % this.samples.length];
-      const w = s.width * 0.5;
-      g.fillStyle(s.boost ? 0x3a2030 : 0x1a1a1d, 1);
-      g.fillTriangle(s.x + s.nx * w, s.y + s.ny * w, s.x - s.nx * w, s.y - s.ny * w, inner.x + inner.nx * w, inner.y + inner.ny * w);
-      g.fillTriangle(s.x - s.nx * w, s.y - s.ny * w, inner.x - inner.nx * w, inner.y - inner.ny * w, inner.x + inner.nx * w, inner.y + inner.ny * w);
-    }
-
-    g.lineStyle(2, 0xe35aa0, 0.18);
-    for (let i = 0; i < this.samples.length; i += 8) {
-      const s = this.samples[i];
-      g.lineBetween(s.x + s.nx * (s.width * 0.5), s.y + s.ny * (s.width * 0.5), s.x - s.nx * (s.width * 0.5), s.y - s.ny * (s.width * 0.5));
-    }
-
-    for (const m of this.marks) {
-      m.life -= dt;
-      if (m.life <= 0) continue;
-      g.fillStyle(0x2c2c30, Math.min(0.55, m.life * 0.2));
-      g.fillCircle(m.x, m.y, 4);
-    }
-
     for (const p of this.parts.items) {
       if (!p.active) continue;
-      g.fillStyle(p.color, p.life / p.max);
-      g.fillCircle(p.x, p.y, p.size);
+      this.gfx.fillStyle(p.color, p.life / p.max);
+      this.gfx.fillCircle(p.x, p.y, p.size);
     }
+    drawCar(this.gfx, this.car, this.def.theme.accent);
 
-    const c = this.car;
-    g.save();
-    g.translateCanvas(c.x, c.y);
-    g.rotateCanvas(c.angle);
-    g.fillStyle(0x1a1a1c, 1);
-    g.fillRoundedRect(-16, -9, 32, 18, 4);
-    g.fillStyle(c.drifting ? 0xe35aa0 : 0xf3f1ec, 1);
-    g.fillRoundedRect(6, -7, 12, 14, 3);
-    g.fillStyle(0x111113, 1);
-    g.fillRect(-12, -11, 7, 4);
-    g.fillRect(-12, 7, 7, 4);
-    g.restore();
-
-    for (const t of this.floaters.items) {
-      if (!t.active) continue;
-      this.hud;
-    }
-
-    this.overlay.clear();
-    const fa = this.juice.flashAlpha(dt);
-    if (fa > 0) {
-      this.overlay.fillStyle(0xffffff, fa);
-      this.overlay.fillRect(0, 0, this.scale.width, this.scale.height);
-    }
+    this.floaterGfx.forEach((label, i) => {
+      const t = this.floaters.items[i];
+      if (!t?.active) {
+        label.setAlpha(0);
+        return;
+      }
+      label.setText(t.text).setPosition(t.x, t.y).setAlpha(Math.min(1, t.life / 400));
+      label.setColor(t.color);
+    });
 
     const combo = Math.max(1, Math.floor(this.score.combo));
     const elapsed = ((this.time.now - this.runStart) / 1000).toFixed(1);
+    const live = this.score.currentDrift > 8 ? `   +${Math.floor(this.score.currentDrift)}` : "";
+    const dbg = this.debug
+      ? `\n${(1000 / Math.max(1, this.game.loop.actualFps)).toFixed?.(0) ?? ""} ${this.game.loop.actualFps | 0}fps  slip ${(this.car.slip * 57.3).toFixed(0)}°  ${this.car.driftAmount.toFixed(2)}`
+      : "";
     this.hud.setText(
-      `${Math.floor(this.score.display).toLocaleString()}\n${combo}x   lap ${this.lap}/2   ${elapsed}s`,
+      `${Math.floor(this.score.display).toLocaleString()}${live}\n${combo}x   lap ${this.lap}/${NEON.lapsToFinish}   ${elapsed}s\n${this.def.name}${dbg}`,
     );
-    this.hint.setAlpha(this.shownHint ? 0.85 : 0);
-
-    if (this.input.activePointer.wasTouch || this.sys.game.device.input.touch) {
-      this.overlay.fillStyle(0xffffff, 0.04);
-      this.overlay.fillRoundedRect(24, this.scale.height - 92, 88, 64, 14);
-      this.overlay.fillRoundedRect(this.scale.width - 112, this.scale.height - 92, 88, 64, 14);
-      this.overlay.fillStyle(0xe35aa0, 0.18);
-      this.overlay.fillRoundedRect(this.scale.width / 2 - 46, this.scale.height - 86, 92, 52, 14);
-    }
+    this.hint.setAlpha(this.shownHint ? 0.88 : 0);
+    drawHudChrome(
+      this.overlay,
+      this.scale.width,
+      this.scale.height,
+      this.sys.game.device.input.touch,
+      this.juice.flashAlpha(dt),
+    );
   }
 
   private finish(kind: ResultKind) {
     if (this.ended) return;
     this.ended = true;
-    this.synth.stopEngine();
+    this.endedAt = this.time.now;
+    this.synth.setSkid(0);
+    this.score.bestDrift = Math.max(this.score.bestDrift, this.score.currentDrift);
     const score = Math.floor(this.score.total);
+    const prev = this.tape?.score ?? 0;
+    const pb = kind !== "crash" && score > prev;
+    if (pb) {
+      saveGhost(
+        {
+          trackId: this.def.id,
+          score,
+          duration: this.time.now - this.runStart,
+          sectors: this.score.sectorScore,
+          samples: this.recorder.samples,
+        },
+        this.reverse ? "daily" : "circuit",
+      );
+      this.synth.personalBest();
+      pulseHaptic([12, 40, 18]);
+    } else if (kind === "finish") this.synth.finishSting();
+    else this.synth.crash(this.car.speed / VEHICLE.maxSpeed);
+
     if (score >= 25000) void this.platform.achievement.unlock("score-25k");
     if (score >= 60000) void this.platform.achievement.unlock("score-60k");
     if (this.lap >= 2) void this.platform.achievement.unlock("two-laps");
+
+    const away = Math.max(0, prev - score);
+    const retryHint =
+      pb && prev > 0
+        ? "New personal best. Can you beat it?"
+        : away > 0 && away < Math.max(1800, prev * 0.12)
+          ? `You were ${away.toLocaleString()} points away.`
+          : kind === "crash"
+            ? "The wall ate the combo. Retry the line."
+            : "Hold the slide longer. Retry.";
+
+    this.platform.events.emit({
+      name: kind === "crash" ? "death" : "finish",
+      props: { gameId: "neon-drift", score, track: this.def.id },
+    });
+
     void this.platform.session.end({
       mode: this.reverse ? "daily" : "circuit",
       score,
       result: kind,
       metadata: {
         laps: this.lap,
-        combo: Math.floor(this.score.combo),
+        combo: Math.floor(this.score.bestCombo),
         wallHits: this.wallHits,
         duration: this.time.now - this.runStart,
+        bestCombo: Math.floor(this.score.bestCombo),
+        bestDrift: Math.floor(this.score.bestDrift),
+        pbDelta: score - prev,
+        cleanSectors: this.score.cleanSectors,
+        trackId: this.def.id,
+        retryHint,
+        driftTime: Math.round(this.score.driftTime * 10) / 10,
+        crashes: this.wallHits,
       },
     });
   }
 
   private retry() {
-    this.synth.dispose();
+    this.retries += 1;
+    this.platform.events.emit({
+      name: "game_retry",
+      props: {
+        gameId: "neon-drift",
+        time_since_run_end_ms: this.ended ? Math.round(this.time.now - this.endedAt) : 0,
+        retry_count_session: this.retries,
+      },
+    });
     this.game.events.off("platform-pause", this.onPause, this);
     this.game.events.off("platform-resume", this.onResume, this);
-    this.platform.events.emit({ name: "game_retry", props: { gameId: "neon-drift" } });
     this.scene.restart();
   }
 
+  private switchTrack(i: number) {
+    this.game.registry.set("trackIndex", i);
+    saveTrackIndex(i);
+    this.retry();
+  }
+
   shutdown() {
-    this.synth.dispose();
     this.game.events.off("platform-pause", this.onPause, this);
     this.game.events.off("platform-resume", this.onResume, this);
   }
 }
 
 export function mountNeonDrift(parent: HTMLElement, platform: PlatformSDK, dailyVariant = false) {
+  const mobile = typeof navigator !== "undefined" && /Mobi|Android/i.test(navigator.userAgent);
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
@@ -424,10 +575,24 @@ export function mountNeonDrift(parent: HTMLElement, platform: PlatformSDK, daily
     banner: false,
     audio: { disableWebAudio: false },
     fps: { target: 60 },
-    render: { antialias: true, roundPixels: false },
+    render: {
+      antialias: !mobile,
+      roundPixels: false,
+      pixelArt: false,
+    },
   });
   game.registry.set("platform", platform);
   game.registry.set("dailyVariant", dailyVariant);
+  game.registry.set("trackIndex", dailyVariant ? 0 : loadTrackIndex());
   game.registry.set("manifest", neonDriftManifest);
+  game.registry.set("debug", process.env.NODE_ENV !== "production");
+  (game as Phaser.Game & { restartRun: () => void }).restartRun = () => {
+    const sc = game.scene.getScene("neon-drift-play");
+    sc?.scene.restart();
+  };
+  game.events.once("destroy", () => {
+    const synth = game.registry.get("synth") as Synth | undefined;
+    synth?.dispose();
+  });
   return game;
 }

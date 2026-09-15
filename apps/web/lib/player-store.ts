@@ -33,6 +33,7 @@ export type PlayRecord = {
   durationMs: number;
   score: number;
   result: string;
+  metadata?: Record<string, number | string | boolean>;
 };
 
 export type Friend = {
@@ -479,7 +480,14 @@ class PlayerStore {
       this.snapshot.uniqueGamesToday = [...this.snapshot.uniqueGamesToday, opts.gameId];
     }
     this.snapshot.history = [
-      { gameId: opts.gameId, at: Date.now(), durationMs: opts.durationMs, score: opts.score, result: opts.result },
+      {
+        gameId: opts.gameId,
+        at: Date.now(),
+        durationMs: opts.durationMs,
+        score: opts.score,
+        result: opts.result,
+        metadata: opts.payload.metadata,
+      },
       ...this.snapshot.history,
     ].slice(0, 80);
 
@@ -621,7 +629,17 @@ class PlayerStore {
             }
             hooks.onHud(nums);
           }
-          if (event.name === "game_retry") analytics.track("game_retry", { gameId });
+          if (
+            event.name === "game_retry" ||
+            event.name === "death" ||
+            event.name === "finish" ||
+            event.name === "personal_best" ||
+            event.name === "medal_earned" ||
+            event.name === "upgrade_selected" ||
+            event.name === "boss_defeated"
+          ) {
+            analytics.track(event.name, { gameId, ...event.props });
+          }
         },
       },
       pause: { request: () => hooks.onPause() },
