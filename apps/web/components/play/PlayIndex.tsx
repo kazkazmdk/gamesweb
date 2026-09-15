@@ -1,10 +1,21 @@
 "use client";
 
-import { GAME_MANIFESTS, recommend } from "@gamesweb/game-sdk";
-import { GameArt } from "@/components/game/GameArt";
-import { GameCard, PlayButton } from "@/components/game/GameCard";
+import { dailyQuests, GAME_MANIFESTS, getManifest, recommend } from "@gamesweb/game-sdk";
+import {
+  ChallengeWidget,
+  EmptyState,
+  FriendPresence,
+  GameTile,
+  PlatformHero,
+  RecordWidget,
+  SectionHeader,
+} from "@/components/platform";
+import { PlayButton as PlayCta } from "@/components/game/GameCard";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
+import { challengeViewModel, gameRecordFor } from "@/lib/platform/adapters";
+import { formatPlayScore } from "@/lib/platform/format";
+import { defaultBoardMode, isCompactCatalog, lowerIsBetter } from "@/lib/platform/modes";
 
 export default function PlayIndex() {
   const player = usePlayer();
@@ -18,62 +29,118 @@ export default function PlayIndex() {
   const featured = GAME_MANIFESTS.find((g) => g.id === rec[0]) ?? GAME_MANIFESTS[0];
   useAccent(featured.accent);
   const continueG = store.continuePlaying();
+  const compact = isCompactCatalog(GAME_MANIFESTS.length);
+  const quests = dailyQuests(player.dayKey);
+  const friendsNow = player.friends.filter((f) => f.status === "accepted" && f.presence !== "offline");
+  const pb = store.personalBest(featured.id, defaultBoardMode(featured.id), lowerIsBetter(featured.id));
 
   return (
     <div>
-      <section className="relative min-h-[58vh] overflow-hidden">
-        <GameArt slug={featured.slug} className="absolute inset-0 h-full w-full" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg)] via-[color-mix(in_srgb,var(--bg)_40%,transparent)] to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)] via-transparent to-transparent" />
-        <div className="relative flex min-h-[58vh] flex-col justify-end px-5 pb-10 md:px-10">
-          <p className="text-[12px] uppercase tracking-[0.2em] text-white/50">Featured</p>
-          <h1 className="display mt-3 text-[56px] md:text-[80px]">{featured.title}</h1>
-          <p className="mt-2 max-w-lg text-[16px] text-white/70">{featured.tagline}</p>
-          <div className="mt-6">
-            <PlayButton href={`/play/${featured.slug}`} />
-          </div>
-        </div>
-      </section>
+      <PlatformHero
+        slug={featured.slug}
+        kicker="Featured"
+        title={featured.title}
+        tagline={featured.tagline}
+        metrics={[formatPlayScore(featured.id, pb), featured.sessionHint].filter(Boolean).join(" · ")}
+        actions={<PlayCta href={`/play/${featured.slug}`} />}
+        minHeight="play"
+      />
       <div className="px-5 py-8 md:px-10">
-        <Section title="Continue">
-          {continueG.length ? (
-            <Grid games={continueG} />
+        {continueG.length ? (
+          <section className="mt-2">
+            <SectionHeader title="Continue" />
+            <div className="mt-3 flex flex-col gap-2">
+              {continueG.map((g) => (
+                <GameTile
+                  key={g.id}
+                  game={g}
+                  variant="wide"
+                  href={`/play/${g.slug}`}
+                  pb={store.personalBest(g.id, defaultBoardMode(g.id), lowerIsBetter(g.id))}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="mt-10" data-testid="play-three-ways">
+          <SectionHeader title="Three ways to play" />
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {GAME_MANIFESTS.map((g) => (
+              <GameTile
+                key={g.id}
+                game={g}
+                href={`/play/${g.slug}`}
+                pb={store.personalBest(g.id, defaultBoardMode(g.id), lowerIsBetter(g.id))}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-10">
+          <SectionHeader title="Daily challenge" />
+          <div className="mt-2 divide-y divide-[var(--line)] md:grid md:grid-cols-3 md:divide-x md:divide-y-0 md:divide-[var(--line)]">
+            {quests.map((q) => (
+              <div key={q.id} className="md:px-4 md:first:pl-0 md:last:pr-0">
+                <ChallengeWidget view={challengeViewModel(player, q)} variant="compact" />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-10">
+          <SectionHeader title="Friends activity" />
+          {friendsNow.length ? (
+            <div className="mt-2 divide-y divide-[var(--line)]">
+              {friendsNow.map((f) => (
+                <FriendPresence key={f.id} friend={f} compact />
+              ))}
+            </div>
           ) : (
-            <p className="text-[14px] text-[var(--text-dim)]">Pick your first game.</p>
+            <EmptyState title="Nobody on the floor yet" body="Invite a rival when you want company." />
           )}
-        </Section>
-        <Section title="For you">
-          <Grid games={rec.map((id) => GAME_MANIFESTS.find((g) => g.id === id)!)} />
-        </Section>
-        <Section title="Competitive">
-          <Grid games={[...GAME_MANIFESTS]} />
-        </Section>
-        <Section title="Quick sessions">
-          <Grid games={[...GAME_MANIFESTS].sort((a, b) => a.sessionHint.localeCompare(b.sessionHint))} />
-        </Section>
-        <Section title="All games">
-          <Grid games={GAME_MANIFESTS} />
-        </Section>
+        </section>
+
+        <section className="mt-10">
+          <SectionHeader title="Recent records" />
+          {GAME_MANIFESTS.some((g) => {
+            const rec = gameRecordFor(player, g.id);
+            return Number.isFinite(rec.score) && rec.score > 0 && rec.score < 1e12;
+          }) ? (
+            <div className="mt-4 space-y-5">
+              {GAME_MANIFESTS.map((g) => {
+                const rec = gameRecordFor(player, g.id);
+                if (!Number.isFinite(rec.score) || rec.score <= 0 || rec.score >= 1e12) return null;
+                return <RecordWidget key={g.id} game={g} score={rec.score} modeLabel={rec.mode} />;
+              })}
+            </div>
+          ) : (
+            <EmptyState title="No records yet" body="Finish a run to pin a personal best here." />
+          )}
+        </section>
+
+        {!compact ? (
+          <>
+            <section className="mt-10">
+              <SectionHeader title="For you" />
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {rec.map((id) => {
+                  const g = getManifest(id);
+                  return g ? <GameTile key={g.id} game={g} /> : null;
+                })}
+              </div>
+            </section>
+            <section className="mt-10">
+              <SectionHeader title="All games" />
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {GAME_MANIFESTS.map((g) => (
+                  <GameTile key={g.id} game={g} />
+                ))}
+              </div>
+            </section>
+          </>
+        ) : null}
       </div>
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-10">
-      <h2 className="text-[13px] uppercase tracking-[0.18em] text-[var(--text-faint)]">{title}</h2>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
-
-function Grid({ games }: { games: typeof GAME_MANIFESTS }) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {games.map((g) => (
-        <GameCard key={g.id} game={g} />
-      ))}
     </div>
   );
 }

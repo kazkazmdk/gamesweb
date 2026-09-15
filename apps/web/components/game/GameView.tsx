@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
+import { loadPlayIndex } from "@/lib/platform/modes";
 import { formatScore } from "@/lib/player-store";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import type Phaser from "phaser";
@@ -63,7 +64,7 @@ export function GameView({ slug }: { slug: string }) {
         instance = mod.mountNeonDrift(parent, platform);
       } else if (game!.id === "velocity-run") {
         const mod = await import("@gamesweb/velocity-run");
-        instance = mod.mountVelocityRun(parent, platform);
+        instance = mod.mountVelocityRun(parent, platform, loadPlayIndex("velocity-run"));
       } else {
         const mod = await import("@gamesweb/swarm-protocol");
         instance = mod.mountSwarmProtocol(parent, platform);

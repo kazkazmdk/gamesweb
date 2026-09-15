@@ -5,21 +5,23 @@ import { GAME_MANIFESTS } from "@gamesweb/game-sdk";
 import { analytics } from "@gamesweb/analytics";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { usePlayer, useStore, useToasts } from "@/lib/player";
+import { useEffect, useState, type ReactNode } from "react";
+import { usePlayer } from "@/lib/player";
 import { levelFromXp } from "@gamesweb/config";
 import { SavePrompt } from "@/components/meta/SavePrompt";
 import { Toasts } from "@/components/meta/Toasts";
 import { Search } from "@/components/shell/Search";
 
+export const PLATFORM_ACCENT = "#d7c4a3";
+
 const NAV = [
-  { href: "/", label: "Home", match: (p: string) => p === "/" },
-  { href: "/play", label: "Play", match: (p: string) => p.startsWith("/play") || p.startsWith("/games") },
-  { href: "/challenges", label: "Challenges", match: (p: string) => p.startsWith("/challenges") },
-  { href: "/friends", label: "Friends", match: (p: string) => p.startsWith("/friends") },
+  { href: "/", label: "Home", match: (p: string) => p === "/", icon: HomeIcon },
+  { href: "/play", label: "Play", match: (p: string) => p.startsWith("/play") || p.startsWith("/games"), icon: PlayIcon },
+  { href: "/challenges", label: "Challenges", match: (p: string) => p.startsWith("/challenges"), icon: FlagIcon },
+  { href: "/friends", label: "Friends", match: (p: string) => p.startsWith("/friends"), icon: FriendsIcon },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children }: { children: ReactNode }) {
   const path = usePathname() ?? "/";
   const playing = path.startsWith("/play/") && path !== "/play";
   const player = usePlayer();
@@ -62,12 +64,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={item.match(path) ? "text-[var(--text)]" : "hover:text-[var(--text)]"}
+                className={item.match(path) ? "nav-active pb-0.5" : "hover:text-[var(--text)]"}
               >
                 {item.label}
               </Link>
             ))}
-            <Link href="/leaderboards" className={path.startsWith("/leaderboards") ? "text-[var(--text)]" : "hover:text-[var(--text)]"}>
+            <Link
+              href="/leaderboards"
+              className={path.startsWith("/leaderboards") ? "nav-active pb-0.5" : "hover:text-[var(--text)]"}
+            >
               Boards
             </Link>
           </nav>
@@ -108,13 +113,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         {[
           ...NAV,
-          { href: "/me", label: "Me", match: (p: string) => p.startsWith("/me") || p.startsWith("/profile") },
+          { href: "/me", label: "Me", match: (p: string) => p.startsWith("/me") || p.startsWith("/profile"), icon: MeIcon },
         ].map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex h-14 flex-col items-center justify-center text-[11px] ${item.match(path) ? "text-[var(--text)]" : "text-[var(--text-dim)]"}`}
+            aria-label={item.label}
+            className={`flex h-14 flex-col items-center justify-center gap-0.5 text-[10px] ${item.match(path) ? "text-[var(--text)]" : "text-[var(--text-dim)]"}`}
           >
+            <item.icon />
             {item.label}
           </Link>
         ))}
@@ -123,6 +130,59 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Toasts />
       <SavePrompt />
     </div>
+  );
+}
+
+function IconFrame({ children }: { children: ReactNode }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
+      {children}
+    </svg>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <IconFrame>
+      <path d="M3 8.2 9 3.5 15 8.2V15H11.2V11H6.8v4H3Z" />
+    </IconFrame>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <IconFrame>
+      <path d="M6 4.2 14 9 6 13.8Z" />
+    </IconFrame>
+  );
+}
+
+function FlagIcon() {
+  return (
+    <IconFrame>
+      <path d="M5 3v12" />
+      <path d="M5 4h8l-1.6 2.4L13 9H5" />
+    </IconFrame>
+  );
+}
+
+function FriendsIcon() {
+  return (
+    <IconFrame>
+      <circle cx="7" cy="6.5" r="2.1" />
+      <path d="M3.4 14c.4-2.2 2-3.4 3.6-3.4S10.2 11.8 10.6 14" />
+      <circle cx="12.2" cy="7" r="1.7" />
+      <path d="M12 10.8c1.4.1 2.6 1.2 3 3.2" />
+    </IconFrame>
+  );
+}
+
+function MeIcon() {
+  return (
+    <IconFrame>
+      <circle cx="9" cy="6.4" r="2.2" />
+      <path d="M4.2 14.2c.6-2.6 2.4-3.8 4.8-3.8s4.2 1.2 4.8 3.8" />
+    </IconFrame>
   );
 }
 
@@ -144,10 +204,10 @@ export function Avatar({ id, size = 32 }: { id: string; size?: number }) {
 }
 
 export function useAccent(color?: string) {
-  const store = useStore();
-  void store;
   useEffect(() => {
-    if (!color) return;
-    document.documentElement.style.setProperty("--accent", color);
+    document.documentElement.style.setProperty("--accent", color || PLATFORM_ACCENT);
+    return () => {
+      document.documentElement.style.setProperty("--accent", PLATFORM_ACCENT);
+    };
   }, [color]);
 }
