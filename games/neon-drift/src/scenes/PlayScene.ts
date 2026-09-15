@@ -243,6 +243,7 @@ export class DriftPlayScene extends Phaser.Scene {
     if (!this.signaledReady) {
       this.signaledReady = true;
       this.platform.events.emit({ name: "game_ready", props: { gameId: "neon-drift" } });
+      this.publishDebug(delta);
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.keys.r)) {
@@ -266,6 +267,7 @@ export class DriftPlayScene extends Phaser.Scene {
     }
     if (this.juice.isFrozen(this.time.now)) {
       this.draw(dt);
+      this.publishDebug(delta);
       return;
     }
 

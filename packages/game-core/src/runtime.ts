@@ -33,10 +33,13 @@ type GwDebugWindow = Window & {
 
 function debugWindow(): GwDebugWindow | null {
   if (typeof window === "undefined") return null;
+  const w = window as GwDebugWindow & { __GW_ALLOW_DEBUG__?: boolean };
+  if (w.__GW_ALLOW_DEBUG__) return w;
   const host = window.location.hostname;
-  const local = host === "localhost" || host === "127.0.0.1";
-  if (!local && process.env.NODE_ENV === "production") return null;
-  return window as GwDebugWindow;
+  const local = host === "localhost" || host === "127.0.0.1" || host === "::1";
+  if (local) return w;
+  if (process.env.NODE_ENV === "production") return null;
+  return w;
 }
 
 export function publishGwDebug(state: GwDebugState, commands?: GwDebugCommands) {

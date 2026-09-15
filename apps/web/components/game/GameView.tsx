@@ -41,6 +41,10 @@ export function GameView({ slug }: { slug: string }) {
 
   useEffect(() => {
     if (!game) return;
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+      (window as Window & { __GW_ALLOW_DEBUG__?: boolean }).__GW_ALLOW_DEBUG__ = true;
+    }
     analytics.track("game_selected", { gameId: game.id });
     analytics.track("game_load_started", { gameId: game.id });
     setBootError(null);

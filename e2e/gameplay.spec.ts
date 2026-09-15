@@ -19,8 +19,12 @@ async function debugOf(page: Page): Promise<GwDebug | null> {
 }
 
 async function waitReady(page: Page, gameId: string) {
+  await page.addInitScript(() => {
+    (window as Window & { __GW_ALLOW_DEBUG__?: boolean }).__GW_ALLOW_DEBUG__ = true;
+  });
   await page.goto(`/play/${gameId}`);
-  await page.locator("canvas").click({ position: { x: 40, y: 40 }, timeout: 20_000 });
+  await page.locator("canvas").waitFor({ timeout: 20_000 });
+  await page.locator("canvas").click({ position: { x: 120, y: 120 }, timeout: 20_000 });
   await expect
     .poll(async () => {
       const d = await debugOf(page);
@@ -63,11 +67,17 @@ test("velocity run moves, jumps, dies, and starts a new attempt", async ({ page 
   const moved = await debugOf(page);
   expect(moved!.playerX).toBeGreaterThan(before!.playerX);
   await page.keyboard.up("KeyD");
-  await page.keyboard.press("Space");
-  await page.waitForTimeout(120);
-  const jumped = await debugOf(page);
-  expect(jumped!.playerY).not.toBe(moved!.playerY);
+  await page.locator("canvas").click({ position: { x: 200, y: 200 } });
+  await page.keyboard.down("Space");
+  await expect
+    .poll(async () => {
+      const d = await debugOf(page);
+      return d?.playerY ?? moved!.playerY;
+    })
+    .not.toBe(moved!.playerY);
+  await page.keyboard.up("Space");
 
+  const jumped = await debugOf(page);
   const deathsBefore = jumped!.sessionDeaths ?? jumped!.deaths ?? 0;
   await page.evaluate(() => {
     (window as unknown as { __GW_DEBUG_CMD__?: { killPlayer?: () => void } }).__GW_DEBUG_CMD__?.killPlayer?.();
