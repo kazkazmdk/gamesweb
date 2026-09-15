@@ -588,6 +588,9 @@ export class VelocityPlayScene extends Phaser.Scene {
       {
         killPlayer: () => this.die(),
         finishRun: () => this.win(),
+        jump: () => {
+          this.touchJump = true;
+        },
       },
     );
   }

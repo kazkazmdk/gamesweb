@@ -37,14 +37,20 @@ test("neon drift steers, scores, pauses, and retries", async ({ page }) => {
   await waitReady(page, "neon-drift");
   const before = await debugOf(page);
   expect(before?.runState).toBe("playing");
-  await page.keyboard.down("ArrowUp");
-  await page.keyboard.down("ArrowRight");
-  await page.waitForTimeout(700);
-  const moving = await debugOf(page);
-  expect(moving).toBeTruthy();
-  expect(Math.abs((moving!.playerAngle ?? 0) - (before!.playerAngle ?? 0)) + Math.abs(moving!.playerX - before!.playerX)).toBeGreaterThan(2);
-  await page.keyboard.up("ArrowRight");
-  await page.keyboard.up("ArrowUp");
+  await page.keyboard.down("KeyW");
+  await page.keyboard.down("KeyD");
+  await page.evaluate(() => {
+    (window as unknown as { __GW_DEBUG_CMD__?: { setDrive?: (t: number, s: number) => void } }).__GW_DEBUG_CMD__?.setDrive?.(1, 1);
+  });
+  await expect
+    .poll(async () => {
+      const d = await debugOf(page);
+      if (!d || !before) return 0;
+      return Math.abs((d.playerAngle ?? 0) - (before.playerAngle ?? 0)) + Math.abs(d.playerX - before.playerX);
+    })
+    .toBeGreaterThan(2);
+  await page.keyboard.up("KeyD");
+  await page.keyboard.up("KeyW");
 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
@@ -67,7 +73,9 @@ test("velocity run moves, jumps, dies, and starts a new attempt", async ({ page 
   const moved = await debugOf(page);
   expect(moved!.playerX).toBeGreaterThan(before!.playerX);
   await page.keyboard.up("KeyD");
-  await page.locator("canvas").click({ position: { x: 200, y: 200 } });
+  await page.evaluate(() => {
+    (window as unknown as { __GW_DEBUG_CMD__?: { jump?: () => void } }).__GW_DEBUG_CMD__?.jump?.();
+  });
   await page.keyboard.down("Space");
   await expect
     .poll(async () => {

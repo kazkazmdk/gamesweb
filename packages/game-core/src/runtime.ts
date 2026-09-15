@@ -24,6 +24,8 @@ export type GwDebugCommands = {
   grantXp?: (amount: number) => void;
   killPlayer?: () => void;
   finishRun?: () => void;
+  setDrive?: (throttle: number, steer: number) => void;
+  jump?: () => void;
 };
 
 type GwDebugWindow = Window & {

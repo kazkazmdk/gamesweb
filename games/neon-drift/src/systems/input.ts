@@ -15,7 +15,7 @@ export function readDriveInput(
   h: number,
 ): DriveInput {
   const pointers = [input.activePointer, input.pointer1, input.pointer2];
-  const touch = pointers.some((p) => p.wasTouch);
+  const touch = pointers.some((p) => p.isDown && p.wasTouch);
   let steer =
     Number(keys.right.isDown || keys.right2.isDown) - Number(keys.left.isDown || keys.left2.isDown);
   let throttle = 0;

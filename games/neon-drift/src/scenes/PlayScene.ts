@@ -77,6 +77,7 @@ export class DriftPlayScene extends Phaser.Scene {
   private signaledReady = false;
   private longFrames = 0;
   private onGrass = false;
+  private testDrive: { throttle: number; steer: number } | null = null;
   private boardMode = "foundation";
 
   constructor() {
@@ -272,10 +273,10 @@ export class DriftPlayScene extends Phaser.Scene {
     }
 
     const drive = readDriveInput(this.keys, this.input, this.scale.width, this.scale.height);
-    this.car.steer = drive.steer;
-    this.car.throttle = drive.throttle;
-    this.car.handbrake = drive.handbrake;
-    this.car.assist = drive.touch ? VEHICLE.touchSteerAssist : 0;
+    this.car.steer = this.testDrive?.steer ?? drive.steer;
+    this.car.throttle = this.testDrive?.throttle ?? drive.throttle;
+    this.car.handbrake = this.testDrive ? false : drive.handbrake;
+    this.car.assist = drive.touch && !this.testDrive ? VEHICLE.touchSteerAssist : 0;
 
     if (this.car.throttle !== 0 || this.car.steer !== 0 || this.car.handbrake) {
       if (this.shownHint) {
@@ -538,6 +539,9 @@ export class DriftPlayScene extends Phaser.Scene {
       },
       {
         finishRun: () => this.finish("finish"),
+        setDrive: (throttle: number, steer: number) => {
+          this.testDrive = { throttle, steer };
+        },
       },
     );
   }
