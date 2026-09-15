@@ -28,10 +28,13 @@ export function GameView({ slug }: { slug: string }) {
     result: string;
     gameId: string;
     durationMs: number;
+    metadata?: Record<string, number | string | boolean>;
   }>(null);
   const [hud, setHud] = useState<Record<string, number>>({});
   const [intense, setIntense] = useState(false);
   const historyLen = useRef(player.history.length);
+  const runEndedAt = useRef(0);
+  const retries = useRef(0);
 
   useAccent(game?.accent);
 
@@ -102,7 +105,14 @@ export function GameView({ slug }: { slug: string }) {
     if (player.history.length > historyLen.current) {
       const last = player.history[0];
       if (last && last.gameId === game?.id) {
-        setResult({ score: last.score, result: last.result, gameId: last.gameId, durationMs: last.durationMs });
+        runEndedAt.current = Date.now();
+        setResult({
+          score: last.score,
+          result: last.result,
+          gameId: last.gameId,
+          durationMs: last.durationMs,
+          metadata: last.metadata,
+        });
       }
     }
     historyLen.current = player.history.length;
@@ -156,12 +166,14 @@ export function GameView({ slug }: { slug: string }) {
     );
   }
 
+  const gameId = game.id;
+
   const pb = store.personalBest(
-    game.id,
-    game.id === "velocity-run" ? "course-1" : game.id === "swarm-protocol" ? "survival" : "circuit",
-    game.id === "velocity-run",
+    gameId,
+    gameId === "velocity-run" ? "course-1" : gameId === "swarm-protocol" ? "survival" : "circuit",
+    gameId === "velocity-run",
   );
-  const friendsHere = player.friends.filter((f) => f.status === "accepted" && f.gameId === game.id);
+  const friendsHere = player.friends.filter((f) => f.status === "accepted" && f.gameId === gameId);
 
   function resume() {
     setPaused(false);
@@ -169,8 +181,20 @@ export function GameView({ slug }: { slug: string }) {
   }
 
   function retry() {
+    retries.current += 1;
+    const since = runEndedAt.current ? Date.now() - runEndedAt.current : 0;
+    analytics.track("game_retry", {
+      gameId,
+      time_since_run_end_ms: since,
+      retry_count_session: retries.current,
+    });
     setResult(null);
     setPaused(false);
+    const g = phaser.current as (Phaser.Game & { restartRun?: () => void }) | null;
+    if (g?.restartRun) {
+      g.restartRun();
+      return;
+    }
     phaser.current?.destroy(true);
     phaser.current = null;
     setLoaded(false);
@@ -307,6 +331,7 @@ export function GameView({ slug }: { slug: string }) {
           score={result.score}
           result={result.result}
           durationMs={result.durationMs}
+          metadata={result.metadata}
           onRetry={retry}
           nextSlug={next?.slug}
           nextTitle={next?.title}
@@ -321,6 +346,7 @@ function Results({
   score,
   result,
   durationMs,
+  metadata,
   onRetry,
   nextSlug,
   nextTitle,
@@ -329,6 +355,7 @@ function Results({
   score: number;
   result: string;
   durationMs: number;
+  metadata?: Record<string, number | string | boolean>;
   onRetry: () => void;
   nextSlug?: string;
   nextTitle?: string;
@@ -344,6 +371,19 @@ function Results({
       : retries >= 4
         ? "other"
         : "retry";
+
+  const pbDelta = typeof metadata?.pbDelta === "number" ? metadata.pbDelta : null;
+  const retryHint = typeof metadata?.retryHint === "string" ? metadata.retryHint : null;
+  const bestCombo = typeof metadata?.bestCombo === "number" ? metadata.bestCombo : null;
+  const bestDrift = typeof metadata?.bestDrift === "number" ? metadata.bestDrift : null;
+  const cleanSectors = typeof metadata?.cleanSectors === "number" ? metadata.cleanSectors : null;
+  const medal = typeof metadata?.medal === "string" ? metadata.medal : null;
+  const nextMedal = typeof metadata?.nextMedal === "string" ? metadata.nextMedal : null;
+  const medalGap = typeof metadata?.medalGap === "number" ? metadata.medalGap : null;
+  const kills = typeof metadata?.kills === "number" ? metadata.kills : null;
+  const level = typeof metadata?.level === "number" ? metadata.level : null;
+  const buildHint = typeof metadata?.buildHint === "string" ? metadata.buildHint : null;
+  const boss = metadata?.boss === true || metadata?.boss === "defeated";
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -361,8 +401,40 @@ function Results({
       <div className="w-[min(420px,92vw)] rounded-2xl border border-white/10 bg-[#121214] p-6">
         <p className="text-[12px] uppercase tracking-[0.18em] text-white/45">{result}</p>
         <p className="display mt-2 text-[48px]">{formatScore(gameId, score)}</p>
-        <p className="mt-2 text-[13px] text-white/55">{Math.round(durationMs / 1000)}s · Lv {store.view().level}</p>
-        <p className="mt-1 text-[13px] text-white/55">{done}/3 challenges today</p>
+        {pbDelta !== null ? (
+          <p className={`mt-1 text-[14px] ${pbDelta >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+            {gameId === "velocity-run"
+              ? pbDelta <= 0
+                ? `PB ${ (pbDelta / 1000).toFixed(3)}s`
+                : `PB +${(pbDelta / 1000).toFixed(3)}s`
+              : pbDelta >= 0
+                ? `PB +${Math.round(pbDelta).toLocaleString()}`
+                : `${Math.abs(Math.round(pbDelta)).toLocaleString()} off PB`}
+          </p>
+        ) : null}
+        {retryHint ? <p className="mt-2 text-[14px] text-white/80">{retryHint}</p> : null}
+        <div className="mt-3 space-y-1 text-[13px] text-white/55">
+          {bestCombo !== null ? <p>Best combo {bestCombo}x</p> : null}
+          {bestDrift !== null ? <p>Best drift {Math.round(bestDrift).toLocaleString()}</p> : null}
+          {cleanSectors !== null ? <p>Clean sectors {cleanSectors}</p> : null}
+          {medal ? (
+            <p>
+              {medal}
+              {nextMedal && medalGap !== null ? ` · ${nextMedal} in ${(medalGap / 1000).toFixed(3)}s` : ""}
+            </p>
+          ) : null}
+          {kills !== null ? (
+            <p>
+              {kills} kills · lv {level ?? 1}
+              {boss ? " · boss down" : ""}
+            </p>
+          ) : null}
+          {buildHint ? <p>{buildHint}</p> : null}
+          <p>
+            {Math.round(durationMs / 1000)}s · Lv {store.view().level}
+          </p>
+          <p>{done}/3 challenges today</p>
+        </div>
         <p className="mt-2 text-[12px] text-white/45">
           {player.syncStatus === "saving"
             ? "Saving…"

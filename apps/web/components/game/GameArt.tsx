@@ -23,11 +23,19 @@ function NeonArt({ className }: { className?: string }) {
       <path d="M-80 720 C 180 480, 360 820, 640 600 S 1080 360, 1680 540 L 1680 900 L -80 900 Z" fill="#161218" />
       <path d="M-80 700 C 200 470, 380 800, 660 590 S 1100 350, 1680 520" fill="none" stroke="#e35aa0" strokeWidth="4" opacity="0.7" />
       <path d="M-80 730 C 220 510, 400 830, 680 620 S 1120 390, 1680 560" fill="none" stroke="#f3f1ec" strokeWidth="1.2" opacity="0.18" />
-      <g transform="translate(1040 530) rotate(-22)">
-        <rect x="-52" y="-20" width="104" height="40" rx="10" fill="#1c181c" />
-        <rect x="14" y="-16" width="34" height="32" rx="7" fill="#e35aa0" />
-        <rect x="-28" y="-24" width="16" height="8" rx="2" fill="#111" />
-        <rect x="-28" y="16" width="16" height="8" rx="2" fill="#111" />
+      <g transform="translate(1040 530) rotate(-18)">
+        <ellipse cx="6" cy="18" rx="34" ry="10" fill="#000" opacity="0.35" />
+        <rect x="-40" y="-16" width="78" height="30" rx="8" fill="#1a1418" />
+        <rect x="-36" y="-13" width="70" height="24" rx="6" fill="#f3f1ec" />
+        <rect x="-2" y="-10" width="28" height="18" rx="4" fill="#241820" />
+        <rect x="28" y="-9" width="8" height="8" rx="1" fill="#f6e7a8" />
+        <rect x="28" y="2" width="8" height="8" rx="1" fill="#f6e7a8" />
+        <rect x="-38" y="-8" width="6" height="6" fill="#e35aa0" />
+        <rect x="-38" y="4" width="6" height="6" fill="#e35aa0" />
+        <rect x="-18" y="-18" width="14" height="6" rx="1" fill="#111" />
+        <rect x="-18" y="12" width="14" height="6" rx="2" fill="#111" />
+        <rect x="10" y="-18" width="14" height="6" rx="2" fill="#111" />
+        <rect x="10" y="12" width="14" height="6" rx="2" fill="#111" />
       </g>
       <circle cx="180" cy="120" r="2.2" fill="#f3f1ec" opacity="0.7" />
       <circle cx="320" cy="80" r="1.4" fill="#f3f1ec" opacity="0.45" />
@@ -60,8 +68,12 @@ function VelocityArt({ className }: { className?: string }) {
       <rect x="1280" y="680" width="320" height="40" fill="#1b3a48" />
       <rect x="1410" y="600" width="24" height="80" fill="#8ff3ff" />
       <polygon points="640,620 680,560 720,620" fill="#d96b6b" />
-      <rect x="708" y="576" width="22" height="44" rx="5" fill="#3ec6e8" />
-      <rect x="714" y="588" width="6" height="8" fill="#071018" />
+      <g transform="translate(708 576)">
+        <rect x="0" y="8" width="22" height="36" rx="5" fill="#3ec6e8" />
+        <rect x="4" y="14" width="6" height="7" fill="#071018" />
+      </g>
+      <rect x="980" y="430" width="8" height="70" fill="#3ec6e8" opacity="0.35" />
+      <rect x="1180" y="360" width="8" height="140" fill="#8ff3ff" opacity="0.2" />
     </svg>
   );
 }
@@ -82,9 +94,12 @@ function SwarmArt({ className }: { className?: string }) {
       <circle cx="980" cy="430" r="16" fill="#f07a3a" />
       <circle cx="980" cy="430" r="6" fill="#140e0c" />
       <circle cx="1220" cy="300" r="22" fill="#e8b089" />
+      <polygon points="1108,548 1142,612 1076,612" fill="#f0d27a" />
       <circle cx="760" cy="560" r="32" fill="#c45c3a" />
-      <polygon points="1100,560 1130,620 1070,620" fill="#f0d27a" />
+      <rect x="748" y="548" width="24" height="18" rx="3" fill="#140e0c" opacity="0.35" />
       <circle cx="1340" cy="520" r="12" fill="#d98a4a" />
+      <circle cx="980" cy="180" r="46" fill="#ffc18a" opacity="0.9" />
+      <circle cx="980" cy="180" r="18" fill="#140e0c" />
       <circle cx="680" cy="320" r="9" fill="#ffc58a" />
       <circle cx="860" cy="240" r="7" fill="#ffc58a" />
       <circle cx="1180" cy="640" r="8" fill="#ffc58a" />

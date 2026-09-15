@@ -2,6 +2,7 @@ export { Juice, ParticlePool, FloatingTextPool, springScale, audioPitchVariation
 export type { Particle, FloatingText } from "./juice";
 export { Synth, createSynth } from "./audio";
 export type { MixerSettings } from "./audio";
+export { pulseHaptic } from "./haptic";
 
 export class Pool<T> {
   private free: T[] = [];

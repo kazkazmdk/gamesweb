@@ -1,19 +1,20 @@
 import { approach, clamp } from "@gamesweb/game-core";
 
 export const MOVE = {
-  maxRun: 310,
-  accel: 2800,
-  decel: 3200,
-  airAccel: 1750,
-  airDecel: 800,
-  gravity: 2150,
-  apexGravity: 1350,
-  jumpV: -690,
-  coyoteMs: 100,
-  bufferMs: 130,
-  fastFall: 1.75,
-  maxFall: 980,
-  jumpCut: 0.42,
+  maxRun: 318,
+  accel: 3100,
+  decel: 3400,
+  airAccel: 1880,
+  airDecel: 720,
+  gravity: 2280,
+  apexGravity: 1280,
+  jumpV: -705,
+  coyoteMs: 110,
+  bufferMs: 140,
+  fastFall: 1.82,
+  maxFall: 1020,
+  jumpCut: 0.4,
+  landSquash: 0.22,
 } as const;
 
 export class Runner {
@@ -30,6 +31,10 @@ export class Runner {
   dead = false;
   facing = 1;
   fastFell = false;
+  squash = 1;
+  stretch = 1;
+  lean = 0;
+  landFlash = 0;
 
   reset(x: number, y: number) {
     this.x = x;
@@ -42,6 +47,10 @@ export class Runner {
     this.jumping = false;
     this.dead = false;
     this.fastFell = false;
+    this.squash = 1;
+    this.stretch = 1;
+    this.lean = 0;
+    this.landFlash = 0;
   }
 
   input(dt: number, move: number, jumpDown: boolean, jumpHeld: boolean, jumpReleased: boolean, down: boolean, now: number) {
@@ -63,6 +72,8 @@ export class Runner {
       this.coyote = 0;
       this.buffer = 0;
       this.jumping = true;
+      this.stretch = 1.18;
+      this.squash = 0.86;
     }
 
     if (jumpReleased && this.vy < 0) {
@@ -71,7 +82,7 @@ export class Runner {
     }
 
     let g: number = MOVE.gravity;
-    if (Math.abs(this.vy) < 40) g = MOVE.apexGravity;
+    if (Math.abs(this.vy) < 42) g = MOVE.apexGravity;
     if (down && this.vy > 0) {
       g *= MOVE.fastFall;
       this.fastFell = true;
@@ -79,16 +90,27 @@ export class Runner {
     this.vy = Math.min(MOVE.maxFall, this.vy + g * dt);
     this.x += this.vx * dt;
     this.y += this.vy * dt;
+
+    this.lean += ((this.grounded ? this.vx / MOVE.maxRun : this.facing * 0.15) * 0.22 - this.lean) * Math.min(1, dt * 12);
+    this.squash += (1 - this.squash) * Math.min(1, dt * 10);
+    this.stretch += (1 - this.stretch) * Math.min(1, dt * 10);
+    this.landFlash = Math.max(0, this.landFlash - dt * 4);
   }
 
   land(y: number) {
+    const impact = Math.min(1, Math.abs(this.vy) / 900);
     this.y = y;
     this.vy = 0;
     this.grounded = true;
+    this.fastFell = false;
+    this.squash = 1 - MOVE.landSquash * (0.45 + impact);
+    this.stretch = 1 + 0.12 * impact;
+    this.landFlash = 0.35 + impact * 0.4;
   }
 
   bonk() {
     if (this.vy < 0) this.vy = 0;
+    this.stretch = 0.9;
   }
 }
 
