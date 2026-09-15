@@ -16,9 +16,7 @@ export function drawWorld(
   g.fillRect(0, 0, def.worldW, def.worldH);
 
   if (quality === "high") {
-    g.fillStyle(theme.grass, 0.55);
-    g.fillRect(0, 0, def.worldW, def.worldH);
-    g.fillStyle(theme.building, 0.7);
+    g.fillStyle(theme.building, 0.75);
     for (let i = 0; i < samples.length; i += 14) {
       const s = samples[i];
       const bx = s.x + s.nx * (s.width * 0.5 + 90);

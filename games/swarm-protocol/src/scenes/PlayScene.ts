@@ -325,8 +325,7 @@ export class SwarmPlayScene extends Phaser.Scene {
   private spawnWave(dt: number) {
     const elapsed = (this.time.now - this.started) / 1000;
     const live = this.enemies.reduce((n, e) => n + (e.active && e.kind !== "boss" ? 1 : 0), 0);
-    const want = desiredCount(elapsedSec(elapsed));
-    void dt;
+    const want = desiredCount(elapsed);
     if (!this.bossSpawned && elapsed >= BOSS_AT) {
       const slot = this.enemies.find((e) => !e.active);
       if (slot) {
@@ -901,10 +900,6 @@ export class SwarmPlayScene extends Phaser.Scene {
       this.cards.forEach((c) => c.setAlpha(0));
     }
   }
-}
-
-function elapsedSec(v: number) {
-  return v;
 }
 
 export function mountSwarmProtocol(parent: HTMLElement, platform: PlatformSDK) {
