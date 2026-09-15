@@ -1,6 +1,6 @@
 import { analytics, setAnalyticsContext } from "@gamesweb/analytics";
 import { brand, levelFromXp, storageKeys, xpRewards } from "@gamesweb/config";
-import { validateScore, type VerifiedStatus } from "@gamesweb/database";
+import { GAME_MODES, validateScore, type VerifiedStatus } from "@gamesweb/database";
 import { applyServerProgression } from "./player/progression-client";
 import { isValidInviteRef } from "./player/invite";
 import {
@@ -16,6 +16,7 @@ import {
   type ScorePayload,
 } from "@gamesweb/game-sdk";
 import { playerApi } from "./player-api";
+import { writeGameplayPrefs } from "./platform/prefs";
 
 export type StoredScore = {
   id: string;
@@ -74,6 +75,9 @@ export type PlayerSnapshot = {
   settings: AudioSettings & {
     reducedMotion: boolean;
     shareActivity: boolean;
+    ghost: boolean;
+    haptics: boolean;
+    shake: number;
   };
   friends: Friend[];
   pbCount: number;
@@ -121,7 +125,7 @@ function emptyPlayer(id?: string): PlayerSnapshot {
     saves: {},
     scores: [],
     history: [],
-    settings: { ...defaultAudio, reducedMotion: false, shareActivity: true },
+    settings: { ...defaultAudio, reducedMotion: false, shareActivity: true, ghost: true, haptics: true, shake: 1 },
     friends: [],
     pbCount: 0,
     sessionGames: [],
@@ -153,7 +157,7 @@ export const SSR_PLAYER: PlayerSnapshot = {
   saves: {},
   scores: [],
   history: [],
-  settings: { ...defaultAudio, reducedMotion: false, shareActivity: true },
+  settings: { ...defaultAudio, reducedMotion: false, shareActivity: true, ghost: true, haptics: true, shake: 1 },
   friends: [],
   pbCount: 0,
   sessionGames: [],
@@ -180,7 +184,9 @@ type SyncOp = {
 class PlayerStore {
   snapshot: PlayerSnapshot = SSR_PLAYER;
   toasts: Toast[] = [];
-  remoteBoards: Record<string, Array<{ name: string; score: number; isYou: boolean; verified?: boolean }>> = {};
+  remoteBoards: Record<string, Array<{ name: string; username?: string; score: number; isYou: boolean; verified?: boolean }>> = {};
+  remoteRanks: Record<string, number | null> = {};
+  boardStatus: Record<string, "ok" | "error" | "loading"> = {};
   private listeners = new Set<Listener>();
   private sessionId = uid();
   private ready = false;
@@ -208,7 +214,11 @@ class PlayerStore {
       const raw = localStorage.getItem(storageKeys.player);
       if (raw) {
         const parsed = JSON.parse(raw) as PlayerSnapshot;
-        this.snapshot = { ...emptyPlayer(), ...parsed };
+        this.snapshot = {
+          ...emptyPlayer(),
+          ...parsed,
+          settings: { ...emptyPlayer().settings, ...parsed.settings },
+        };
       } else {
         this.snapshot = emptyPlayer();
       }
@@ -219,6 +229,7 @@ class PlayerStore {
     }
     this.rollDay();
     this.ready = true;
+    writeGameplayPrefs(this.snapshot.settings);
     analytics.identify(this.snapshot.authId ?? this.snapshot.id, {
       guest: this.snapshot.isGuest,
       level: levelFromXp(this.snapshot.xp).level,
@@ -258,6 +269,7 @@ class PlayerStore {
 
   update(partial: Partial<PlayerSnapshot>) {
     this.snapshot = { ...this.snapshot, ...partial };
+    if (partial.settings) writeGameplayPrefs(this.snapshot.settings);
     this.persist();
     this.emit();
   }
@@ -434,7 +446,8 @@ class PlayerStore {
     if (!def || this.snapshot.achievements.includes(id)) return false;
     this.snapshot.achievements = [...this.snapshot.achievements, id];
     analytics.track("achievement_unlocked", { key, gameId: def.gameId });
-    this.toast({ kind: "achievement", title: def.name, body: def.description });
+    const gameTitle = def.gameId ? getManifest(def.gameId)?.title : "Gamesweb";
+    this.toast({ kind: "achievement", title: def.name, body: `${def.xp} XP · ${gameTitle}` });
     await this.addXp(def.xp, "achievement");
     this.persist();
     this.emit();
@@ -650,6 +663,42 @@ class PlayerStore {
     };
   }
 
+  personalRank(gameId: string, mode: string) {
+    return this.remoteRanks[`${gameId}:${mode}`] ?? null;
+  }
+
+  boardError(gameId: string, mode: string) {
+    return this.boardStatus[`${gameId}:${mode}`] === "error";
+  }
+
+  async ensureBoard(gameId: string, mode: string, force = false) {
+    const key = `${gameId}:${mode}`;
+    if (!force && (this.boardStatus[key] === "ok" || this.boardStatus[key] === "loading")) return;
+    this.boardStatus[key] = "loading";
+    try {
+      const board = await playerApi.leaderboard(gameId, mode);
+      if (board.ok) {
+        this.remoteBoards[key] = board.data.rows.map((r) => ({
+          name: r.displayName,
+          username: r.username,
+          score: r.score,
+          isYou: r.username === this.snapshot.username,
+          verified: r.verified,
+        }));
+        this.boardStatus[key] = "ok";
+      } else {
+        this.boardStatus[key] = "error";
+        if (board.status === 503) this.snapshot.backend = "local";
+      }
+      const rank = await playerApi.myRank(gameId, mode);
+      if (rank.ok) this.remoteRanks[key] = rank.data.personalRank;
+      this.emit();
+    } catch {
+      this.boardStatus[key] = "error";
+      this.emit();
+    }
+  }
+
   leaderboard(gameId: string, mode?: string) {
     const lower = gameId === "velocity-run";
     const rows = this.snapshot.scores.filter((s) => s.gameId === gameId && (!mode || s.mode === mode) && s.verified !== "flagged");
@@ -659,7 +708,7 @@ class PlayerStore {
       if (!cur || (lower ? r.score < cur.score : r.score > cur.score)) best.set("you", r);
     }
     const you = best.get("you");
-    const local = you ? [{ name: this.snapshot.displayName, score: you.score, isYou: true }] : [];
+    const local = you ? [{ name: this.snapshot.displayName, username: this.snapshot.username, score: you.score, isYou: true }] : [];
     const remote = this.remoteBoards[`${gameId}:${mode ?? ""}`] ?? [];
     const merged = [...remote.filter((r) => !r.isYou), ...local];
     merged.sort((a, b) => (lower ? a.score - b.score : b.score - a.score));
@@ -714,9 +763,18 @@ class PlayerStore {
       f.id === id ? { ...f, status: "accepted" as const, presence: "online" as const } : f,
     );
     analytics.track("friend_added");
+    this.toast({ kind: "info", title: "Friend accepted", body: friend?.displayName });
     this.persist();
     this.emit();
     if (friend && !this.snapshot.isGuest) void playerApi.friendAction(friend.id, "accept");
+  }
+
+  declineFriend(id: string) {
+    const friend = this.snapshot.friends.find((f) => f.id === id);
+    this.snapshot.friends = this.snapshot.friends.filter((f) => f.id !== id);
+    this.persist();
+    this.emit();
+    if (friend && !this.snapshot.isGuest) void playerApi.friendAction(friend.id, "decline");
   }
 
   removeFriend(id: string) {
@@ -814,17 +872,9 @@ class PlayerStore {
         this.snapshot.backend = info.persistence === "durable" ? "supabase" : "local";
       }
       for (const g of GAME_MANIFESTS) {
-        const mode = g.id === "velocity-run" ? "course-1" : g.id === "swarm-protocol" ? "survival" : "foundation";
-        const board = await playerApi.leaderboard(g.id, mode);
-        if (board.ok) {
-          this.remoteBoards[`${g.id}:${mode}`] = board.data.rows.map((r) => ({
-            name: r.displayName,
-            score: r.score,
-            isYou: r.username === this.snapshot.username,
-            verified: r.verified,
-          }));
-        } else if (board.status === 503) {
-          this.snapshot.backend = "local";
+        const modes = GAME_MODES[g.id as keyof typeof GAME_MODES] ?? [g.id === "velocity-run" ? "course-1" : g.id === "swarm-protocol" ? "survival" : "foundation"];
+        for (const mode of modes) {
+          await this.ensureBoard(g.id, mode);
         }
       }
       const me = await playerApi.me();

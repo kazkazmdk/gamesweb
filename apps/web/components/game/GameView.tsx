@@ -180,7 +180,7 @@ export function GameView({ slug }: { slug: string }) {
     return (
       <div className="grid min-h-dvh place-items-center">
         <p>Unknown game.</p>
-        <Link href="/play">Back</Link>
+        <Link href="/">Back</Link>
       </div>
     );
   }
@@ -424,10 +424,10 @@ function Results({
   }, [onRetry]);
 
   return (
-    <div className="absolute inset-0 z-40 grid place-items-center bg-black/60 backdrop-blur-sm">
-      <div className="w-[min(420px,92vw)] rounded-2xl border border-white/10 bg-[#121214] p-6">
-        <p className="text-[12px] uppercase tracking-[0.18em] text-white/45">{result}</p>
-        <p className="display mt-2 text-[48px]">{formatScore(gameId, score)}</p>
+    <div className="absolute inset-0 z-40 grid place-items-center bg-black/55">
+      <div className="w-[min(420px,92vw)] px-6 py-8">
+        <p className="meta text-white/45">{result}</p>
+        <p className="display mt-3 text-[64px]">{formatScore(gameId, score)}</p>
         {pbDelta !== null ? (
           <p
             className={`mt-1 text-[14px] ${

@@ -37,6 +37,28 @@ export function neonBoardMode(index: number, daily = false) {
   return NEON_BOARD_MODES[index] ?? "foundation";
 }
 
+export function boardModeFromPlayIndex(gameId: string, index: number, daily = false) {
+  if (gameId === "neon-drift") return neonBoardMode(index, daily);
+  if (gameId === "velocity-run") return `course-${index + 1}`;
+  return defaultMode(gameId);
+}
+
+export function playIndexFromBoardMode(gameId: string, mode: string) {
+  if (gameId === "neon-drift") {
+    const i = NEON_BOARD_MODES.indexOf(mode as (typeof NEON_BOARD_MODES)[number]);
+    return i >= 0 ? i : 0;
+  }
+  if (gameId === "velocity-run") {
+    const n = Number(mode.replace("course-", ""));
+    return Number.isFinite(n) ? Math.max(0, n - 1) : 0;
+  }
+  return 0;
+}
+
+export function boardModeLabel(gameId: string, mode: string) {
+  return BOARD_LABELS[mode] ?? playModeOptions(gameId)[playIndexFromBoardMode(gameId, mode)]?.label ?? mode;
+}
+
 export function playModeOptions(gameId: string): ModeOption[] {
   if (gameId === "neon-drift") return NEON_TRACKS;
   if (gameId === "velocity-run") return VELOCITY_COURSES;

@@ -9,6 +9,22 @@ export type JuiceWorld = {
   timeScale: number;
 };
 
+let prefAt = 0;
+let cachedShake = 1;
+let cachedReduced = false;
+
+function juicePrefs() {
+  if (typeof localStorage === "undefined") return { shake: 1, reduced: false };
+  const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+  if (now - prefAt > 400) {
+    prefAt = now;
+    cachedReduced = localStorage.getItem("gw:reduced-motion") === "1";
+    const n = Number(localStorage.getItem("gw:shake") ?? "1");
+    cachedShake = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 1;
+  }
+  return { shake: cachedShake, reduced: cachedReduced };
+}
+
 export class Juice {
   private freezeUntil = 0;
   private shakeT = 0;
@@ -60,20 +76,23 @@ export class Juice {
 
   applyCamera(cam: { x: number; y: number }, nowMs: number): { x: number; y: number } {
     this.now = nowMs;
+    const prefs = juicePrefs();
+    if (prefs.reduced || prefs.shake <= 0) return { x: cam.x, y: cam.y };
     let x = 0;
     let y = 0;
+    const mag = this.shakeMag * prefs.shake;
     if (nowMs < this.shakeT) {
-      x += (Math.random() - 0.5) * 2 * this.shakeMag;
-      y += (Math.random() - 0.5) * 2 * this.shakeMag;
+      x += (Math.random() - 0.5) * 2 * mag;
+      y += (Math.random() - 0.5) * 2 * mag;
     } else {
       this.shakeMag *= 0.85;
     }
     if (this.punch > 0.01) {
-      y += this.punch * 4;
+      y += this.punch * 4 * prefs.shake;
       this.punch *= 0.72;
     }
     this.rumble *= 0.86;
-    x += (Math.random() - 0.5) * this.rumble * 3;
+    x += (Math.random() - 0.5) * this.rumble * 3 * prefs.shake;
     return { x: cam.x + x, y: cam.y + y };
   }
 

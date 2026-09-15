@@ -44,6 +44,9 @@ export default function ChallengesPage() {
           complete
         </p>
       </div>
+      {summary.done === summary.total && summary.total > 0 ? (
+        <p className="mt-8 text-[15px] text-[var(--ok)]">All dailies resolved. Reset {formatCountdown(remain)}.</p>
+      ) : null}
       <div className="mt-10 grid gap-8 md:grid-cols-1 lg:grid-cols-3">
         {quests.map((q) => (
           <ChallengeWidget key={q.id} view={challengeViewModel(player, q)} variant="full" />

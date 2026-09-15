@@ -12,7 +12,7 @@ import { utcDayKey } from "@gamesweb/game-sdk";
 import type { Identity } from "@/lib/api/identity";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { commitSha, APP_VERSION } from "@/lib/version";
-import type { BackendStore, OfflineRun, ScoreWriteResult, StoredProfile, StoredSave, StoredSession, SubmitScoreInput } from "@/lib/backend/types";
+import type { BackendStore, OfflineRun, PublicPlayerPayload, ScoreWriteResult, StoredProfile, StoredSave, StoredSession, SubmitScoreInput } from "@/lib/backend/types";
 
 function admin() {
   const client = createSupabaseAdmin();
@@ -765,6 +765,71 @@ export class SupabaseBackend implements BackendStore {
       questCompleted: profile?.questCompleted ?? [],
       stats: profile?.stats ?? {},
       streak: profile?.streak ?? 0,
+    };
+  }
+
+  async getPublicProfile(username: string): Promise<PublicPlayerPayload | null> {
+    const sb = admin();
+    const { data: pub } = await sb
+      .from("public_profiles")
+      .select("username, display_name, avatar, level")
+      .ilike("username", username)
+      .maybeSingle();
+    if (!pub) return null;
+    const { data: owner } = await sb
+      .from("profiles")
+      .select("user_id, share_activity, xp")
+      .ilike("username", pub.username)
+      .maybeSingle();
+    const { data: scores } = await sb
+      .from("public_scores")
+      .select("game_id, mode, score, created_at")
+      .eq("username", pub.username);
+    const rows = (scores ?? []) as Array<{ game_id: string; mode: string; score: number; created_at: string }>;
+    const best = new Map<string, { gameId: string; mode: string; score: number }>();
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      const id = `${row.game_id}:${row.mode}`;
+      const cur = best.get(id);
+      const lower = lowerIsBetter(row.game_id);
+      if (!cur || (lower ? row.score < cur.score : row.score > cur.score)) {
+        best.set(id, { gameId: row.game_id, mode: row.mode, score: row.score });
+      }
+      counts.set(row.game_id, (counts.get(row.game_id) ?? 0) + 1);
+    }
+    let favoriteGameId: string | null = null;
+    let n = 0;
+    for (const [id, c] of counts) {
+      if (c > n) {
+        favoriteGameId = id;
+        n = c;
+      }
+    }
+    const { data: ach } = owner?.user_id
+      ? await sb.from("player_achievements").select("achievement_id").eq("user_id", owner.user_id)
+      : { data: [] as Array<{ achievement_id: string }> };
+    const share = owner?.share_activity !== false;
+    const activity = share
+      ? rows
+          .slice()
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .slice(0, 8)
+          .map((s) => ({
+            gameId: s.game_id,
+            event: "Played",
+            score: s.score,
+            at: new Date(s.created_at).getTime(),
+          }))
+      : null;
+    return {
+      username: pub.username,
+      displayName: pub.display_name,
+      avatar: pub.avatar,
+      level: pub.level ?? levelFromXp(owner?.xp ?? 0).level,
+      favoriteGameId,
+      records: [...best.values()],
+      achievements: (ach ?? []).map((a: { achievement_id: string }) => a.achievement_id),
+      activity,
     };
   }
 }

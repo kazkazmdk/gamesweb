@@ -10,6 +10,7 @@ import {
   FriendPresence,
   GameModeSelector,
   GameTile,
+  InlineError,
   PlatformHero,
   RankWidget,
   SectionHeader,
@@ -18,7 +19,7 @@ import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
 import { achievementProgress, dailySummary, friendOnBoard, rankViewModel } from "@/lib/platform/adapters";
 import { formatFraction, formatPlayScore } from "@/lib/platform/format";
-import { defaultBoardMode, loadPlayIndex, lowerIsBetter, playModeOptions, savePlayIndex } from "@/lib/platform/modes";
+import { boardModeFromPlayIndex, loadPlayIndex, lowerIsBetter, playModeOptions, savePlayIndex } from "@/lib/platform/modes";
 
 export function GameHub({ game }: { game: GameManifest }) {
   useAccent(game.accent);
@@ -28,12 +29,16 @@ export function GameHub({ game }: { game: GameManifest }) {
   useEffect(() => {
     setPlayMode(String(loadPlayIndex(game.id)));
   }, [game.id]);
+  useEffect(() => {
+    void store.ensureBoard(game.id, boardModeFromPlayIndex(game.id, Number(playMode)));
+  }, [store, game.id, playMode]);
   const modes = playModeOptions(game.id);
-  const boardMode = defaultBoardMode(game.id);
+  const boardMode = boardModeFromPlayIndex(game.id, Number(playMode));
   const pb = store.personalBest(game.id, boardMode, lowerIsBetter(game.id));
   const related = GAME_MANIFESTS.filter((g) => g.id !== game.id);
   const board = store.leaderboard(game.id, boardMode);
-  const rank = rankViewModel(board, game.id);
+  const personal = store.personalRank(game.id, boardMode);
+  const rank = rankViewModel(board, game.id, personal);
   const friend = friendOnBoard(board, player.friends);
   const dailies = dailySummary(player);
   const ach = achievementProgress(player, game.id);
@@ -66,6 +71,7 @@ export function GameHub({ game }: { game: GameManifest }) {
         <div className="mt-4 flex flex-wrap items-end gap-8">
           <Metric value={formatPlayScore(game.id, pb) ?? "—"} label="Personal best" />
           <Metric value={rank.rank ? `#${rank.rank}` : "—"} label="Rank" />
+          <Metric value={selected?.label ?? "—"} label="Mode" />
           <Metric value={formatFraction(dailies.done, dailies.total)} label="Daily" />
           <Metric
             value={friend ? `${friend.name}` : "—"}
@@ -151,16 +157,24 @@ export function GameHub({ game }: { game: GameManifest }) {
           <section>
             <SectionHeader title="Board" />
             <div className="mt-4">
-              <RankWidget
-                gameId={game.id}
-                gameTitle={game.title}
-                slug={game.slug}
-                rows={board}
-                rank={rank.rank}
-                youScore={rank.you?.score}
-                gap={rank.gap}
-                friend={friend}
-              />
+              {store.boardError(game.id, boardMode) ? (
+                <InlineError
+                  title="Global board unavailable"
+                  body="Your local PB is still here."
+                  onRetry={() => void store.ensureBoard(game.id, boardMode, true)}
+                />
+              ) : (
+                <RankWidget
+                  gameId={game.id}
+                  gameTitle={game.title}
+                  slug={game.slug}
+                  rows={board}
+                  rank={rank.rank}
+                  youScore={rank.you?.score}
+                  gap={rank.gap}
+                  friend={friend}
+                />
+              )}
             </div>
           </section>
           <section>

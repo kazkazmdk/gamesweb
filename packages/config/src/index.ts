@@ -73,10 +73,12 @@ export const xpRewards = {
 
 export const routes = {
   home: "/",
+  arcade: "/arcade",
   play: "/play",
   playGame: (slug: string) => `/play/${slug}`,
   gameHub: (slug: string) => `/games/${slug}`,
   challenges: "/challenges",
+  achievements: "/achievements",
   leaderboards: "/leaderboards",
   friends: "/friends",
   profile: (username: string) => `/profile/${username}`,

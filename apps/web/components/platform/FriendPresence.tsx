@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { getManifest } from "@gamesweb/game-sdk";
 import { GameArt } from "@/components/game/GameArt";
 import type { Friend } from "@/lib/player-store";
@@ -13,12 +14,14 @@ export function FriendPresence({
   compact,
   onRemove,
   onAccept,
+  onDecline,
 }: {
   friend: Friend;
   pbLabel?: string | null;
   compact?: boolean;
   onRemove?: () => void;
   onAccept?: () => void;
+  onDecline?: () => void;
 }) {
   const game = friend.gameId ? getManifest(friend.gameId) : null;
   const playing = friend.status === "accepted" && friend.presence === "playing" && game;
@@ -51,7 +54,9 @@ export function FriendPresence({
         ) : null}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px]">{friend.displayName}</p>
+        <Link href={`/profile/${friend.username}`} className="truncate text-[15px] hover:text-[var(--text)]">
+          {friend.displayName}
+        </Link>
         <p className="flex flex-wrap items-center gap-2 text-[12px] text-[var(--text-dim)]">
           {status ? <StatusPill kind={status} /> : null}
           <span>{line}</span>
@@ -62,6 +67,11 @@ export function FriendPresence({
         {friend.status === "pending-in" && onAccept ? (
           <QuickAction tone="primary" onClick={onAccept}>
             Accept
+          </QuickAction>
+        ) : null}
+        {friend.status === "pending-in" && onDecline ? (
+          <QuickAction tone="quiet" onClick={onDecline}>
+            Decline
           </QuickAction>
         ) : null}
         {playing ? (
