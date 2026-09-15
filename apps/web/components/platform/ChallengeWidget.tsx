@@ -34,9 +34,9 @@ export function ChallengeWidget({
         {variant === "full" ? (
           <p className="mt-1 max-w-md text-[13px] text-[var(--text-dim)]">{view.quest.description}</p>
         ) : null}
-        <p className="metric mt-4 text-[28px] md:text-[36px]">
+        <p className="stat mt-4 text-[28px] md:text-[36px]">
           {view.currentLabel}
-          <span className="ml-2 text-[13px] text-[var(--text-faint)]">/ {view.targetLabel}</span>
+          <span className="ml-2 text-[13px] font-normal text-[var(--text-faint)]">/ {view.targetLabel}</span>
         </p>
         <div className="mt-3">
           <ProgressWidget value={view.progress} max={view.quest.target} size={variant === "full" ? "md" : "sm"} />

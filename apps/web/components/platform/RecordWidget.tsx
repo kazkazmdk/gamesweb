@@ -42,7 +42,7 @@ export function RecordWidget({
         <GameArt slug={game.slug} className="h-full w-full object-cover" />
       </div>
       <div>
-        <p className="metric text-[32px]">{label}</p>
+        <p className="stat text-[32px]">{label}</p>
         <p className="meta mt-1">
           {game.title}
           {modeLabel ? ` · ${modeLabel}` : ""}

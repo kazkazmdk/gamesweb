@@ -22,10 +22,10 @@ export function PlatformHero({
 }) {
   const height =
     minHeight === "play"
-      ? "min-h-[58vh]"
+      ? "min-h-[40vh] md:min-h-[58vh]"
       : minHeight === "hub"
-        ? "min-h-[70vh]"
-        : "min-h-[78vh] md:min-h-[86vh]";
+        ? "min-h-[52vh] md:min-h-[70vh]"
+        : "min-h-[64vh] md:min-h-[86vh]";
   return (
     <section className={`relative overflow-hidden ${height}`}>
       <GameArt slug={slug} className="absolute inset-0 h-full w-full object-cover" />

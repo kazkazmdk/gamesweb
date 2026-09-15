@@ -15,9 +15,9 @@ export function ProgressWidget({
   return (
     <div>
       {label ? (
-        <p className="metric text-[22px]">
+        <p className="stat text-[28px] md:text-[32px]">
           {value}
-          <span className="ml-1 text-[13px] text-[var(--text-faint)]">/ {max}</span>
+          <span className="ml-1 text-[13px] font-normal text-[var(--text-faint)]">/ {max}</span>
         </p>
       ) : null}
       {caption ? <p className="meta mt-1">{caption}</p> : null}

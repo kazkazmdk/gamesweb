@@ -19,14 +19,17 @@ export function AchievementStrip({
   items: AchievementItem[];
   showcase?: boolean;
 }) {
-  const shown = showcase ? items.filter((a) => a.unlocked).slice(0, 3) : items;
+  const shown = (showcase ? items.filter((a) => a.unlocked) : [...items].sort((a, b) => Number(b.unlocked) - Number(a.unlocked))).slice(
+    0,
+    showcase ? 3 : 6,
+  );
   return (
     <div>
       <div className="flex items-end justify-between gap-4">
         <div>
-          <p className="metric text-[32px]">
+          <p className="stat text-[32px]">
             {unlocked}
-            <span className="ml-1 text-[14px] text-[var(--text-faint)]">/ {total}</span>
+            <span className="ml-1 text-[14px] font-normal text-[var(--text-faint)]">/ {total}</span>
           </p>
           <p className="meta mt-1">Unlocked</p>
         </div>

@@ -60,21 +60,27 @@ export default function LeaderboardsPage() {
       <section className="mt-10 max-w-xl">
         <SectionHeader title="Your position" />
         <div className="mt-4">
-          <RankWidget
-            gameId={game.id}
-            gameTitle={game.title}
-            slug={game.slug}
-            rows={rows}
-            variant="compact"
-            rank={rank.rank}
-            youScore={rank.you?.score}
-            gap={rank.gap}
-          />
-          {rank.gap !== null && rank.rank && rank.rank > 1 ? (
-            <p className="mt-2 text-[13px] text-[var(--text-dim)]">
-              {formatPlayScore(game.id, Math.abs(rank.gap))} to {formatRank(rank.rank - 1)}
-            </p>
-          ) : null}
+          {rank.you ? (
+            <>
+              <RankWidget
+                gameId={game.id}
+                gameTitle={game.title}
+                slug={game.slug}
+                rows={rows}
+                variant="compact"
+                rank={rank.rank}
+                youScore={rank.you.score}
+                gap={rank.gap}
+              />
+              {rank.gap !== null && rank.rank && rank.rank > 1 ? (
+                <p className="mt-2 text-[13px] text-[var(--text-dim)]">
+                  {formatPlayScore(game.id, Math.abs(rank.gap))} to {formatRank(rank.rank - 1)}
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-[14px] text-[var(--text-dim)]">Play to take a place on this board.</p>
+          )}
         </div>
       </section>
 
@@ -132,13 +138,13 @@ function BoardRow({
     <li
       className={`flex items-center gap-3 border-t border-[var(--line)] py-3 ${top ? "pt-4" : ""} ${you ? "text-[var(--text)]" : "text-[var(--text-dim)]"}`}
     >
-      <span className={`metric w-10 shrink-0 text-[18px] ${top ? "text-[var(--text)]" : ""}`}>{formatRank(rank)}</span>
+      <span className={`stat w-10 shrink-0 text-[18px] ${top ? "text-[var(--text)]" : ""}`}>{formatRank(rank)}</span>
       {avatar ? <Avatar id={avatar} size={28} /> : <span className="h-7 w-7 shrink-0 rounded-full bg-white/10" aria-hidden />}
       <span className="min-w-0 flex-1 truncate text-[15px]">
         {name}
         {you ? " · you" : ""}
       </span>
-      <span className="metric text-[20px] text-[var(--text)]">{score}</span>
+      <span className="stat text-[20px] text-[var(--text)]">{score}</span>
     </li>
   );
 }

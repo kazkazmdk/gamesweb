@@ -17,7 +17,7 @@ export function ActivityFeed({ items }: { items: ActivityItem[] }) {
               {item.timeLabel ? ` · ${item.timeLabel}` : ""}
             </p>
           </div>
-          {item.scoreLabel ? <p className="metric text-[20px]">{item.scoreLabel}</p> : null}
+          {item.scoreLabel ? <p className="stat text-[20px]">{item.scoreLabel}</p> : null}
         </li>
       ))}
     </ul>

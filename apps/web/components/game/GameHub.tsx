@@ -177,9 +177,9 @@ export function GameHub({ game }: { game: GameManifest }) {
           </section>
           <section>
             <SectionHeader title="Related" />
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 space-y-2">
               {related.map((g) => (
-                <GameTile key={g.id} game={g} />
+                <GameTile key={g.id} game={g} variant="wide" />
               ))}
             </div>
           </section>
@@ -192,7 +192,7 @@ export function GameHub({ game }: { game: GameManifest }) {
 function Metric({ value, label }: { value: string; label: string }) {
   return (
     <div>
-      <p className="metric text-[32px] md:text-[40px]">{value}</p>
+      <p className="stat text-[32px] md:text-[40px]">{value}</p>
       <p className="meta mt-1">{label}</p>
     </div>
   );

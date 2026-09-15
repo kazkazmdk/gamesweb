@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           Local backend — progress stays on this device until Supabase is configured.
         </p>
       ) : null}
-      <main className="pb-24 md:pb-16">{children}</main>
+      <main className="pb-28 md:pb-16">{children}</main>
       <footer className="hidden border-t border-[var(--line)] px-8 py-6 text-[12px] text-[var(--text-faint)] md:flex md:gap-6">
         <Link href="/about">About</Link>
         <Link href="/privacy">Privacy</Link>

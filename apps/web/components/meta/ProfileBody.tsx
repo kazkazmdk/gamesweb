@@ -76,10 +76,18 @@ export function ProfileBody({ self, username }: { self?: boolean; username?: str
       <section className="mt-12">
         <SectionHeader title="Records" />
         <div className="mt-4 space-y-6">
-          {GAME_MANIFESTS.map((g) => {
+          {GAME_MANIFESTS.some((g) => {
             const rec = gameRecordFor(player, g.id);
-            return <RecordWidget key={g.id} game={g} score={rec.score} modeLabel={rec.mode} />;
-          })}
+            return Number.isFinite(rec.score) && rec.score > 0 && rec.score < 1e12;
+          }) ? (
+            GAME_MANIFESTS.map((g) => {
+              const rec = gameRecordFor(player, g.id);
+              if (!Number.isFinite(rec.score) || rec.score <= 0 || rec.score >= 1e12) return null;
+              return <RecordWidget key={g.id} game={g} score={rec.score} modeLabel={rec.mode} />;
+            })
+          ) : (
+            <EmptyState title="No records yet" body="Finish a run to pin a personal best." action={<QuickAction href="/play">Play</QuickAction>} />
+          )}
         </div>
       </section>
 

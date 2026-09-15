@@ -38,7 +38,7 @@ export function RankWidget({
   if (variant === "compact") {
     return (
       <div>
-        <p className="metric text-[40px]">{formatRank(rank ?? null)}</p>
+        <p className="stat text-[40px]">{formatRank(rank ?? null)}</p>
         <p className="meta mt-1">{scoreLabel ?? "YOUR RANK"}</p>
       </div>
     );
@@ -48,7 +48,7 @@ export function RankWidget({
     <div>
       <div className="flex items-end justify-between gap-4">
         <div>
-          <p className="metric text-[48px]">{formatRank(rank ?? null)}</p>
+          <p className="stat text-[48px]">{formatRank(rank ?? null)}</p>
           <p className="meta mt-1">{scoreLabel ? `${scoreLabel} · your best` : "YOUR RANK"}</p>
         </div>
         {gap !== null && gap !== undefined && rank && rank > 1 ? (
@@ -65,7 +65,7 @@ export function RankWidget({
               {i + 1} {row.name}
               {row.isYou ? " · you" : ""}
             </span>
-            <span className="metric text-[16px]">{formatPlayScore(gameId, row.score)}</span>
+            <span className="stat text-[16px]">{formatPlayScore(gameId, row.score)}</span>
           </li>
         ))}
       </ol>

@@ -56,7 +56,7 @@ export default function AuthPage() {
 
       <section className="mt-8" aria-label="Save this run">
         <p className="meta">Save this run</p>
-        <p className="metric mt-2 text-[40px]">{formatLevel(lv.level)}</p>
+        <p className="stat mt-2 text-[40px]">{formatLevel(lv.level)}</p>
         <div className="mt-4">
           <ProgressWidget value={lv.intoLevel} max={Math.max(1, lv.needed)} caption="Level progress" />
         </div>

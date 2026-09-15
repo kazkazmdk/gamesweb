@@ -26,21 +26,21 @@ export default function ChallengesPage() {
       <h1 className="display mt-2 text-[44px] md:text-[64px]">Daily Challenges</h1>
       <div className="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-[13px] text-[var(--text-dim)]">
         <p>
-          <span className="metric mr-2 text-[22px] text-[var(--text)]">{formatCountdown(remain)}</span>
+          <span className="stat mr-2 text-[22px] text-[var(--text)]">{formatCountdown(remain)}</span>
           reset
         </p>
         {player.streak > 0 ? (
           <p>
-            <span className="metric mr-2 text-[22px] text-[var(--text)]">{player.streak}</span>
+            <span className="stat mr-2 text-[22px] text-[var(--text)]">{player.streak}</span>
             day streak
           </p>
         ) : null}
         <p>
-          <span className="metric mr-2 text-[22px] text-[var(--text)]">{summary.xp}</span>
+          <span className="stat mr-2 text-[22px] text-[var(--text)]">{summary.xp}</span>
           / {summary.totalXp} XP
         </p>
         <p>
-          <span className="metric mr-2 text-[22px] text-[var(--text)]">{formatFraction(summary.done, summary.total)}</span>
+          <span className="stat mr-2 text-[22px] text-[var(--text)]">{formatFraction(summary.done, summary.total)}</span>
           complete
         </p>
       </div>

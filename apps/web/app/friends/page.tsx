@@ -1,6 +1,6 @@
 "use client";
 
-import { InviteWidget, EmptyState, FriendPresence, SectionHeader } from "@/components/platform";
+import { InviteWidget, FriendPresence, SectionHeader } from "@/components/platform";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
 
@@ -38,7 +38,7 @@ export default function FriendsPage() {
       ) : null}
 
       {player.friends.length === 0 ? (
-        <EmptyState title="No friends yet" body="Send a link. They can play before creating an account." />
+        <p className="mt-8 text-[14px] text-[var(--text-dim)]">No friends yet</p>
       ) : (
         <div className="mt-10 max-w-xl space-y-10">
           <Group title="Playing now" empty="Nobody in a run right now." friends={playing} store={store} />
