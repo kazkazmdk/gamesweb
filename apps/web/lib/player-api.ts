@@ -123,4 +123,21 @@ export const playerApi = {
   async putSave(gameId: string, version: string, payload: Record<string, unknown>) {
     return parse(await fetch("/api/saves", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ gameId, version, payload, updatedAt: Date.now() }) }));
   },
+  async publicProfile(username: string) {
+    return parse<{
+      username: string;
+      displayName: string;
+      avatar: string;
+      level: number;
+      favoriteGameId: string | null;
+      records: Array<{ gameId: string; mode: string; score: number }>;
+      achievements: string[];
+      activity: Array<{ gameId: string; event: string; score: number; at: number }> | null;
+    }>(await fetch(`/api/profile/${encodeURIComponent(username)}`));
+  },
+  async searchPlayers(q: string) {
+    return parse<{ rows: Array<{ username: string; displayName: string; avatar: string }> }>(
+      await fetch(`/api/friends?q=${encodeURIComponent(q)}`),
+    );
+  },
 };

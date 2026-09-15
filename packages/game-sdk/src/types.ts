@@ -35,6 +35,11 @@ export type GameManifest = {
   inputMethods: InputMethod[];
   thumbnail: string;
   hero: string;
+  heroImage?: string;
+  heroVideo?: string;
+  gameplayStill?: string;
+  tileImage?: string;
+  backdropImage?: string;
   version: string;
   achievements: AchievementDefinition[];
   supportedDevices: Array<"desktop" | "laptop" | "tablet" | "mobile">;

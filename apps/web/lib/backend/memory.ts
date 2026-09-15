@@ -12,6 +12,7 @@ import type { Identity } from "@/lib/api/identity";
 import type {
   BackendStore,
   OfflineRun,
+  PublicPlayerPayload,
   ScoreWriteResult,
   StoredFriend,
   StoredPresence,
@@ -649,6 +650,50 @@ export class MemoryBackend implements BackendStore {
       questCompleted: profile?.questCompleted ?? [],
       stats: profile?.stats ?? {},
       streak: profile?.streak ?? 0,
+    };
+  }
+
+  async getPublicProfile(username: string): Promise<PublicPlayerPayload | null> {
+    const key = this.usernameIndex.get(username.toLowerCase());
+    if (!key) return null;
+    const profile = this.profiles.get(key);
+    if (!profile) return null;
+    const mine = [...this.scores.values()].filter((s) => s.userId === profile.userId && s.verified === "verified");
+    const best = new Map<string, { gameId: string; mode: string; score: number }>();
+    for (const row of mine) {
+      const id = `${row.gameId}:${row.mode}`;
+      const cur = best.get(id);
+      const lower = lowerIsBetter(row.gameId);
+      if (!cur || (lower ? row.score < cur.score : row.score > cur.score)) {
+        best.set(id, { gameId: row.gameId, mode: row.mode, score: row.score });
+      }
+    }
+    const counts = new Map<string, number>();
+    for (const row of mine) counts.set(row.gameId, (counts.get(row.gameId) ?? 0) + 1);
+    let favoriteGameId: string | null = profile.playedGameIds[0] ?? null;
+    let n = 0;
+    for (const [id, c] of counts) {
+      if (c > n) {
+        favoriteGameId = id;
+        n = c;
+      }
+    }
+    const activity = profile.shareActivity
+      ? mine
+          .slice()
+          .sort((a, b) => b.createdAt - a.createdAt)
+          .slice(0, 8)
+          .map((s) => ({ gameId: s.gameId, event: "Played", score: s.score, at: s.createdAt }))
+      : null;
+    return {
+      username: profile.username,
+      displayName: profile.displayName,
+      avatar: profile.avatar,
+      level: levelFromXp(profile.xp).level,
+      favoriteGameId,
+      records: [...best.values()],
+      achievements: profile.achievements,
+      activity,
     };
   }
 }

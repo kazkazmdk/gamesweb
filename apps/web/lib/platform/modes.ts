@@ -19,13 +19,45 @@ export const VELOCITY_COURSES: ModeOption[] = [
 ];
 
 const BOARD_LABELS: Record<string, string> = {
-  circuit: "Circuit",
+  foundation: "Harbour Loop",
+  technical: "Hairpin District",
+  velocity: "Ridge Sweep",
   daily: "Daily",
+  circuit: "Circuit",
   "course-1": "Gate A",
   "course-2": "Needle",
   "course-3": "Rushline",
   survival: "Survival",
 };
+
+export const NEON_BOARD_MODES = ["foundation", "technical", "velocity"] as const;
+
+export function neonBoardMode(index: number, daily = false) {
+  if (daily) return "daily";
+  return NEON_BOARD_MODES[index] ?? "foundation";
+}
+
+export function boardModeFromPlayIndex(gameId: string, index: number, daily = false) {
+  if (gameId === "neon-drift") return neonBoardMode(index, daily);
+  if (gameId === "velocity-run") return `course-${index + 1}`;
+  return defaultMode(gameId);
+}
+
+export function playIndexFromBoardMode(gameId: string, mode: string) {
+  if (gameId === "neon-drift") {
+    const i = NEON_BOARD_MODES.indexOf(mode as (typeof NEON_BOARD_MODES)[number]);
+    return i >= 0 ? i : 0;
+  }
+  if (gameId === "velocity-run") {
+    const n = Number(mode.replace("course-", ""));
+    return Number.isFinite(n) ? Math.max(0, n - 1) : 0;
+  }
+  return 0;
+}
+
+export function boardModeLabel(gameId: string, mode: string) {
+  return BOARD_LABELS[mode] ?? playModeOptions(gameId)[playIndexFromBoardMode(gameId, mode)]?.label ?? mode;
+}
 
 export function playModeOptions(gameId: string): ModeOption[] {
   if (gameId === "neon-drift") return NEON_TRACKS;

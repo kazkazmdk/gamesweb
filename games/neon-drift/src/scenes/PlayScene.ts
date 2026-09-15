@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth } from "@gamesweb/game-core";
+import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { neonDriftManifest } from "@gamesweb/game-sdk";
 import { CAMERA, NEON, VEHICLE } from "../config";
@@ -69,11 +69,17 @@ export class DriftPlayScene extends Phaser.Scene {
   private lastComboFloor = 1;
   private fpsAcc = 0;
   private frames = 0;
+  private ticks = 0;
   private quality: "high" | "low" = "high";
   private debug = false;
   private sectorHits = 0;
   private lastBoost = false;
   private streakClean = true;
+  private signaledReady = false;
+  private longFrames = 0;
+  private onGrass = false;
+  private testDrive: { throttle: number; steer: number } | null = null;
+  private boardMode = "foundation";
 
   constructor() {
     super("neon-drift-play");
@@ -101,7 +107,10 @@ export class DriftPlayScene extends Phaser.Scene {
     this.marks = [];
     this.recorder.reset();
     this.showGhost = ghostEnabled();
-    this.tape = loadGhost(this.def.id, this.reverse ? "daily" : "circuit");
+    this.boardMode = this.reverse ? "daily" : this.def.id;
+    this.tape = loadGhost(this.def.id, this.boardMode);
+    this.signaledReady = false;
+    this.onGrass = false;
     this.debug = this.game.registry.get("debug") === true && process.env.NODE_ENV !== "production";
     const mobile = this.sys.game.device.input.touch;
     this.parts = new ParticlePool(mobile ? 140 : 260);
@@ -152,25 +161,29 @@ export class DriftPlayScene extends Phaser.Scene {
     }
 
     const kb = this.input.keyboard!;
+    const code = Phaser.Input.Keyboard.KeyCodes;
     this.keys = {
-      up: kb.addKey("W"),
-      up2: kb.addKey("UP"),
-      down: kb.addKey("S"),
-      down2: kb.addKey("DOWN"),
-      left: kb.addKey("A"),
-      left2: kb.addKey("LEFT"),
-      right: kb.addKey("D"),
-      right2: kb.addKey("RIGHT"),
-      space: kb.addKey("SPACE"),
-      r: kb.addKey("R"),
-      esc: kb.addKey("ESC"),
-      g: kb.addKey("G"),
-      one: kb.addKey("ONE"),
-      two: kb.addKey("TWO"),
-      three: kb.addKey("THREE"),
+      up: kb.addKey(code.W),
+      up2: kb.addKey(code.UP),
+      down: kb.addKey(code.S),
+      down2: kb.addKey(code.DOWN),
+      left: kb.addKey(code.A),
+      left2: kb.addKey(code.LEFT),
+      right: kb.addKey(code.D),
+      right2: kb.addKey(code.RIGHT),
+      space: kb.addKey(code.SPACE),
+      r: kb.addKey(code.R),
+      esc: kb.addKey(code.ESC),
+      g: kb.addKey(code.G),
+      one: kb.addKey(code.ONE),
+      two: kb.addKey(code.TWO),
+      three: kb.addKey(code.THREE),
     };
 
-    this.input.on("pointerdown", () => this.ensureAudio());
+    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      this.ensureAudio();
+      this.handleChromeTap(p.x, p.y);
+    });
     this.platform.session.start();
     this.platform.events.emit({ name: "gameplay_started", props: { gameId: "neon-drift", track: this.def.id } });
     this.fitCam(this.scale.width, this.scale.height);
@@ -221,6 +234,7 @@ export class DriftPlayScene extends Phaser.Scene {
 
   update(_: number, delta: number) {
     const dt = Math.min(0.033, delta / 1000);
+    this.ticks += 1;
     this.frames += 1;
     this.fpsAcc += delta;
     if (this.fpsAcc > 1000) {
@@ -229,6 +243,11 @@ export class DriftPlayScene extends Phaser.Scene {
       else if (fps > 56) this.quality = this.sys.game.device.input.touch ? "low" : "high";
       this.fpsAcc = 0;
       this.frames = 0;
+    }
+    if (!this.signaledReady) {
+      this.signaledReady = true;
+      this.platform.events.emit({ name: "game_ready", props: { gameId: "neon-drift" } });
+      this.publishDebug(delta);
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.keys.r)) {
@@ -247,18 +266,20 @@ export class DriftPlayScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.esc)) this.platform.pause.request();
     if (this.paused || this.ended) {
       this.draw(0);
+      this.publishDebug(delta);
       return;
     }
-    if (this.juice.isFrozen(this.time.now)) {
+    if (!this.testDrive && this.juice.isFrozen(this.time.now)) {
       this.draw(dt);
+      this.publishDebug(delta);
       return;
     }
 
     const drive = readDriveInput(this.keys, this.input, this.scale.width, this.scale.height);
-    this.car.steer = drive.steer;
-    this.car.throttle = drive.throttle;
-    this.car.handbrake = drive.handbrake;
-    this.car.assist = drive.touch ? VEHICLE.touchSteerAssist : 0;
+    this.car.steer = this.testDrive?.steer ?? drive.steer;
+    this.car.throttle = this.testDrive?.throttle ?? drive.throttle;
+    this.car.handbrake = this.testDrive ? false : drive.handbrake;
+    this.car.assist = drive.touch && !this.testDrive ? VEHICLE.touchSteerAssist : 0;
 
     if (this.car.throttle !== 0 || this.car.steer !== 0 || this.car.handbrake) {
       if (this.shownHint) {
@@ -273,6 +294,7 @@ export class DriftPlayScene extends Phaser.Scene {
     }
 
     this.car.step(dt);
+    this.publishDebug(delta);
     const q = queryTrack(this.samples, this.car.x, this.car.y);
     this.car.surface = q.surface;
 
@@ -317,7 +339,11 @@ export class DriftPlayScene extends Phaser.Scene {
       void this.platform.achievement.unlock("boost-gate");
     }
     this.lastBoost = q.surface === "boost";
-    if (q.surface === "asphalt" && this.car.speed > 200) void this.platform.achievement.unlock("grass-survive");
+    if (q.surface === "grass") this.onGrass = true;
+    if (this.onGrass && q.surface === "asphalt" && this.car.speed > 200) {
+      void this.platform.achievement.unlock("grass-survive");
+      this.onGrass = false;
+    }
 
     const comboFloor = Math.floor(this.score.combo);
     if (comboFloor > this.lastComboFloor) {
@@ -410,10 +436,7 @@ export class DriftPlayScene extends Phaser.Scene {
     }
 
     this.draw(dt);
-    this.platform.events.emit({
-      name: "hud",
-      props: { score: Math.floor(this.score.display), combo: Math.floor(this.score.combo) },
-    });
+    this.publishDebug(delta);
   }
 
   private showSectorDelta(index: number, gained: number) {
@@ -428,6 +451,7 @@ export class DriftPlayScene extends Phaser.Scene {
   }
 
   private draw(dt: number) {
+    this.gfx.clear();
     drawWorld(this.gfx, this.def, this.samples, this.quality);
     drawMarks(this.gfx, this.marks, dt);
     if (this.showGhost && this.tape) {
@@ -467,6 +491,69 @@ export class DriftPlayScene extends Phaser.Scene {
       this.sys.game.device.input.touch,
       this.juice.flashAlpha(dt),
     );
+    this.drawMobileChrome();
+  }
+
+  private drawMobileChrome() {
+    if (!this.sys.game.device.input.touch || this.reverse) return;
+    const w = this.scale.width;
+    this.overlay.fillStyle(this.showGhost ? 0xe35aa0 : 0xffffff, this.showGhost ? 0.28 : 0.08);
+    this.overlay.fillRoundedRect(w - 86, 48, 70, 28, 8);
+    this.overlay.fillStyle(0xffffff, 0.1);
+    for (let i = 0; i < 3; i += 1) {
+      const active = (TRACKS[i]?.id ?? "") === this.def.id;
+      this.overlay.fillStyle(active ? 0xe35aa0 : 0xffffff, active ? 0.28 : 0.08);
+      this.overlay.fillRoundedRect(16 + i * 54, 48, 48, 28, 8);
+    }
+  }
+
+  private handleChromeTap(x: number, y: number) {
+    if (!this.sys.game.device.input.touch) return;
+    const w = this.scale.width;
+    if (y >= 48 && y <= 76 && x >= w - 86 && x <= w - 16) {
+      this.showGhost = !this.showGhost;
+      setGhostEnabled(this.showGhost);
+      return;
+    }
+    if (this.reverse) return;
+    for (let i = 0; i < 3; i += 1) {
+      const left = 16 + i * 54;
+      if (y >= 48 && y <= 76 && x >= left && x <= left + 48) {
+        this.switchTrack(i);
+        return;
+      }
+    }
+  }
+
+  private publishDebug(delta: number) {
+    this.longFrames = countLongFrame(delta, this.longFrames);
+    publishGwDebug(
+      {
+        gameId: "neon-drift",
+        ready: this.signaledReady,
+        runState: this.ended ? "ended" : this.paused ? "paused" : "playing",
+        playerX: this.car.x,
+        playerY: this.car.y,
+        playerAngle: this.car.angle,
+        score: Math.floor(this.score.display),
+        paused: this.paused,
+        fps: this.game.loop.actualFps,
+        longFrames: this.longFrames,
+        combo: Math.floor(this.score.combo),
+        trackId: this.def.id,
+        speed: this.car.speed,
+        throttle: this.testDrive?.throttle ?? this.car.throttle,
+        frozen: this.juice.isFrozen(this.time.now),
+        tick: this.ticks,
+      },
+      {
+        finishRun: () => this.finish("finish"),
+        setDrive: (throttle: number, steer: number) => {
+          this.paused = false;
+          this.testDrive = { throttle, steer };
+        },
+      },
+    );
   }
 
   private finish(kind: ResultKind) {
@@ -487,7 +574,7 @@ export class DriftPlayScene extends Phaser.Scene {
           sectors: this.score.sectorScore,
           samples: this.recorder.samples,
         },
-        this.reverse ? "daily" : "circuit",
+        this.boardMode,
       );
       this.synth.personalBest();
       pulseHaptic([12, 40, 18]);
@@ -497,6 +584,7 @@ export class DriftPlayScene extends Phaser.Scene {
     if (score >= 25000) void this.platform.achievement.unlock("score-25k");
     if (score >= 60000) void this.platform.achievement.unlock("score-60k");
     if (this.lap >= 2) void this.platform.achievement.unlock("two-laps");
+    if (this.reverse && kind === "finish") void this.platform.achievement.unlock("daily-drift");
 
     const away = Math.max(0, prev - score);
     const retryHint =
@@ -514,7 +602,7 @@ export class DriftPlayScene extends Phaser.Scene {
     });
 
     void this.platform.session.end({
-      mode: this.reverse ? "daily" : "circuit",
+      mode: this.boardMode,
       score,
       result: kind,
       metadata: {
@@ -558,10 +646,16 @@ export class DriftPlayScene extends Phaser.Scene {
   shutdown() {
     this.game.events.off("platform-pause", this.onPause, this);
     this.game.events.off("platform-resume", this.onResume, this);
+    clearGwDebug();
   }
 }
 
-export function mountNeonDrift(parent: HTMLElement, platform: PlatformSDK, dailyVariant = false) {
+export function mountNeonDrift(
+  parent: HTMLElement,
+  platform: PlatformSDK,
+  dailyVariant = false,
+  trackIndex?: number,
+) {
   const mobile = typeof navigator !== "undefined" && /Mobi|Android/i.test(navigator.userAgent);
   const game = new Phaser.Game({
     type: Phaser.AUTO,
@@ -583,7 +677,7 @@ export function mountNeonDrift(parent: HTMLElement, platform: PlatformSDK, daily
   });
   game.registry.set("platform", platform);
   game.registry.set("dailyVariant", dailyVariant);
-  game.registry.set("trackIndex", dailyVariant ? 0 : loadTrackIndex());
+  game.registry.set("trackIndex", dailyVariant ? 0 : trackIndex ?? loadTrackIndex());
   game.registry.set("manifest", neonDriftManifest);
   game.registry.set("debug", process.env.NODE_ENV !== "production");
   (game as Phaser.Game & { restartRun: () => void }).restartRun = () => {
@@ -593,6 +687,7 @@ export function mountNeonDrift(parent: HTMLElement, platform: PlatformSDK, daily
   game.events.once("destroy", () => {
     const synth = game.registry.get("synth") as Synth | undefined;
     synth?.dispose();
+    clearGwDebug();
   });
   return game;
 }

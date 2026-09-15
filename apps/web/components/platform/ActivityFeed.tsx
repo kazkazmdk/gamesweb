@@ -4,7 +4,9 @@ import { QuickAction } from "./QuickAction";
 
 export function ActivityFeed({ items }: { items: ActivityItem[] }) {
   if (!items.length) {
-    return <EmptyState title="No history yet" body="Finish a run to start the feed." action={<QuickAction href="/play">Play</QuickAction>} />;
+    return (
+      <EmptyState title="No history yet" body="Finish a run to start the feed." action={<QuickAction href="/">Play</QuickAction>} />
+    );
   }
   return (
     <ul>

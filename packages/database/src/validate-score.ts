@@ -66,7 +66,9 @@ function num(metadata: Record<string, number | string | boolean>, key: string): 
 }
 
 function validateNeonDrift(payload: ScorePayload, durationSec: number, reasons: string[]) {
-  if (payload.mode !== "circuit" && payload.mode !== "daily") reasons.push("invalid_mode");
+  if (!["foundation", "technical", "velocity", "daily", "circuit"].includes(payload.mode)) {
+    reasons.push("invalid_mode");
+  }
   if (payload.score < 0 || payload.score > 5_000_000) reasons.push("score_out_of_range");
   const maxPlausible = Math.max(8000, durationSec * 4200);
   if (payload.score > maxPlausible) reasons.push("score_exceeds_pace");

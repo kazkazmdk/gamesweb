@@ -14,7 +14,7 @@ export function ChallengeWidget({
   variant?: "compact" | "full";
 }) {
   const done = view.done;
-  const href = view.slug ? `/play/${view.slug}` : "/play";
+  const href = view.slug ? `/play/${view.slug}` : "/";
   const tone = done ? "completed" : variant;
 
   return (

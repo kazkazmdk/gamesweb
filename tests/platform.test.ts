@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { activityFromHistory, challengeViewModel, friendsBoard, playerStatsFromSnapshot } from "../apps/web/lib/platform/adapters";
 import { formatCountdown, formatPlayScore, formatRank, greeting, hasRecord } from "../apps/web/lib/platform/format";
-import { boardModeOptions, defaultBoardMode, isCompactCatalog, playModeOptions } from "../apps/web/lib/platform/modes";
+import { boardModeOptions, boardModeFromPlayIndex, defaultBoardMode, isCompactCatalog, neonBoardMode, playModeOptions } from "../apps/web/lib/platform/modes";
 import type { PlayerSnapshot } from "../apps/web/lib/player-store";
 
 const player = {
@@ -34,9 +34,20 @@ describe("catalog and modes", () => {
     expect(isCompactCatalog(3)).toBe(true);
     expect(isCompactCatalog(12)).toBe(false);
   });
-  it("does not mix neon tracks into score boards", () => {
-    expect(boardModeOptions("neon-drift").map((m) => m.id)).toEqual(["circuit", "daily"]);
+  it("maps play indexes onto neon and velocity boards", () => {
+    expect(boardModeFromPlayIndex("neon-drift", 1)).toBe("technical");
+    expect(boardModeFromPlayIndex("velocity-run", 2)).toBe("course-3");
+    expect(boardModeOptions("neon-drift").map((m) => m.id)).toEqual([
+      "foundation",
+      "technical",
+      "velocity",
+      "daily",
+      "circuit",
+    ]);
     expect(playModeOptions("neon-drift").map((m) => m.label)).toContain("Hairpin District");
+    expect(neonBoardMode(1)).toBe("technical");
+    expect(neonBoardMode(0, true)).toBe("daily");
+    expect(defaultBoardMode("neon-drift")).toBe("foundation");
     expect(defaultBoardMode("velocity-run")).toBe("course-1");
   });
 });
@@ -62,9 +73,9 @@ describe("adapters", () => {
   });
   it("filters friend boards honestly", () => {
     const rows = [
-      { name: "Player", score: 10, isYou: true },
-      { name: "Victor", score: 8 },
-      { name: "Stranger", score: 9 },
+      { name: "Player", username: "player", score: 10, isYou: true },
+      { name: "Victor", username: "v", score: 8 },
+      { name: "Stranger", username: "stranger", score: 9 },
     ];
     expect(friendsBoard(rows, player.friends).map((r) => r.name)).toEqual(["Player", "Victor"]);
   });

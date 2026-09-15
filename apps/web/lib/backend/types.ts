@@ -161,4 +161,16 @@ export type BackendStore = {
   getIdempotency(scope: string, key: string): Promise<{ status: number; response: unknown } | null>;
   putIdempotency(scope: string, key: string, endpoint: string, status: number, response: unknown, identity: Identity): Promise<void>;
   accountProgress(userId: string): Promise<AccountProgress>;
+  getPublicProfile(username: string): Promise<PublicPlayerPayload | null>;
+};
+
+export type PublicPlayerPayload = {
+  username: string;
+  displayName: string;
+  avatar: string;
+  level: number;
+  favoriteGameId: string | null;
+  records: Array<{ gameId: string; mode: string; score: number }>;
+  achievements: string[];
+  activity: Array<{ gameId: string; event: string; score: number; at: number }> | null;
 };

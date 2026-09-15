@@ -1,19 +1,32 @@
 import { test, expect } from "@playwright/test";
 
-test("home surfaces player widgets", async ({ page }) => {
+test("games home is focus-driven", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Continue playing" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Neon Drift" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Play|Continue/ }).first()).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("heading", { name: "Velocity Run" })).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("heading", { name: "Swarm Protocol" })).toBeVisible();
+});
+
+test("play index redirects to games home", async ({ page }) => {
+  await page.goto("/play");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByTestId("games-home")).toBeVisible();
+});
+
+test("arcade hub is the widget surface", async ({ page }) => {
+  await page.goto("/arcade");
+  await expect(page.getByRole("heading", { name: "Arcade" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Daily challenges" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Friends playing" })).toBeVisible();
 });
 
-test("play discovery does not repeat catalog rows", async ({ page }) => {
-  await page.goto("/play");
-  await expect(page.getByRole("heading", { name: "Three ways to play" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Competitive" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Quick sessions" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "All games" })).toHaveCount(0);
+test("achievements is a real destination", async ({ page }) => {
+  await page.goto("/achievements");
+  await expect(page.getByRole("heading", { name: "Achievements" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Neon Drift" })).toBeVisible();
 });
 
 test("challenges show mission progress", async ({ page }) => {
@@ -52,6 +65,7 @@ test("settings keep labeled controls", async ({ page }) => {
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
   await expect(page.getByLabel("Display name")).toBeVisible();
+  await page.getByRole("button", { name: "Audio" }).click();
   await expect(page.getByRole("switch", { name: "Mute" })).toBeVisible();
   await expect(page.getByLabel("Master")).toBeVisible();
 });
@@ -67,9 +81,9 @@ test("mobile navigation uses five destinations", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   const nav = page.getByRole("navigation", { name: "Mobile" });
-  await expect(nav.getByRole("link", { name: "Home", exact: true })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Play", exact: true })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Challenges", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Games", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Arcade", exact: true })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Search", exact: true })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Friends", exact: true })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Me", exact: true })).toBeVisible();
 });
@@ -78,4 +92,11 @@ test("game hub leads with your run", async ({ page }) => {
   await page.goto("/games/neon-drift");
   await expect(page.getByRole("heading", { name: "Your run" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "The game" })).toBeVisible();
+  await page.getByRole("tab", { name: "Hairpin District" }).click();
+  await expect(page.getByRole("tab", { name: "Hairpin District" })).toHaveAttribute("aria-selected", "true");
+});
+
+test("public profile missing state", async ({ page }) => {
+  await page.goto("/profile/nobody-here-xyz");
+  await expect(page.getByRole("heading", { name: /not found|unavailable/i })).toBeVisible();
 });

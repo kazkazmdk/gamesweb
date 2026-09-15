@@ -2,7 +2,7 @@ export const GAME_IDS = ["neon-drift", "velocity-run", "swarm-protocol"] as cons
 export type GameId = (typeof GAME_IDS)[number];
 
 export const GAME_MODES: Record<GameId, readonly string[]> = {
-  "neon-drift": ["circuit", "daily"],
+  "neon-drift": ["foundation", "technical", "velocity", "daily", "circuit"],
   "velocity-run": ["course-1", "course-2", "course-3"],
   "swarm-protocol": ["survival"],
 };
@@ -31,7 +31,7 @@ export function isGameId(value: string): value is GameId {
 export function defaultMode(gameId: string): string {
   if (gameId === "velocity-run") return "course-1";
   if (gameId === "swarm-protocol") return "survival";
-  return "circuit";
+  return "foundation";
 }
 
 export function lowerIsBetter(gameId: string): boolean {

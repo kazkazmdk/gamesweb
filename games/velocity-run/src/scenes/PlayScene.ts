@@ -1,9 +1,9 @@
 import Phaser from "phaser";
-import { clamp, Juice, ParticlePool, pulseHaptic, Synth } from "@gamesweb/game-core";
+import { clamp, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { velocityRunManifest } from "@gamesweb/game-sdk";
 import { COURSES, medalFor, nextMedalTarget, type Course, type Rect } from "../systems/courses";
-import { aabb, Runner } from "../systems/movement";
+import { aabb, MOVE, Runner } from "../systems/movement";
 import {
   GhostRecorder,
   ghostEnabled,
@@ -48,7 +48,12 @@ export class VelocityPlayScene extends Phaser.Scene {
   private camZ = 1;
   private touchMove = 0;
   private touchJump = false;
+  private movePointerId = -1;
+  private jumpPointerId = -1;
   private audioReady = false;
+  private signaledReady = false;
+  private longFrames = 0;
+  private sessionDeaths = 0;
   private recorder = new GhostRecorder();
   private tape: GhostTape | null = null;
   private showGhost = true;
@@ -74,6 +79,10 @@ export class VelocityPlayScene extends Phaser.Scene {
     this.running = false;
     this.timeMs = 0;
     this.dying = 0;
+    this.deaths = 0;
+    this.sessionDeaths = 0;
+    this.retries = 0;
+    this.signaledReady = false;
     this.splitIndex = 0;
     this.splits = [];
     this.camX = this.spawn.x;
@@ -131,16 +140,30 @@ export class VelocityPlayScene extends Phaser.Scene {
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
       this.ensureAudio();
-      if (p.x < this.scale.width * 0.36) this.touchMove = -1;
-      else if (p.x > this.scale.width * 0.64) this.touchMove = 1;
-      else this.touchJump = true;
+      if (this.handleChromeTap(p.x, p.y)) return;
+      if (!p.wasTouch) return;
+      if (p.x < this.scale.width * 0.36) {
+        this.touchMove = -1;
+        this.movePointerId = p.id;
+      } else if (p.x > this.scale.width * 0.64) {
+        this.touchMove = 1;
+        this.movePointerId = p.id;
+      } else {
+        this.touchJump = true;
+        this.jumpPointerId = p.id;
+      }
     });
-    this.input.on("pointerup", () => {
-      this.touchMove = 0;
-      this.touchJump = false;
+    this.input.on("pointerup", (p: Phaser.Input.Pointer) => {
+      if (p.id === this.movePointerId) {
+        this.touchMove = 0;
+        this.movePointerId = -1;
+      }
+      if (p.id === this.jumpPointerId) {
+        this.touchJump = false;
+        this.jumpPointerId = -1;
+      }
     });
 
-    this.platform.session.start();
     this.platform.events.emit({ name: "gameplay_started", props: { gameId: "velocity-run", course: this.course.id } });
     this.fitCam(this.scale.width, this.scale.height);
     this.scale.on("resize", (gs: Phaser.Structs.Size) => {
@@ -175,6 +198,11 @@ export class VelocityPlayScene extends Phaser.Scene {
 
   update(_: number, delta: number) {
     const dt = Math.min(0.033, delta / 1000);
+    this.longFrames = countLongFrame(delta, this.longFrames);
+    if (!this.signaledReady) {
+      this.signaledReady = true;
+      this.platform.events.emit({ name: "game_ready", props: { gameId: "velocity-run" } });
+    }
     if (Phaser.Input.Keyboard.JustDown(this.keys.r)) {
       if (!this.ended) this.retry();
       return;
@@ -200,6 +228,7 @@ export class VelocityPlayScene extends Phaser.Scene {
         this.runner.reset(this.spawn.x, this.spawn.y);
         this.running = false;
         this.timeMs = 0;
+        this.deaths = 0;
         this.splitIndex = 0;
         this.splits = [];
         this.recorder.reset();
@@ -220,6 +249,7 @@ export class VelocityPlayScene extends Phaser.Scene {
     if (!this.running && (move !== 0 || jumpDown)) {
       this.running = true;
       this.startMs = this.time.now;
+      this.platform.session.start();
       this.shownHint = false;
       try {
         localStorage.setItem("gw:velocity-tutorial", "1");
@@ -233,13 +263,13 @@ export class VelocityPlayScene extends Phaser.Scene {
     if (!this.ended) {
       const wasGround = this.runner.grounded;
       this.runner.grounded = false;
+      if (wasGround) this.runner.coyote = this.time.now + MOVE.coyoteMs;
       this.runner.input(dt, move, jumpDown, jumpHeld, jumpReleased, down, this.time.now);
       this.collide();
       if (this.runner.grounded && !wasGround) {
         this.parts.burst(this.runner.x + 8, this.runner.y + 28, 6, this.course.theme.accent, 70, 200);
         this.synth.tone(220 + Math.random() * 30, 0.035, "triangle", 0.028, 0.08);
       }
-      if (wasGround && !this.runner.grounded) this.runner.coyote = this.time.now + 110;
       if (down && this.runner.vy > 80) void this.platform.achievement.unlock("fast-fall");
       if (this.running) this.timeMs = this.time.now - this.startMs;
       this.recorder.tick(dt, this.timeMs, this.runner.x, this.runner.y);
@@ -288,7 +318,7 @@ export class VelocityPlayScene extends Phaser.Scene {
       } else if (dy > 0) {
         r.y += py;
         r.bonk();
-      } else {
+      } else if (r.vy >= 0) {
         r.land(s.y - r.h);
       }
     }
@@ -314,6 +344,7 @@ export class VelocityPlayScene extends Phaser.Scene {
   private die() {
     if (this.ended || this.dying > 0) return;
     this.deaths += 1;
+    this.sessionDeaths += 1;
     this.dying = 90;
     this.juice.hitStop(40);
     this.juice.screenShake(7, 90);
@@ -346,7 +377,9 @@ export class VelocityPlayScene extends Phaser.Scene {
     if (medal === "gold" || medal === "platinum") void this.platform.achievement.unlock("gold");
     if (medal === "platinum") void this.platform.achievement.unlock("platinum");
     if (this.courseIndex === 0 && this.timeMs < 40000) void this.platform.achievement.unlock("sub-40");
-    if (this.deaths === 0) void this.platform.achievement.unlock("no-death");
+    if (this.sessionDeaths === 0) void this.platform.achievement.unlock("no-death");
+    this.markCourseCleared();
+    if (pb && prev > 0) this.markSecondPb();
     void this.platform.quest.progress("velocity-run:gold", medal === "gold" || medal === "platinum" ? 1 : 0);
     if (this.courseIndex === 0 && this.timeMs < 65000) {
       void this.platform.quest.progress("velocity-run:course-1-under", 65000);
@@ -370,6 +403,7 @@ export class VelocityPlayScene extends Phaser.Scene {
       metadata: {
         medal: medal ?? "none",
         deaths: this.deaths,
+        sessionDeaths: this.sessionDeaths,
         course: this.courseIndex,
         lowerIsBetter: true,
         pbDelta: prev > 0 ? this.timeMs - prev : 0,
@@ -399,6 +433,11 @@ export class VelocityPlayScene extends Phaser.Scene {
 
   private switchCourse(i: number) {
     this.game.registry.set("courseIndex", i);
+    try {
+      localStorage.setItem("gw:velocity-course", String(i));
+    } catch {
+      /* noop */
+    }
     this.retry();
   }
 
@@ -477,12 +516,89 @@ export class VelocityPlayScene extends Phaser.Scene {
       this.overlay.fillRoundedRect(this.scale.width - 16 - this.scale.width * 0.3, this.scale.height * 0.28, this.scale.width * 0.3, this.scale.height * 0.5, 16);
       this.overlay.fillStyle(th.accent, 0.18);
       this.overlay.fillRoundedRect(this.scale.width / 2 - 54, this.scale.height - 92, 108, 64, 16);
+      this.overlay.fillStyle(this.showGhost ? th.accent : 0xffffff, this.showGhost ? 0.28 : 0.08);
+      this.overlay.fillRoundedRect(this.scale.width - 86, 48, 70, 28, 8);
+      for (let i = 0; i < 3; i += 1) {
+        const active = i === this.courseIndex;
+        this.overlay.fillStyle(active ? th.accent : 0xffffff, active ? 0.28 : 0.08);
+        this.overlay.fillRoundedRect(16 + i * 54, 48, 48, 28, 8);
+      }
     }
+    this.publishDebug();
+  }
+
+  private handleChromeTap(x: number, y: number) {
+    if (!this.sys.game.device.input.touch) return false;
+    const w = this.scale.width;
+    if (y >= 48 && y <= 76 && x >= w - 86 && x <= w - 16) {
+      this.showGhost = !this.showGhost;
+      setGhostEnabled(this.showGhost);
+      return true;
+    }
+    for (let i = 0; i < 3; i += 1) {
+      const left = 16 + i * 54;
+      if (y >= 48 && y <= 76 && x >= left && x <= left + 48) {
+        this.switchCourse(i);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private markCourseCleared() {
+    try {
+      const key = "gw:velocity-cleared";
+      const got = new Set((localStorage.getItem(key) ?? "").split(",").filter(Boolean));
+      got.add(this.course.id);
+      localStorage.setItem(key, [...got].join(","));
+      if (got.size >= COURSES.length) void this.platform.achievement.unlock("all-courses");
+    } catch {
+      /* noop */
+    }
+  }
+
+  private markSecondPb() {
+    try {
+      const key = `gw:velocity-pb-count:${this.course.id}`;
+      const n = Number(localStorage.getItem(key) ?? 0) + 1;
+      localStorage.setItem(key, String(n));
+      if (n >= 2) void this.platform.achievement.unlock("pb-twice");
+    } catch {
+      /* noop */
+    }
+  }
+
+  private publishDebug() {
+    publishGwDebug(
+      {
+        gameId: "velocity-run",
+        ready: this.signaledReady,
+        runState: this.ended ? "ended" : this.paused ? "paused" : "playing",
+        playerX: this.runner.x,
+        playerY: this.runner.y,
+        score: Math.floor(this.timeMs),
+        paused: this.paused,
+        fps: this.game.loop.actualFps,
+        longFrames: this.longFrames,
+        deaths: this.deaths,
+        sessionDeaths: this.sessionDeaths,
+        timeMs: this.timeMs,
+        courseId: this.course.id,
+      },
+      {
+        killPlayer: () => this.die(),
+        finishRun: () => this.win(),
+        jump: () => {
+          this.touchJump = true;
+        },
+      },
+    );
   }
 
   shutdown() {
     this.game.events.off("platform-pause", this.onPause, this);
     this.game.events.off("platform-resume", this.onResume, this);
+    clearGwDebug();
   }
 }
 
@@ -508,6 +624,7 @@ export function mountVelocityRun(parent: HTMLElement, platform: PlatformSDK, cou
   game.events.once("destroy", () => {
     const synth = game.registry.get("synth") as Synth | undefined;
     synth?.dispose();
+    clearGwDebug();
   });
   return game;
 }

@@ -1,12 +1,13 @@
-import { LeaderboardQuerySchema, assertMode } from "@gamesweb/database";
+import { LeaderboardQuerySchema, assertMode, defaultMode, isGameId } from "@gamesweb/database";
 import { jsonError, jsonOk } from "@/lib/api/errors";
 import { getBackend } from "@/lib/backend";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
+  const game = url.searchParams.get("game") ?? url.searchParams.get("gameId") ?? "";
   const parsed = LeaderboardQuerySchema.safeParse({
-    game: url.searchParams.get("game") ?? url.searchParams.get("gameId"),
-    mode: url.searchParams.get("mode") ?? "circuit",
+    game,
+    mode: url.searchParams.get("mode") ?? (isGameId(game) ? defaultMode(game) : "foundation"),
     limit: url.searchParams.get("limit") ?? "10",
   });
   if (!parsed.success) return jsonError("INVALID_PAYLOAD", "Invalid leaderboard query.", 400);

@@ -1,162 +1,183 @@
 "use client";
 
-import { dailyQuests, GAME_MANIFESTS, getManifest, recommend } from "@gamesweb/game-sdk";
+import { GAME_MANIFESTS } from "@gamesweb/game-sdk";
 import { levelFromXp } from "@gamesweb/config";
-import { useMemo } from "react";
-import { PlayButton } from "@/components/game/GameCard";
-import {
-  ActivityFeed,
-  ChallengeWidget,
-  EmptyState,
-  FriendPresence,
-  GameTile,
-  InviteWidget,
-  PlatformHero,
-  QuickAction,
-  SectionHeader,
-} from "@/components/platform";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { GameArt } from "@/components/game/GameArt";
+import { GameModeSelector, QuickAction } from "@/components/platform";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
-import {
-  activityFromHistory,
-  challengeViewModel,
-  dailySummary,
-  lastPbEvent,
-} from "@/lib/platform/adapters";
-import { formatLevel, formatPlayScore, greeting } from "@/lib/platform/format";
-import { defaultBoardMode, lowerIsBetter } from "@/lib/platform/modes";
+import { focusedGameContext } from "@/lib/platform/focus";
+import { formatLevel } from "@/lib/platform/format";
+import { boardModeFromPlayIndex, loadPlayIndex, playModeOptions, savePlayIndex } from "@/lib/platform/modes";
 
 export default function HomePage() {
   const player = usePlayer();
   const store = useStore();
+  const router = useRouter();
+  const [focus, setFocus] = useState(0);
+  const [playIndex, setPlayIndex] = useState(0);
+  const game = GAME_MANIFESTS[focus] ?? GAME_MANIFESTS[0];
+  useAccent(game.accent);
   const lv = levelFromXp(player.xp);
-  const returning = player.history.length > 0;
-  const quests = dailyQuests(player.dayKey);
-  const dailies = dailySummary(player);
-  const rec = useMemo(
-    () =>
-      recommend({
-        history: player.history.map((h) => ({ gameId: h.gameId, durationMs: h.durationMs, at: h.at })),
-        playedIds: store.playedIds(),
-        challengeGameIds: quests.map((q) => q.gameId).filter((id): id is string => Boolean(id)),
-        friendsPlaying: player.friends.filter((f) => f.presence === "playing").map((f) => f.gameId ?? ""),
-      }),
-    [player, quests, store],
-  );
-  const hero = getManifest(rec[0]) ?? GAME_MANIFESTS[0];
-  useAccent(hero.accent);
-  const pb = store.personalBest(hero.id, defaultBoardMode(hero.id), lowerIsBetter(hero.id));
-  const pbLabel = formatPlayScore(hero.id, pb);
-  const continueGames = store.continuePlaying().slice(0, 4);
-  const forYou = rec.map((id) => getManifest(id)!).filter(Boolean);
-  const friendsNow = player.friends.filter((f) => f.status === "accepted" && f.presence !== "offline");
-  const lastPb = lastPbEvent(player.history);
-  const lastPbGame = lastPb ? getManifest(lastPb.gameId) : null;
-  const activity = activityFromHistory(player.history, 4);
+  const reduced = player.settings.reducedMotion;
 
-  const contextBits = returning
-    ? [
-        formatLevel(lv.level),
-        player.streak > 0 ? `${player.streak} day streak` : null,
-        `${dailies.done}/${dailies.total} dailies`,
-        lastPb && lastPbGame ? `Last PB: ${lastPbGame.title} ${formatPlayScore(lastPb.gameId, lastPb.score)}` : null,
-      ].filter(Boolean)
-    : [];
+  useEffect(() => {
+    setPlayIndex(loadPlayIndex(game.id));
+  }, [game.id]);
+
+  const board = store.leaderboard(game.id, boardModeFromPlayIndex(game.id, playIndex));
+  const ctx = useMemo(
+    () => focusedGameContext(player, game, playIndex, board),
+    [player, game, playIndex, board],
+  );
+
+  useEffect(() => {
+    void store.ensureBoard(game.id, ctx.boardMode);
+  }, [store, game.id, ctx.boardMode]);
+
+  const setFocusSafe = useCallback((index: number) => {
+    const next = (index + GAME_MANIFESTS.length) % GAME_MANIFESTS.length;
+    setFocus(next);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (!el) return;
+      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable) return;
+      if (document.querySelector('[role="dialog"][aria-label="Search"]')) return;
+      if (el.closest('[role="tablist"]')) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setFocusSafe(focus + 1);
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setFocusSafe(focus - 1);
+      }
+      if (e.key === "Enter") {
+        if (el.closest("a,button")) return;
+        e.preventDefault();
+        router.push(`/play/${game.slug}`);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [focus, game.slug, router, setFocusSafe]);
+
+  const onlineFriends = player.friends.filter((f) => f.status === "accepted" && f.presence !== "offline").length;
+  const modes = playModeOptions(game.id);
+  const next = GAME_MANIFESTS[(focus + 1) % GAME_MANIFESTS.length];
+  const fade = reduced ? "" : "duration-300";
 
   return (
-    <div>
-      <PlatformHero
-        slug={hero.slug}
-        kicker={returning ? "Continue" : "Instant play"}
-        title={hero.title}
-        tagline={hero.tagline}
-        context={
-          returning ? (
-            <p className="mt-2 text-[14px] text-white/70">
-              {greeting()}, {player.displayName}
-              {contextBits.length ? ` · ${contextBits.slice(0, 2).join(" · ")}` : ""}
-            </p>
-          ) : null
-        }
-        metrics={[pbLabel ? pbLabel : null, hero.sessionHint, contextBits[2], contextBits[3]].filter(Boolean).join(" · ")}
-        actions={
-          <>
-            <PlayButton href={`/play/${hero.slug}`} />
-            <InviteWidget slug={hero.slug} compact />
-          </>
-        }
-      />
-
-      <div className="space-y-12 px-5 py-10 md:px-10">
-        <section>
-          <SectionHeader title="Continue playing" />
-          {continueGames.length ? (
-            <div className="mt-4 flex flex-col gap-2">
-              {continueGames.map((g) => {
-                const best = store.personalBest(g.id, defaultBoardMode(g.id), lowerIsBetter(g.id));
-                return (
-                  <GameTile
-                    key={g.id}
-                    game={g}
-                    variant="wide"
-                    href={`/play/${g.slug}`}
-                    kicker="Resume"
-                    pb={best}
-                  />
-                );
-              })}
-            </div>
-          ) : (
-            <EmptyState title="Pick your first game." action={<QuickAction href="/play">Browse</QuickAction>} />
-          )}
-        </section>
-
-        <section>
-          <SectionHeader title="Daily challenges" meta={`${dailies.done}/${dailies.total}`} />
-          <div className="mt-2 divide-y divide-[var(--line)]">
-            {quests.map((q) => (
-              <ChallengeWidget key={q.id} view={challengeViewModel(player, q)} variant="compact" />
-            ))}
+    <div className="relative md:min-h-[calc(100dvh-var(--header-h))]" data-testid="games-home">
+      <div
+        className={`relative h-[42vh] overflow-hidden md:absolute md:inset-0 md:h-auto ${reduced ? "" : "transition-opacity duration-[280ms]"}`}
+      >
+        <GameArt slug={game.slug} variant="backdrop" className="absolute inset-0 h-full w-full" />
+        {next && next.id !== game.id ? (
+          <div className="pointer-events-none absolute inset-0 opacity-0" aria-hidden>
+            <GameArt slug={next.slug} variant="backdrop" className="h-full w-full" />
           </div>
-        </section>
-
-        <section>
-          <SectionHeader title="Friends playing" action={<QuickAction href="/friends" tone="quiet">All</QuickAction>} />
-          {friendsNow.length ? (
-            <div className="mt-2 divide-y divide-[var(--line)]">
-              {friendsNow.map((f) => (
-                <FriendPresence key={f.id} friend={f} compact />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              title="No friends online"
-              body="Games are better with rivals."
-              action={<QuickAction href="/friends">Invite</QuickAction>}
-            />
-          )}
-        </section>
-
-        <section>
-          <SectionHeader title="For you" />
-          <div className="mt-4 flex gap-3 overflow-x-auto scrollbar-none">
-            {forYou.map((g) => (
-              <div key={g.id} className="w-[240px] shrink-0">
-                <GameTile game={g} />
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {activity.length ? (
-          <section>
-            <SectionHeader title="Recent" />
-            <div className="mt-2">
-              <ActivityFeed items={activity} />
-            </div>
-          </section>
         ) : null}
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)] via-[color-mix(in_srgb,var(--bg)_18%,transparent)] to-transparent md:bg-gradient-to-r md:from-[var(--bg)] md:via-[color-mix(in_srgb,var(--bg)_42%,transparent)] md:to-transparent" />
+        <div className="absolute inset-0 hidden bg-gradient-to-t from-[var(--bg)] via-transparent to-[color-mix(in_srgb,var(--bg)_35%,transparent)] md:block md:to-transparent" />
       </div>
+
+      <div className="relative flex flex-col px-5 pb-8 pt-4 md:min-h-[calc(100dvh-var(--header-h))] md:px-10 md:pb-12">
+        <div className="flex items-center justify-between gap-4 text-[12px] text-white/60">
+          <p>
+            {formatLevel(lv.level)}
+            {player.streak > 0 ? ` · ${player.streak}d streak` : ""}
+            {onlineFriends > 0 ? ` · ${onlineFriends} online` : ""}
+          </p>
+        </div>
+
+        <div className={`mt-6 max-w-xl md:order-2 md:mt-auto md:pt-10 ${reduced ? "" : "transition-all duration-300"}`}>
+          <p className="meta text-white/55">{game.genre}</p>
+          <h1 className="display mt-2 text-[44px] text-white md:mt-3 md:text-[88px]">{game.title}</h1>
+          <p className="mt-2 max-w-md text-[15px] text-white/75 md:mt-3 md:text-[16px]">{game.tagline}</p>
+
+          <div className="mt-6 flex flex-wrap items-center gap-3 md:mt-8">
+            <QuickAction href={`/play/${game.slug}`}>{ctx.playLabel}</QuickAction>
+            <QuickAction href={`/games/${game.slug}`} tone="quiet">
+              Game Hub
+            </QuickAction>
+          </div>
+        </div>
+
+        <div
+          className={`mt-5 flex items-end gap-3 overflow-x-auto pb-3 scrollbar-none md:order-1 md:mt-6 ${fade}`}
+          role="listbox"
+          aria-label="Games"
+          onTouchStart={(e) => {
+            const x = e.changedTouches[0]?.clientX ?? 0;
+            (e.currentTarget as HTMLElement).dataset.x = String(x);
+          }}
+          onTouchEnd={(e) => {
+            const start = Number((e.currentTarget as HTMLElement).dataset.x ?? 0);
+            const x = e.changedTouches[0]?.clientX ?? start;
+            const dx = x - start;
+            if (dx < -40) setFocusSafe(focus + 1);
+            if (dx > 40) setFocusSafe(focus - 1);
+          }}
+        >
+          {GAME_MANIFESTS.map((g, i) => {
+            const on = i === focus;
+            return (
+              <button
+                key={g.id}
+                type="button"
+                role="option"
+                aria-selected={on}
+                onClick={() => setFocus(i)}
+                className={`relative shrink-0 overflow-hidden rounded-sm transition-[width,opacity,transform] ${
+                  reduced ? "" : "duration-300"
+                } ${on ? "w-[168px] md:w-[200px] opacity-100" : "w-[96px] md:w-[112px] opacity-55"}`}
+              >
+                <span className="block aspect-[16/10]">
+                  <GameArt slug={g.slug} variant="tile" className="h-full w-full" />
+                </span>
+                <span className={`mt-2 block text-left text-[12px] ${on ? "text-white" : "text-white/55"}`}>{g.title}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-4 md:order-3 md:mt-8 md:gap-y-5">
+          <Metric label="PB" value={ctx.pbLabel ?? "—"} />
+          <Metric label="Mode" value={ctx.modeLabel} />
+          {ctx.friendBest?.scoreLabel ? (
+            <Metric label="Friend best" value={`${ctx.friendBest.name} ${ctx.friendBest.scoreLabel}`} />
+          ) : null}
+          {ctx.daily ? <Metric label="Daily" value={`${ctx.daily.current} / ${ctx.daily.target}`} /> : null}
+        </dl>
+
+        <div className="mt-5 hidden max-w-lg md:order-4 md:block">
+          <GameModeSelector
+            label={game.id === "neon-drift" ? "Track" : game.id === "velocity-run" ? "Course" : "Mode"}
+            options={modes}
+            value={String(playIndex)}
+            onChange={(id) => {
+              const index = Number(id);
+              setPlayIndex(index);
+              savePlayIndex(game.id, index);
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="meta text-white/45">{label}</dt>
+      <dd className="stat mt-1 text-[24px] text-white md:text-[36px]">{value}</dd>
     </div>
   );
 }

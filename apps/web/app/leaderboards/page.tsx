@@ -1,8 +1,8 @@
 "use client";
 
 import { GAME_MANIFESTS } from "@gamesweb/game-sdk";
-import { useMemo, useState } from "react";
-import { EmptyState, GameModeSelector, QuickAction, RankWidget, SectionHeader } from "@/components/platform";
+import { useEffect, useMemo, useState } from "react";
+import { EmptyState, GameModeSelector, InlineError, QuickAction, RankWidget, SectionHeader } from "@/components/platform";
 import { Avatar, useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
 import { friendsBoard, rankViewModel } from "@/lib/platform/adapters";
@@ -19,12 +19,17 @@ export default function LeaderboardsPage() {
   const game = GAME_MANIFESTS.find((g) => g.id === gameId) ?? GAME_MANIFESTS[0];
   const modes = boardModeOptions(game.id);
   const allRows = store.leaderboard(game.id, mode);
+  const personal = store.personalRank(game.id, mode);
   const rows = useMemo(
     () => (scope === "friends" ? friendsBoard(allRows, player.friends) : allRows),
     [allRows, player.friends, scope],
   );
-  const rank = rankViewModel(rows, game.id);
+  const rank = rankViewModel(rows, game.id, scope === "global" ? personal : null);
   const youOffTop = rank.rank !== null && rank.rank > 10;
+
+  useEffect(() => {
+    void store.ensureBoard(gameId, mode);
+  }, [store, gameId, mode]);
 
   function selectGame(id: string) {
     setGameId(id);
@@ -56,6 +61,16 @@ export default function LeaderboardsPage() {
           onChange={(id) => setScope(id as "global" | "friends")}
         />
       </div>
+
+      {store.boardError(game.id, mode) ? (
+        <div className="mt-8 max-w-xl">
+          <InlineError
+            title="Global board unavailable"
+            body="Your local PB remains visible."
+            onRetry={() => void store.ensureBoard(game.id, mode, true)}
+          />
+        </div>
+      ) : null}
 
       <section className="mt-10 max-w-xl">
         <SectionHeader title="Your position" />

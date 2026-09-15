@@ -130,11 +130,11 @@ export function activityFromHistory(history: PlayRecord[], limit = 8): ActivityI
   });
 }
 
-export type BoardRow = { name: string; score: number; isYou?: boolean };
+export type BoardRow = { name: string; username?: string; score: number; isYou?: boolean };
 
-export function rankViewModel(rows: BoardRow[], gameId: string) {
+export function rankViewModel(rows: BoardRow[], gameId: string, personalRank?: number | null) {
   const youIndex = rows.findIndex((r) => r.isYou);
-  const rank = youIndex >= 0 ? youIndex + 1 : null;
+  const rank = personalRank ?? null;
   const you = youIndex >= 0 ? rows[youIndex] : null;
   const above = youIndex > 0 ? rows[youIndex - 1] : null;
   const lower = lowerIsBetter(gameId);
@@ -155,13 +155,17 @@ export function rankViewModel(rows: BoardRow[], gameId: string) {
 }
 
 export function friendOnBoard(rows: BoardRow[], friends: Friend[]) {
-  const names = new Set(friends.filter((f) => f.status === "accepted").map((f) => f.displayName));
-  return rows.find((r) => !r.isYou && names.has(r.name)) ?? null;
+  const usernames = new Set(
+    friends.filter((f) => f.status === "accepted").map((f) => f.username.toLowerCase()),
+  );
+  return rows.find((r) => !r.isYou && r.username && usernames.has(r.username.toLowerCase())) ?? null;
 }
 
 export function friendsBoard(rows: BoardRow[], friends: Friend[]) {
-  const names = new Set(friends.filter((f) => f.status === "accepted").map((f) => f.displayName));
-  return rows.filter((r) => r.isYou || names.has(r.name));
+  const usernames = new Set(
+    friends.filter((f) => f.status === "accepted").map((f) => f.username.toLowerCase()),
+  );
+  return rows.filter((r) => r.isYou || (r.username && usernames.has(r.username.toLowerCase())));
 }
 
 export function latestUnlocks(player: PlayerSnapshot, limit = 3) {

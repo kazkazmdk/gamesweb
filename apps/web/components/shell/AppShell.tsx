@@ -14,11 +14,18 @@ import { Search } from "@/components/shell/Search";
 
 export const PLATFORM_ACCENT = "#d7c4a3";
 
-const NAV = [
-  { href: "/", label: "Home", match: (p: string) => p === "/", icon: HomeIcon },
-  { href: "/play", label: "Play", match: (p: string) => p.startsWith("/play") || p.startsWith("/games"), icon: PlayIcon },
-  { href: "/challenges", label: "Challenges", match: (p: string) => p.startsWith("/challenges"), icon: FlagIcon },
+const DESKTOP_NAV = [
+  { href: "/", label: "Games", match: (p: string) => p === "/" },
+  { href: "/arcade", label: "Arcade", match: (p: string) => p.startsWith("/arcade") || p.startsWith("/challenges") || p.startsWith("/achievements") },
+  { href: "/leaderboards", label: "Boards", match: (p: string) => p.startsWith("/leaderboards") },
+  { href: "/friends", label: "Friends", match: (p: string) => p.startsWith("/friends") },
+];
+
+const MOBILE_NAV = [
+  { href: "/", label: "Games", match: (p: string) => p === "/", icon: HomeIcon },
+  { href: "/arcade", label: "Arcade", match: (p: string) => p.startsWith("/arcade") || p.startsWith("/challenges") || p.startsWith("/achievements"), icon: ArcadeIcon },
   { href: "/friends", label: "Friends", match: (p: string) => p.startsWith("/friends"), icon: FriendsIcon },
+  { href: "/me", label: "Me", match: (p: string) => p.startsWith("/me") || p.startsWith("/profile") || p.startsWith("/settings"), icon: MeIcon },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -33,15 +40,23 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [path]);
 
   useEffect(() => {
+    document.documentElement.classList.toggle("reduce-motion", player.settings.reducedMotion);
+  }, [player.settings.reducedMotion]);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setQuery(true);
       }
+      if (e.key === "Escape" && query) {
+        e.preventDefault();
+        setQuery(false);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [query]);
 
   if (playing) {
     return (
@@ -59,8 +74,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link href="/" className="display text-[22px] tracking-[-0.06em]">
             {brand.wordmark}
           </Link>
-          <nav className="hidden items-center gap-6 text-[13px] text-[var(--text-dim)] md:flex">
-            {NAV.map((item) => (
+          <nav className="hidden items-center gap-6 text-[13px] text-[var(--text-dim)] md:flex" aria-label="Primary">
+            {DESKTOP_NAV.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -69,12 +84,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {item.label}
               </Link>
             ))}
-            <Link
-              href="/leaderboards"
-              className={path.startsWith("/leaderboards") ? "nav-active pb-0.5" : "hover:text-[var(--text)]"}
-            >
-              Boards
-            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-3">
@@ -96,11 +105,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
         </div>
       </header>
-      {player.backend === "local" ? (
-        <p className="px-5 py-2 text-center text-[12px] text-[var(--text-faint)] md:px-8">
-          Local backend — progress stays on this device until Supabase is configured.
-        </p>
-      ) : null}
       <main className="pb-28 md:pb-16">{children}</main>
       <footer className="hidden border-t border-[var(--line)] px-8 py-6 text-[12px] text-[var(--text-faint)] md:flex md:gap-6">
         <Link href="/about">About</Link>
@@ -111,10 +115,27 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-[var(--line)] bg-[color-mix(in_srgb,var(--bg)_88%,transparent)] pb-[var(--safe-bottom)] backdrop-blur-md md:hidden"
         aria-label="Mobile"
       >
-        {[
-          ...NAV,
-          { href: "/me", label: "Me", match: (p: string) => p.startsWith("/me") || p.startsWith("/profile"), icon: MeIcon },
-        ].map((item) => (
+        {MOBILE_NAV.slice(0, 2).map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            aria-label={item.label}
+            className={`flex h-14 flex-col items-center justify-center gap-0.5 text-[10px] ${item.match(path) ? "text-[var(--text)]" : "text-[var(--text-dim)]"}`}
+          >
+            <item.icon />
+            {item.label}
+          </Link>
+        ))}
+        <button
+          type="button"
+          aria-label="Search"
+          className="flex h-14 flex-col items-center justify-center gap-0.5 text-[10px] text-[var(--text-dim)]"
+          onClick={() => setQuery(true)}
+        >
+          <SearchIcon />
+          Search
+        </button>
+        {MOBILE_NAV.slice(2).map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -149,19 +170,22 @@ function HomeIcon() {
   );
 }
 
-function PlayIcon() {
+function ArcadeIcon() {
   return (
     <IconFrame>
-      <path d="M6 4.2 14 9 6 13.8Z" />
+      <rect x="4" y="6" width="10" height="8" rx="1.5" />
+      <path d="M7 6V4.5h4V6" />
+      <circle cx="7.5" cy="10" r="0.8" fill="currentColor" stroke="none" />
+      <circle cx="10.5" cy="10" r="0.8" fill="currentColor" stroke="none" />
     </IconFrame>
   );
 }
 
-function FlagIcon() {
+function SearchIcon() {
   return (
     <IconFrame>
-      <path d="M5 3v12" />
-      <path d="M5 4h8l-1.6 2.4L13 9H5" />
+      <circle cx="8" cy="8" r="3.2" />
+      <path d="M10.6 10.6 14 14" />
     </IconFrame>
   );
 }

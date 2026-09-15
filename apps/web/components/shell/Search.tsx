@@ -5,12 +5,16 @@ import { analytics } from "@gamesweb/analytics";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { GameArt } from "@/components/game/GameArt";
-import { useStore } from "@/lib/player";
+import { Avatar } from "@/components/shell/AppShell";
+import { usePlayer, useStore } from "@/lib/player";
+import { playerApi } from "@/lib/player-api";
 
 export function Search({ games, onClose }: { games: GameManifest[]; onClose: () => void }) {
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
+  const [players, setPlayers] = useState<Array<{ username: string; displayName: string; avatar: string }>>([]);
   const store = useStore();
+  const player = usePlayer();
   const router = useRouter();
   const results = useMemo(() => store.search(q), [q, store]);
   const recent = store.continuePlaying().slice(0, 3);
@@ -19,6 +23,21 @@ export function Search({ games, onClose }: { games: GameManifest[]; onClose: () 
   useEffect(() => {
     setActive(0);
   }, [q]);
+
+  useEffect(() => {
+    if (q.trim().length < 3) {
+      setPlayers([]);
+      return;
+    }
+    const t = window.setTimeout(() => {
+      void playerApi.searchPlayers(q.trim()).then((res) => {
+        if (res.ok) {
+          setPlayers(res.data.rows.filter((p) => p.username.toLowerCase() !== player.username.toLowerCase()));
+        }
+      });
+    }, 280);
+    return () => window.clearTimeout(t);
+  }, [q, player.username]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -80,7 +99,7 @@ export function Search({ games, onClose }: { games: GameManifest[]; onClose: () 
                 <li key={`recent-${g.id}`}>
                   <button type="button" className="flex w-full items-center gap-3 py-2 text-left" onClick={() => open(g)}>
                     <span className="h-8 w-12 overflow-hidden">
-                      <GameArt slug={g.slug} className="h-full w-full object-cover" />
+                      <GameArt slug={g.slug} variant="tile" className="h-full w-full object-cover" />
                     </span>
                     <span>{g.title}</span>
                   </button>
@@ -100,7 +119,7 @@ export function Search({ games, onClose }: { games: GameManifest[]; onClose: () 
               >
                 <span className="flex items-center gap-3">
                   <span className="h-8 w-12 overflow-hidden">
-                    <GameArt slug={g.slug} className="h-full w-full object-cover" />
+                    <GameArt slug={g.slug} variant="tile" className="h-full w-full object-cover" />
                   </span>
                   <span>
                     <span className="block">{g.title}</span>
@@ -115,6 +134,31 @@ export function Search({ games, onClose }: { games: GameManifest[]; onClose: () 
             <li className="px-3 py-6 text-[13px] text-[var(--text-dim)]">No titles match yet.</li>
           ) : null}
         </ul>
+        {players.length ? (
+          <div className="mt-2 border-t border-[var(--line)] px-3 py-2">
+            <p className="meta">Players</p>
+            <ul>
+              {players.map((p) => (
+                <li key={p.username}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 py-2 text-left"
+                    onClick={() => {
+                      onClose();
+                      router.push(`/profile/${p.username}`);
+                    }}
+                  >
+                    <Avatar id={p.avatar} size={28} />
+                    <span>
+                      <span className="block">{p.displayName}</span>
+                      <span className="text-[12px] text-[var(--text-dim)]">@{p.username}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     </div>
   );

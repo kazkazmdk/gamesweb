@@ -14,14 +14,17 @@ export function readDriveInput(
   w: number,
   h: number,
 ): DriveInput {
-  const pointers = [input.activePointer, input.pointer1, input.pointer2];
-  const touch = pointers.some((p) => p.wasTouch);
+  const pointers = [input.activePointer, input.pointer1, input.pointer2].filter(
+    (p): p is Phaser.Input.Pointer => Boolean(p),
+  );
+  const touch = pointers.some((p) => p.isDown && p.wasTouch);
   let steer =
-    Number(keys.right.isDown || keys.right2.isDown) - Number(keys.left.isDown || keys.left2.isDown);
+    Number(Boolean(keys.right?.isDown || keys.right2?.isDown)) -
+    Number(Boolean(keys.left?.isDown || keys.left2?.isDown));
   let throttle = 0;
-  if (keys.up.isDown || keys.up2.isDown) throttle = 1;
-  else if (keys.down.isDown || keys.down2.isDown) throttle = -1;
-  let handbrake = keys.space.isDown;
+  if (keys.up?.isDown || keys.up2?.isDown) throttle = 1;
+  else if (keys.down?.isDown || keys.down2?.isDown) throttle = -1;
+  let handbrake = Boolean(keys.space?.isDown);
 
   if (touch) {
     throttle = 1;

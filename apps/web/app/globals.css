@@ -71,6 +71,14 @@ button {
   }
 }
 
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation: none !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
 .scrollbar-none {
   scrollbar-width: none;
 }

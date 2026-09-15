@@ -38,13 +38,13 @@ export default function FriendsPage() {
       ) : null}
 
       {player.friends.length === 0 ? (
-        <p className="mt-8 text-[14px] text-[var(--text-dim)]">No friends yet</p>
+        <p className="mt-8 text-[15px] text-[var(--text-dim)]">No friends yet. Invite someone to chase your Neon score.</p>
       ) : (
         <div className="mt-10 max-w-xl space-y-10">
-          <Group title="Playing now" empty="Nobody in a run right now." friends={playing} store={store} />
+          <Group title="Playing now" empty="No friends playing. Invite someone to chase a score." friends={playing} store={store} />
           <Group title="Online" empty="No one idle-online." friends={online} store={store} />
           <Group title="Requests" empty="No pending invites." friends={requests} store={store} />
-          <Group title="Offline" empty="No offline friends." friends={offline} store={store} />
+          <Group title="Offline" empty="Offline friends stay quiet until they return." friends={offline} store={store} />
         </div>
       )}
     </div>
@@ -71,8 +71,9 @@ function Group({
             <FriendPresence
               key={f.id}
               friend={f}
-              onRemove={() => store.removeFriend(f.id)}
+              onRemove={f.status === "accepted" ? () => store.removeFriend(f.id) : undefined}
               onAccept={f.status === "pending-in" ? () => store.acceptFriend(f.id) : undefined}
+              onDecline={f.status === "pending-in" ? () => store.declineFriend(f.id) : undefined}
             />
           ))}
         </div>
