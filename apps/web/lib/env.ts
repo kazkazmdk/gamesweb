@@ -50,11 +50,17 @@ export function showSeedData(): boolean {
 
 export type BackendKind = "memory" | "supabase" | "none";
 
+function hasAnyBackendSecrets(): boolean {
+  return Boolean(supabaseUrl() || supabasePublishableKey() || supabaseSecretKey() || hasUpstash());
+}
+
 export function resolveBackend(): BackendKind {
   const forced = read("GAMESWEB_BACKEND");
   if (forced === "memory") return "memory";
   if (forced === "supabase") return hasSupabaseAdmin() ? "supabase" : "none";
   if (hasSupabaseAdmin()) return "supabase";
+  // Empty Vercel project (no Supabase/Upstash): playable in-process demo.
+  if (!hasAnyBackendSecrets()) return "memory";
   if (isVercelProduction()) return "none";
   return "memory";
 }
@@ -72,6 +78,9 @@ export function publicEnvFlags() {
 
 export function assertProductionSecrets(): string[] {
   if (!isVercelProduction()) return [];
+  // Explicit demo, or a fresh Vercel project with no backend secrets yet.
+  if (read("GAMESWEB_BACKEND") === "memory") return [];
+  if (!hasAnyBackendSecrets()) return [];
   const missing: string[] = [];
   if (!supabaseUrl()) missing.push("NEXT_PUBLIC_SUPABASE_URL");
   if (!supabasePublishableKey()) missing.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");

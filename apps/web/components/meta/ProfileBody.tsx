@@ -1,16 +1,35 @@
 "use client";
 
-import { GAME_MANIFESTS, PLATFORM_ACHIEVEMENTS } from "@gamesweb/game-sdk";
+import { GAME_MANIFESTS, PLATFORM_ACHIEVEMENTS, allAchievements } from "@gamesweb/game-sdk";
 import { levelFromXp } from "@gamesweb/config";
-import { Avatar } from "@/components/shell/AppShell";
-import { usePlayer, useStore } from "@/lib/player";
-import { formatScore } from "@/lib/player-store";
+import { useState } from "react";
+import {
+  AchievementStrip,
+  ActivityFeed,
+  EmptyState,
+  PlayerCard,
+  ProgressWidget,
+  QuickAction,
+  RecordWidget,
+  SectionHeader,
+  StatsWidget,
+} from "@/components/platform";
+import { useAccent } from "@/components/shell/AppShell";
+import { usePlayer } from "@/lib/player";
+import {
+  activityFromHistory,
+  favoriteGameId,
+  gameRecordFor,
+  latestUnlocks,
+  playerStatsFromSnapshot,
+} from "@/lib/platform/adapters";
+import { formatLevel } from "@/lib/platform/format";
 
 export function ProfileBody({ self, username }: { self?: boolean; username?: string }) {
+  useAccent();
   const player = usePlayer();
-  const store = useStore();
   const lv = levelFromXp(player.xp);
-  const pct = Math.round((lv.intoLevel / Math.max(1, lv.needed)) * 100);
+  const [showAll, setShowAll] = useState(false);
   if (!self && username && username !== player.username) {
     return (
       <div className="px-5 py-10 md:px-10">
@@ -19,67 +38,101 @@ export function ProfileBody({ self, username }: { self?: boolean; username?: str
       </div>
     );
   }
+  const stats = playerStatsFromSnapshot(player);
+  const favorite = favoriteGameId(player);
+  const favoriteTitle = GAME_MANIFESTS.find((g) => g.id === favorite)?.title;
+  const showcase = latestUnlocks(player, 3);
+  const activity = activityFromHistory(player.history, 10);
+
   return (
     <div className="px-5 py-8 md:px-10">
-      <div className="flex items-center gap-4">
-        <Avatar id={player.avatar} size={64} />
-        <div>
-          <h1 className="display text-[40px]">{player.displayName}</h1>
-          <p className="text-[13px] text-[var(--text-dim)]">
-            @{player.username} · {player.isGuest ? "guest" : "account"} · {player.streak}d streak
-          </p>
-        </div>
-      </div>
-      <p className="mt-6 text-[14px]">
-        Level {lv.level}
-        <span className="ml-2 text-[var(--text-dim)]">
-          {lv.intoLevel} / {lv.needed} XP
-        </span>
+      <PlayerCard
+        name={player.displayName}
+        username={player.username}
+        avatar={player.avatar}
+        level={lv.level}
+        stat={`${player.streak}d streak${favoriteTitle ? ` · ${favoriteTitle}` : ""}`}
+        size="md"
+        heading
+      />
+      <p className="mt-4 text-[13px] text-[var(--text-dim)]">
+        {player.isGuest ? "Guest" : "Account"} · {formatLevel(lv.level)}
       </p>
-      <div className="mt-2 h-1 max-w-md overflow-hidden rounded-full bg-white/10">
-        <div className="h-full bg-[var(--accent)]" style={{ width: `${pct}%` }} />
+      <div className="mt-4 max-w-md">
+        <ProgressWidget value={lv.intoLevel} max={Math.max(1, lv.needed)} caption="Level progress" />
       </div>
 
-      <h2 className="mt-10 text-[13px] uppercase tracking-[0.18em] text-[var(--text-faint)]">Records</h2>
-      <ul className="mt-3 grid gap-2 md:grid-cols-3">
-        {GAME_MANIFESTS.map((g) => {
-          const mode = g.id === "velocity-run" ? "course-1" : g.id === "swarm-protocol" ? "survival" : "circuit";
-          const pb = store.personalBest(g.id, mode, g.id === "velocity-run");
-          return (
-            <li key={g.id} className="rounded-xl bg-[var(--surface)] px-4 py-3">
-              <p className="text-[12px] text-[var(--text-faint)]">{g.title}</p>
-              <p className="mt-1 text-[18px]">{Number.isFinite(pb) && pb > 0 && pb < 1e12 ? formatScore(g.id, pb) : "—"}</p>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="mt-10">
+        <StatsWidget
+          items={[
+            { value: stats.runs, label: "Runs" },
+            { value: stats.pbs, label: "PBs" },
+            { value: stats.achievements, label: "Achievements" },
+            { value: stats.games, label: "Games" },
+          ]}
+        />
+      </div>
 
-      <h2 className="mt-10 text-[13px] uppercase tracking-[0.18em] text-[var(--text-faint)]">Achievements</h2>
-      <ul className="mt-3 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-        {PLATFORM_ACHIEVEMENTS.map((a) => {
-          const on = player.achievements.includes(`platform:${a.key}`);
-          return (
-            <li key={a.key} className="rounded-xl border border-[var(--line)] px-3 py-3">
-              <p className={on ? "" : "text-[var(--text-dim)]"}>{a.name}</p>
-              <p className="text-[12px] text-[var(--text-faint)]">{a.description}</p>
-            </li>
-          );
-        })}
-      </ul>
+      <section className="mt-12">
+        <SectionHeader title="Records" />
+        <div className="mt-4 space-y-6">
+          {GAME_MANIFESTS.some((g) => {
+            const rec = gameRecordFor(player, g.id);
+            return Number.isFinite(rec.score) && rec.score > 0 && rec.score < 1e12;
+          }) ? (
+            GAME_MANIFESTS.map((g) => {
+              const rec = gameRecordFor(player, g.id);
+              if (!Number.isFinite(rec.score) || rec.score <= 0 || rec.score >= 1e12) return null;
+              return <RecordWidget key={g.id} game={g} score={rec.score} modeLabel={rec.mode} />;
+            })
+          ) : (
+            <EmptyState title="No records yet" body="Finish a run to pin a personal best." action={<QuickAction href="/play">Play</QuickAction>} />
+          )}
+        </div>
+      </section>
 
-      <h2 className="mt-10 text-[13px] uppercase tracking-[0.18em] text-[var(--text-faint)]">History</h2>
-      {player.history.length ? (
-        <ul className="mt-3 max-w-lg space-y-2 text-[14px]">
-          {player.history.slice(0, 12).map((h) => (
-            <li key={h.at} className="flex justify-between text-[var(--text-dim)]">
-              <span>{GAME_MANIFESTS.find((g) => g.id === h.gameId)?.title}</span>
-              <span>{formatScore(h.gameId, h.score)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-3 text-[14px] text-[var(--text-dim)]">Pick your first game.</p>
-      )}
+      <section className="mt-12">
+        <SectionHeader
+          title="Latest unlocks"
+          action={
+            <button type="button" className="min-h-11 text-[13px] text-[var(--text-dim)]" onClick={() => setShowAll((v) => !v)}>
+              {showAll ? "Hide" : "View all"}
+            </button>
+          }
+        />
+        <div className="mt-4">
+          {showcase.length ? (
+            <AchievementStrip
+              unlocked={stats.achievements}
+              total={allAchievements().length}
+              items={showcase.map((a) => ({ key: a.key, name: a.name, description: a.description, unlocked: true }))}
+              showcase
+            />
+          ) : (
+            <EmptyState title="No unlocks yet" body="Finish a run to start a showcase." action={<QuickAction href="/play">Play</QuickAction>} />
+          )}
+        </div>
+        {showAll ? (
+          <ul className="mt-6 max-w-lg divide-y divide-[var(--line)]">
+            {PLATFORM_ACHIEVEMENTS.map((a) => {
+              const on = player.achievements.includes(`platform:${a.key}`);
+              return (
+                <li key={a.key} className="py-3">
+                  <p className={on ? "text-[14px]" : "text-[14px] text-[var(--text-dim)]"}>{a.name}</p>
+                  <p className="text-[12px] text-[var(--text-faint)]">{a.description}</p>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+      </section>
+
+      <section className="mt-12 max-w-lg">
+        <SectionHeader title="History" />
+        <div className="mt-2">
+          <ActivityFeed items={activity} />
+        </div>
+      </section>
     </div>
   );
 }
