@@ -75,7 +75,7 @@ export default function HomePage() {
   return (
     <div className="relative md:min-h-[calc(100dvh-var(--header-h))]" data-testid="games-home">
       <div
-        className={`relative h-[50vh] overflow-hidden md:absolute md:inset-0 md:h-auto ${reduced ? "" : "transition-opacity duration-[280ms]"}`}
+        className={`relative h-[42vh] overflow-hidden md:absolute md:inset-0 md:h-auto ${reduced ? "" : "transition-opacity duration-[280ms]"}`}
       >
         <GameArt slug={game.slug} variant="backdrop" className="absolute inset-0 h-full w-full" />
         {next && next.id !== game.id ? (
@@ -110,7 +110,7 @@ export default function HomePage() {
         </div>
 
         <div
-          className={`mt-6 flex items-end gap-3 overflow-x-auto pb-2 scrollbar-none md:order-1 md:mt-6 ${fade}`}
+          className={`mt-5 flex items-end gap-3 overflow-x-auto pb-3 scrollbar-none md:order-1 md:mt-6 ${fade}`}
           role="listbox"
           aria-label="Games"
           onTouchStart={(e) => {
