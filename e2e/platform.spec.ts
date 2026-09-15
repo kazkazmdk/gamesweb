@@ -59,7 +59,7 @@ test("settings keep labeled controls", async ({ page }) => {
 test("auth previews local progress", async ({ page }) => {
   await page.goto("/auth");
   await expect(page.getByText("Save this run")).toBeVisible();
-  await expect(page.getByText(/^Lv /)).toBeVisible();
+  await expect(page.getByLabel("Save this run").getByText(/^Lv /)).toBeVisible();
   await expect(page.getByText("PBs")).toBeVisible();
 });
 
@@ -67,11 +67,11 @@ test("mobile navigation uses five destinations", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   const nav = page.getByRole("navigation", { name: "Mobile" });
-  await expect(nav.getByRole("link", { name: "Home" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Play" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Challenges" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Friends" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Me" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Home", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Play", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Challenges", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Friends", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Me", exact: true })).toBeVisible();
 });
 
 test("game hub leads with your run", async ({ page }) => {
