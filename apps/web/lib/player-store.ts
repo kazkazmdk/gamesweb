@@ -26,6 +26,7 @@ export type StoredScore = {
   at: number;
   verified: VerifiedStatus;
   metadata: Record<string, number | string | boolean>;
+  localSessionId?: string;
 };
 
 export type PlayRecord = {
@@ -72,9 +73,12 @@ export type PlayerSnapshot = {
   saves: Record<string, { version: string; payload: Record<string, unknown> }>;
   scores: StoredScore[];
   history: PlayRecord[];
+  achievementUnlocks: Record<string, number>;
   settings: AudioSettings & {
     reducedMotion: boolean;
     shareActivity: boolean;
+    sharePresence: boolean;
+    sharePublicActivity: boolean;
     ghost: boolean;
     haptics: boolean;
     shake: number;
@@ -98,6 +102,23 @@ function uid() {
     return crypto.randomUUID();
   }
   return `g-${Math.random().toString(16).slice(2)}-${Date.now()}`;
+}
+
+function migrateSettings(
+  defaults: PlayerSnapshot["settings"],
+  incoming: Partial<PlayerSnapshot["settings"]> | undefined,
+): PlayerSnapshot["settings"] {
+  const merged = { ...defaults, ...incoming };
+  const hadSplit = Boolean(
+    incoming &&
+      (Object.prototype.hasOwnProperty.call(incoming, "sharePresence") ||
+        Object.prototype.hasOwnProperty.call(incoming, "sharePublicActivity")),
+  );
+  if (!hadSplit && typeof incoming?.shareActivity === "boolean") {
+    merged.sharePresence = incoming.shareActivity;
+    merged.sharePublicActivity = incoming.shareActivity;
+  }
+  return merged;
 }
 
 function guestName(id: string) {
@@ -125,7 +146,8 @@ function emptyPlayer(id?: string): PlayerSnapshot {
     saves: {},
     scores: [],
     history: [],
-    settings: { ...defaultAudio, reducedMotion: false, shareActivity: true, ghost: true, haptics: true, shake: 1 },
+    achievementUnlocks: {},
+    settings: { ...defaultAudio, reducedMotion: false, shareActivity: true, sharePresence: true, sharePublicActivity: true, ghost: true, haptics: true, shake: 1 },
     friends: [],
     pbCount: 0,
     sessionGames: [],
@@ -157,7 +179,8 @@ export const SSR_PLAYER: PlayerSnapshot = {
   saves: {},
   scores: [],
   history: [],
-  settings: { ...defaultAudio, reducedMotion: false, shareActivity: true, ghost: true, haptics: true, shake: 1 },
+  achievementUnlocks: {},
+  settings: { ...defaultAudio, reducedMotion: false, shareActivity: true, sharePresence: true, sharePublicActivity: true, ghost: true, haptics: true, shake: 1 },
   friends: [],
   pbCount: 0,
   sessionGames: [],
@@ -217,7 +240,11 @@ class PlayerStore {
         this.snapshot = {
           ...emptyPlayer(),
           ...parsed,
-          settings: { ...emptyPlayer().settings, ...parsed.settings },
+          achievementUnlocks: {
+            ...emptyPlayer().achievementUnlocks,
+            ...(parsed as PlayerSnapshot & { achievementUnlocks?: Record<string, number> }).achievementUnlocks,
+          },
+          settings: migrateSettings(emptyPlayer().settings, parsed.settings),
         };
       } else {
         this.snapshot = emptyPlayer();
@@ -342,6 +369,7 @@ class PlayerStore {
       at: Date.now(),
       verified: validation.status,
       metadata: payload.metadata,
+      localSessionId: sessionId,
     };
     this.snapshot.scores = [row, ...this.snapshot.scores].slice(0, 400);
     analytics.track("score_submitted", { gameId, score: payload.score, status: validation.status });
@@ -445,6 +473,7 @@ class PlayerStore {
     const id = `${def?.gameId ?? "platform"}:${key}`;
     if (!def || this.snapshot.achievements.includes(id)) return false;
     this.snapshot.achievements = [...this.snapshot.achievements, id];
+    this.snapshot.achievementUnlocks = { ...this.snapshot.achievementUnlocks, [id]: Date.now() };
     analytics.track("achievement_unlocked", { key, gameId: def.gameId });
     const gameTitle = def.gameId ? getManifest(def.gameId)?.title : "Gamesweb";
     this.toast({ kind: "achievement", title: def.name, body: `${def.xp} XP · ${gameTitle}` });
@@ -791,10 +820,11 @@ class PlayerStore {
     this.emit();
   }
 
-  async updateProfileRemote(patch?: { shareActivity?: boolean; displayName?: string }) {
+  async updateProfileRemote(patch?: { sharePresence?: boolean; sharePublicActivity?: boolean; displayName?: string }) {
     await playerApi.updateProfile({
       displayName: patch?.displayName ?? this.snapshot.displayName,
-      shareActivity: patch?.shareActivity ?? this.snapshot.settings.shareActivity,
+      sharePresence: patch?.sharePresence ?? this.snapshot.settings.sharePresence,
+      sharePublicActivity: patch?.sharePublicActivity ?? this.snapshot.settings.sharePublicActivity,
     });
   }
 
@@ -813,6 +843,7 @@ class PlayerStore {
         startedAt: s.at,
         endedAt: s.at,
         metadata: s.metadata,
+        localSessionId: s.localSessionId ?? s.id,
       }));
     const merge = await playerApi.merge({ offlineRuns });
     if (!merge.ok && merge.status !== 503) throw new Error("merge");
@@ -888,10 +919,18 @@ class PlayerStore {
           this.snapshot.avatar = me.data.avatar;
           this.snapshot.xp = me.data.xp;
           this.snapshot.achievements = me.data.achievements;
+          if (me.data.achievementUnlocks) {
+            this.snapshot.achievementUnlocks = { ...this.snapshot.achievementUnlocks, ...me.data.achievementUnlocks };
+          }
           this.snapshot.questCompleted = me.data.questCompleted ?? this.snapshot.questCompleted;
           this.snapshot.questProgress = me.data.questProgress ?? this.snapshot.questProgress;
           this.snapshot.streak = me.data.streak ?? this.snapshot.streak;
-          this.snapshot.settings = { ...this.snapshot.settings, shareActivity: me.data.shareActivity };
+          this.snapshot.settings = {
+            ...this.snapshot.settings,
+            sharePresence: me.data.sharePresence ?? me.data.shareActivity,
+            sharePublicActivity: me.data.sharePublicActivity ?? me.data.shareActivity,
+            shareActivity: me.data.sharePublicActivity ?? me.data.shareActivity,
+          };
           analytics.identify(me.data.id, { username: me.data.username, guest: false });
           const friends = await playerApi.friends();
           if (friends.ok) {
@@ -926,14 +965,14 @@ class PlayerStore {
     if (typeof window === "undefined") return;
     if (this.presenceTimer) window.clearInterval(this.presenceTimer);
     const beat = () => {
-      if (this.snapshot.isGuest || !this.snapshot.settings.shareActivity) return;
+      if (this.snapshot.isGuest || !this.snapshot.settings.sharePresence) return;
       void playerApi.presence("online", null);
     };
     this.presenceTimer = window.setInterval(beat, 45_000);
   }
 
   private async presencePlaying(gameId: string) {
-    if (!this.snapshot.settings.shareActivity) return;
+    if (!this.snapshot.settings.sharePresence) return;
     void playerApi.presence("playing", gameId);
   }
 

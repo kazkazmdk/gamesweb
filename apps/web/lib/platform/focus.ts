@@ -85,6 +85,7 @@ export function achievementCatalog(player: PlayerSnapshot) {
       gameId,
       gameTitle: game?.title ?? "Platform",
       unlocked: player.achievements.includes(id),
+      unlockedAt: player.achievementUnlocks?.[id],
       how: a.description,
     };
   });

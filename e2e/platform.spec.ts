@@ -66,8 +66,12 @@ test("settings keep labeled controls", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
   await expect(page.getByLabel("Display name")).toBeVisible();
   await page.getByRole("button", { name: "Audio" }).click();
-  await expect(page.getByRole("switch", { name: "Mute" })).toBeVisible();
-  await expect(page.getByLabel("Master")).toBeVisible();
+  await page.getByRole("button", { name: "Social" }).click();
+  await expect(page.getByRole("switch", { name: "Share game presence" })).toBeVisible();
+  await page.getByRole("button", { name: "Privacy" }).click();
+  await expect(page.getByRole("switch", { name: "Show recent activity on profile" })).toBeVisible();
+  await page.getByRole("button", { name: "Accessibility" }).click();
+  await expect(page.getByRole("switch", { name: "Haptics" })).toBeVisible();
 });
 
 test("auth previews local progress", async ({ page }) => {

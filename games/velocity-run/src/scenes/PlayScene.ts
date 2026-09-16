@@ -53,6 +53,7 @@ export class VelocityPlayScene extends Phaser.Scene {
   private audioReady = false;
   private signaledReady = false;
   private longFrames = 0;
+  private ticks = 0;
   private sessionDeaths = 0;
   private recorder = new GhostRecorder();
   private tape: GhostTape | null = null;
@@ -199,6 +200,7 @@ export class VelocityPlayScene extends Phaser.Scene {
   update(_: number, delta: number) {
     const dt = Math.min(0.033, delta / 1000);
     this.longFrames = countLongFrame(delta, this.longFrames);
+    this.ticks += 1;
     if (!this.signaledReady) {
       this.signaledReady = true;
       this.platform.events.emit({ name: "game_ready", props: { gameId: "velocity-run" } });
@@ -584,6 +586,8 @@ export class VelocityPlayScene extends Phaser.Scene {
         sessionDeaths: this.sessionDeaths,
         timeMs: this.timeMs,
         courseId: this.course.id,
+        tick: this.ticks,
+        frozen: false,
       },
       {
         killPlayer: () => this.die(),

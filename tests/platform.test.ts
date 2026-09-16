@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activityFromHistory, challengeViewModel, friendsBoard, playerStatsFromSnapshot } from "../apps/web/lib/platform/adapters";
+import { activityFromHistory, challengeViewModel, friendsBoard, latestUnlocks, playerStatsFromSnapshot } from "../apps/web/lib/platform/adapters";
 import { formatCountdown, formatPlayScore, formatRank, greeting, hasRecord } from "../apps/web/lib/platform/format";
 import { boardModeOptions, boardModeFromPlayIndex, defaultBoardMode, isCompactCatalog, neonBoardMode, playModeOptions } from "../apps/web/lib/platform/modes";
 import type { PlayerSnapshot } from "../apps/web/lib/player-store";
@@ -9,7 +9,8 @@ const player = {
     { gameId: "neon-drift", at: 1_000, durationMs: 8000, score: 22000, result: "finish", metadata: { pbDelta: 1200 } },
   ],
   pbCount: 2,
-  achievements: ["platform:first-run"],
+  achievements: ["platform:first-run", "neon-drift:score-25k"],
+  achievementUnlocks: { "neon-drift:score-25k": 2_000, "platform:first-run": 1_000 },
   questProgress: { "2026-09-14:nd-score-25k": 18420 },
   questCompleted: [],
   friends: [{ id: "1", username: "v", displayName: "Victor", avatar: "orb-1", status: "accepted", presence: "offline" }],
@@ -54,7 +55,7 @@ describe("catalog and modes", () => {
 
 describe("adapters", () => {
   it("derives stats from snapshot", () => {
-    expect(playerStatsFromSnapshot(player)).toEqual({ runs: 1, pbs: 2, achievements: 1, games: 1 });
+    expect(playerStatsFromSnapshot(player)).toEqual({ runs: 1, pbs: 2, achievements: 2, games: 1 });
   });
   it("builds challenge progress without faking", () => {
     const view = challengeViewModel(player, {
@@ -83,5 +84,9 @@ describe("adapters", () => {
     const items = activityFromHistory(player.history);
     expect(items[0].event).toBe("New PB");
     expect(items[0].title).toBe("Neon Drift");
+  });
+  it("sorts recent unlocks by timestamp not catalog order", () => {
+    const recent = latestUnlocks(player, 1);
+    expect(recent[0]?.key).toBe("score-25k");
   });
 });

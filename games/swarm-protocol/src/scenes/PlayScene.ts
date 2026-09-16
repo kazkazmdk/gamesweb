@@ -73,6 +73,7 @@ export class SwarmPlayScene extends Phaser.Scene {
   private cardHits: Array<{ x: number; y: number; w: number; h: number }> = [];
   private signaledReady = false;
   private longFrames = 0;
+  private ticks = 0;
   private shieldA = 0;
   private pulseT = 0;
   private elites = 0;
@@ -242,6 +243,7 @@ export class SwarmPlayScene extends Phaser.Scene {
       this.frames = 0;
     }
     this.longFrames = countLongFrame(delta, this.longFrames);
+    this.ticks += 1;
     if (!this.signaledReady) {
       this.signaledReady = true;
       this.platform.events.emit({ name: "game_ready", props: { gameId: "swarm-protocol" } });
@@ -940,6 +942,8 @@ export class SwarmPlayScene extends Phaser.Scene {
         longFrames: this.longFrames,
         kills: this.kills,
         level: this.level,
+        tick: this.ticks,
+        frozen: false,
       },
       {
         pickUpgrade: (i) => this.take(i),

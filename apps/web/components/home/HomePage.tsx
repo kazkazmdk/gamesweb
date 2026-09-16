@@ -77,14 +77,16 @@ export default function HomePage() {
       <div
         className={`relative h-[42vh] overflow-hidden md:absolute md:inset-0 md:h-auto ${reduced ? "" : "transition-opacity duration-[280ms]"}`}
       >
-        <GameArt slug={game.slug} variant="backdrop" className="absolute inset-0 h-full w-full" />
+        <GameArt slug={game.slug} variant="backdrop" className="absolute inset-0 h-full w-full origin-center object-cover max-md:scale-125 max-md:object-[68%_42%] md:object-[78%_46%]" />
         {next && next.id !== game.id ? (
           <div className="pointer-events-none absolute inset-0 opacity-0" aria-hidden>
             <GameArt slug={next.slug} variant="backdrop" className="h-full w-full" />
           </div>
         ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)] via-[color-mix(in_srgb,var(--bg)_18%,transparent)] to-transparent md:bg-gradient-to-r md:from-[var(--bg)] md:via-[color-mix(in_srgb,var(--bg)_42%,transparent)] md:to-transparent" />
-        <div className="absolute inset-0 hidden bg-gradient-to-t from-[var(--bg)] via-transparent to-[color-mix(in_srgb,var(--bg)_35%,transparent)] md:block md:to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-full md:w-[48%]">
+          <div className="h-full bg-gradient-to-r from-[var(--bg)] via-[color-mix(in_srgb,var(--bg)_62%,transparent)] to-transparent" />
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[var(--bg)] to-transparent md:hidden" />
       </div>
 
       <div className="relative flex flex-col px-5 pb-8 pt-4 md:min-h-[calc(100dvh-var(--header-h))] md:px-10 md:pb-12">

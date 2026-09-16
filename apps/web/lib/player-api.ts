@@ -75,13 +75,16 @@ export const playerApi = {
       xp: number;
       level: number;
       shareActivity: boolean;
+      sharePresence: boolean;
+      sharePublicActivity: boolean;
       achievements: string[];
+      achievementUnlocks?: Record<string, number>;
       questCompleted: string[];
       questProgress: Record<string, number>;
       streak: number;
     }>(await fetch("/api/player/me"));
   },
-  async updateProfile(patch: { displayName?: string; shareActivity?: boolean; username?: string; avatar?: string }) {
+  async updateProfile(patch: { displayName?: string; shareActivity?: boolean; sharePresence?: boolean; sharePublicActivity?: boolean; username?: string; avatar?: string }) {
     return parse(await fetch("/api/player/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }));
   },
   async merge(input: {
@@ -93,6 +96,7 @@ export const playerApi = {
       startedAt: number;
       endedAt: number;
       metadata: Record<string, number | string | boolean>;
+      localSessionId?: string;
     }>;
   }) {
     return parse<{ ok: true; alreadyMerged: boolean; xp: number; achievements: string[] }>(

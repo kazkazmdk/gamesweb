@@ -431,7 +431,9 @@ grant execute on function public.merge_guest_progress(
 ) to service_role;
 
 -- Public views stay column-minimal. Recreate to lock the surface.
-create or replace view public.public_profiles
+drop view if exists public.public_scores;
+drop view if exists public.public_profiles;
+create view public.public_profiles
 with (security_barrier = true, security_invoker = false) as
 select
   p.username,
@@ -446,7 +448,7 @@ select
 from public.profiles p
 where p.is_seed is distinct from true;
 
-create or replace view public.public_scores
+create view public.public_scores
 with (security_barrier = true, security_invoker = false) as
 select
   s.game_id,

@@ -1,134 +1,72 @@
--- Authoritative progression, browser write revocation, guest_progress, relative rewards.
--- Additive on 0001_init.sql + 0002_hardening.sql + 0003_quality_hardening.sql.
--- Do not edit those files.
+-- Privacy split, transactional one-shot XP, merge local_session_id dedupe,
+-- guest achievement timestamps. Additive on 0001–0004.
+
+insert into public.achievements (id, game_id, key, name, description, xp_reward)
+values
+  ('neon-drift:first-slide', 'neon-drift', 'first-slide', 'First Slide', 'Enter a drift.', 15),
+  ('neon-drift:combo-5', 'neon-drift', 'combo-5', 'Heat 5', 'Reach a 5x combo.', 25),
+  ('neon-drift:score-25k', 'neon-drift', 'score-25k', 'Pink Line', 'Score 25,000 in one run.', 30),
+  ('neon-drift:score-60k', 'neon-drift', 'score-60k', 'Night Apex', 'Score 60,000 in one run.', 50),
+  ('neon-drift:two-laps', 'neon-drift', 'two-laps', 'Clean Circuit', 'Finish two laps.', 25),
+  ('neon-drift:near-miss', 'neon-drift', 'near-miss', 'Paint Swap', 'Bank a near-miss bonus.', 20),
+  ('neon-drift:grass-survive', 'neon-drift', 'grass-survive', 'Dirt Warning', 'Rejoin asphalt after grass.', 15),
+  ('neon-drift:boost-gate', 'neon-drift', 'boost-gate', 'Gatekeeper', 'Hit a boost ribbon.', 15),
+  ('neon-drift:no-crash-lap', 'neon-drift', 'no-crash-lap', 'Quiet Hands', 'Complete a lap without a wall hit.', 35),
+  ('neon-drift:daily-drift', 'neon-drift', 'daily-drift', 'Evening Line', 'Finish the daily drift target.', 30),
+  ('velocity-run:first-finish', 'velocity-run', 'first-finish', 'First Finish', 'Finish a course.', 15),
+  ('velocity-run:bronze', 'velocity-run', 'bronze', 'Bronze', 'Earn bronze or better.', 15),
+  ('velocity-run:gold', 'velocity-run', 'gold', 'Gold', 'Earn gold or better.', 35),
+  ('velocity-run:platinum', 'velocity-run', 'platinum', 'Platinum', 'Earn platinum.', 70),
+  ('velocity-run:all-courses', 'velocity-run', 'all-courses', 'All Courses', 'Finish every course.', 40),
+  ('velocity-run:no-death', 'velocity-run', 'no-death', 'No Death', 'Finish without dying.', 30),
+  ('velocity-run:sub-40', 'velocity-run', 'sub-40', 'Sub 40', 'Finish Gate A under 40s.', 25),
+  ('velocity-run:fast-fall', 'velocity-run', 'fast-fall', 'Fast Fall', 'Commit a long fall.', 10),
+  ('velocity-run:retry-10', 'velocity-run', 'retry-10', 'Retry 10', 'Retry ten times.', 20),
+  ('velocity-run:pb-twice', 'velocity-run', 'pb-twice', 'Twice As Fast', 'Beat a Velocity PB twice.', 30),
+  ('swarm-protocol:first-blood', 'swarm-protocol', 'first-blood', 'First Blood', 'Get 10 kills.', 10),
+  ('swarm-protocol:survive-2', 'swarm-protocol', 'survive-2', 'Survive 2', 'Survive two minutes.', 20),
+  ('swarm-protocol:survive-5', 'swarm-protocol', 'survive-5', 'Survive 5', 'Survive five minutes.', 40),
+  ('swarm-protocol:level-8', 'swarm-protocol', 'level-8', 'Level 8', 'Reach level 8.', 35),
+  ('swarm-protocol:elite', 'swarm-protocol', 'elite', 'Elite', 'Destroy an elite.', 25),
+  ('swarm-protocol:splitter', 'swarm-protocol', 'splitter', 'Splitter', 'Destroy a splitter.', 15),
+  ('swarm-protocol:dash-kill', 'swarm-protocol', 'dash-kill', 'Dash Kill', 'Kill while dashing.', 20),
+  ('swarm-protocol:kills-200', 'swarm-protocol', 'kills-200', 'Kills 200', 'Reach 200 kills.', 40),
+  ('swarm-protocol:shield', 'swarm-protocol', 'shield', 'Shield', 'Pick a shield upgrade.', 15),
+  ('swarm-protocol:chain', 'swarm-protocol', 'chain', 'Chain', 'Chain a kill streak.', 15)
+on conflict (id) do nothing;
 --
--- Contracts:
--- * anon / authenticated may SELECT catalogs and public views, plus owner SELECT on
---   private tables. They must not INSERT/UPDATE/DELETE authoritative rows.
---   RLS is defense in depth; GRANTS are the capability boundary.
--- * XP is the source of truth. level columns are derived via gamesweb_level_from_xp
---   (port of packages/config/src/index.ts — keep the curve in sync).
--- * finalize_game_run applies relative xpEarned on a row locked FOR UPDATE.
---   Never treat client/Node newXp as the written value.
--- * Guest cumulative XP/quests/stats live in guest_progress (service_role only).
--- * merge_guest_progress: newXp = account.xp + guest_progress.xp (once).
---   Achievement rows may union; they must not add XP again (already inside guest.xp).
--- * idempotency_keys.expires_at is set by the API (~7 days). No in-band janitor.
---   Future cron: delete from public.idempotency_keys where expires_at < now();
--- Rollback: drop guest_progress / new functions, restore 0003 RPC bodies, re-grant
--- table writes only if a rollback of the product architecture is required.
+-- * share_presence / share_public_activity start from share_activity.
+-- * finalize_game_run locks the identity row before scoring one-shot bonuses.
+-- * scores (anonymous_id|user_id, local_session_id) is unique when the id is set.
+-- * guest_progress.achievement_unlocks stores { id: timestamptz } without inventing dates.
 
 -- ---------------------------------------------------------------------------
--- Level curve (JS port)
+-- Privacy columns
 -- ---------------------------------------------------------------------------
-create or replace function public.gamesweb_xp_required_for_level(p_level integer)
-returns integer
-language sql
-immutable
-set search_path = public
-as $$
-  select case
-    when p_level <= 1 then 0
-    else floor(80 * power((p_level - 1)::numeric, 1.42) + 40 * (p_level - 1))::integer
-  end;
-$$;
+alter table public.profiles
+  add column if not exists share_presence boolean not null default true;
 
-create or replace function public.gamesweb_level_from_xp(p_xp integer)
-returns integer
-language plpgsql
-immutable
-set search_path = public
-as $$
-declare
-  remaining integer := greatest(0, coalesce(p_xp, 0));
-  lvl integer := 1;
-  need integer;
-begin
-  while lvl < 99 loop
-    need := public.gamesweb_xp_required_for_level(lvl + 1);
-    if remaining < need then
-      exit;
-    end if;
-    remaining := remaining - need;
-    lvl := lvl + 1;
-  end loop;
-  return lvl;
-end;
-$$;
+alter table public.profiles
+  add column if not exists share_public_activity boolean not null default true;
 
-revoke all on function public.gamesweb_xp_required_for_level(integer) from public, anon, authenticated;
-revoke all on function public.gamesweb_level_from_xp(integer) from public, anon, authenticated;
-grant execute on function public.gamesweb_xp_required_for_level(integer) to service_role;
-grant execute on function public.gamesweb_level_from_xp(integer) to service_role;
+update public.profiles
+  set share_presence = share_activity,
+      share_public_activity = share_activity
+  where true;
 
--- ---------------------------------------------------------------------------
--- Guest progression (service-role only)
--- ---------------------------------------------------------------------------
-create table if not exists public.guest_progress (
-  anonymous_id text primary key,
-  xp integer not null default 0,
-  level integer not null default 1,
-  streak integer not null default 0,
-  quest_progress jsonb not null default '{}'::jsonb,
-  quest_completed text[] not null default '{}',
-  stats jsonb not null default '{}'::jsonb,
-  achievements text[] not null default '{}',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  last_seen_at timestamptz not null default now(),
-  migrated_at timestamptz,
-  constraint guest_progress_anonymous_id_len check (char_length(anonymous_id) between 8 and 80),
-  constraint guest_progress_xp_nonneg check (xp >= 0),
-  constraint guest_progress_level_min check (level >= 1),
-  constraint guest_progress_streak_nonneg check (streak >= 0)
-);
+comment on column public.profiles.share_presence is
+  'Friends may see online/playing presence when true.';
+comment on column public.profiles.share_public_activity is
+  'Verified recent runs may appear on the public profile when true.';
 
-drop trigger if exists guest_progress_updated_at on public.guest_progress;
-create trigger guest_progress_updated_at
-  before update on public.guest_progress
-  for each row execute procedure public.gamesweb_set_updated_at();
-
-alter table public.guest_progress enable row level security;
-revoke all on table public.guest_progress from public, anon, authenticated;
-grant all on table public.guest_progress to service_role;
-
-comment on table public.guest_progress is
-  'Server-side cumulative guest progression. No anon/authenticated SELECT. Identity is the Next gw_guest cookie, never a browser Supabase client.';
-
--- ---------------------------------------------------------------------------
--- Drop browser write policies (mutations go through Next + service role)
--- ---------------------------------------------------------------------------
-drop policy if exists "profiles_update_own" on public.profiles;
-drop policy if exists "own profile update" on public.profiles;
-
-drop policy if exists "saves_own" on public.game_saves;
-create policy "saves_select_own" on public.game_saves
-  for select using ((select auth.uid()) = user_id);
-
-drop policy if exists "stats_own" on public.player_stats;
-create policy "stats_select_own" on public.player_stats
-  for select using ((select auth.uid()) = user_id);
-
-drop policy if exists "quest_progress_own" on public.quest_progress;
-create policy "quest_progress_select_own" on public.quest_progress
-  for select using ((select auth.uid()) = user_id);
-
-drop policy if exists "friendships_insert_self" on public.friendships;
-drop policy if exists "friendships_update_member" on public.friendships;
--- friendships_members SELECT stays. Writes are service-role only.
--- If grants were ever restored, no generic "member can update any status" policy remains.
-
-drop policy if exists "presence_self_write" on public.presence;
-drop policy if exists "presence_self_or_friends" on public.presence;
-create policy "presence_select_self" on public.presence
-  for select using ((select auth.uid()) = user_id);
+drop policy if exists "presence_select_friends" on public.presence;
 create policy "presence_select_friends" on public.presence
   for select using (
     exists (
       select 1
       from public.friendships f
       join public.profiles p on p.user_id = presence.user_id
-      where p.share_activity = true
+      where p.share_presence = true
         and f.status = 'accepted'
         and (
           (f.requester_id = (select auth.uid()) and f.addressee_id = presence.user_id)
@@ -147,160 +85,25 @@ create policy "presence_select_friends" on public.presence
   );
 
 -- ---------------------------------------------------------------------------
--- GRANTS: revoke browser writes, keep required SELECTs
+-- Guest achievement timestamps + score identity
 -- ---------------------------------------------------------------------------
-alter default privileges in schema public
-  revoke all on tables from anon, authenticated;
+alter table public.guest_progress
+  add column if not exists achievement_unlocks jsonb not null default '{}'::jsonb;
 
-revoke all on table public.profiles from public, anon, authenticated;
-revoke all on table public.game_sessions from public, anon, authenticated;
-revoke all on table public.scores from public, anon, authenticated;
-revoke all on table public.player_achievements from public, anon, authenticated;
-revoke all on table public.quest_progress from public, anon, authenticated;
-revoke all on table public.player_stats from public, anon, authenticated;
-revoke all on table public.friendships from public, anon, authenticated;
-revoke all on table public.presence from public, anon, authenticated;
-revoke all on table public.game_saves from public, anon, authenticated;
-revoke all on table public.guest_migrations from public, anon, authenticated;
-revoke all on table public.idempotency_keys from public, anon, authenticated;
-revoke all on table public.player_cosmetics from public, anon, authenticated;
-revoke all on table public.guest_progress from public, anon, authenticated;
+create unique index if not exists scores_anon_local_session_uidx
+  on public.scores (anonymous_id, local_session_id)
+  where anonymous_id is not null
+    and local_session_id is not null
+    and char_length(local_session_id) > 0;
 
-grant select on table public.games to anon, authenticated;
-grant select on table public.achievements to anon, authenticated;
-grant select on table public.quests to anon, authenticated;
-grant select on table public.cosmetics to anon, authenticated;
-grant select on table public.public_profiles to anon, authenticated;
-grant select on table public.public_scores to anon, authenticated;
-
-grant select on table public.profiles to authenticated;
-grant select on table public.game_sessions to authenticated;
-grant select on table public.scores to authenticated;
-grant select on table public.player_achievements to authenticated;
-grant select on table public.quest_progress to authenticated;
-grant select on table public.player_stats to authenticated;
-grant select on table public.friendships to authenticated;
-grant select on table public.presence to authenticated;
-grant select on table public.game_saves to authenticated;
-grant select on table public.guest_migrations to authenticated;
-grant select on table public.player_cosmetics to authenticated;
-
-grant all on table public.profiles to service_role;
-grant all on table public.game_sessions to service_role;
-grant all on table public.scores to service_role;
-grant all on table public.player_achievements to service_role;
-grant all on table public.quest_progress to service_role;
-grant all on table public.player_stats to service_role;
-grant all on table public.friendships to service_role;
-grant all on table public.presence to service_role;
-grant all on table public.game_saves to service_role;
-grant all on table public.guest_migrations to service_role;
-grant all on table public.idempotency_keys to service_role;
-grant all on table public.player_cosmetics to service_role;
-grant all on table public.guest_progress to service_role;
-grant all on table public.games to service_role;
-grant all on table public.achievements to service_role;
-grant all on table public.quests to service_role;
-grant all on table public.cosmetics to service_role;
+create unique index if not exists scores_user_local_session_uidx
+  on public.scores (user_id, local_session_id)
+  where user_id is not null
+    and local_session_id is not null
+    and char_length(local_session_id) > 0;
 
 -- ---------------------------------------------------------------------------
--- Helpers used by RPCs
--- ---------------------------------------------------------------------------
-create or replace function public.gamesweb_ensure_quest(p_quest_id text)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if p_quest_id is null or char_length(p_quest_id) < 8 or char_length(p_quest_id) > 96 then
-    return;
-  end if;
-  if position(':' in p_quest_id) = 0 then
-    return;
-  end if;
-  insert into public.quests (id, type, requirements, reward, starts_at, ends_at)
-  values (p_quest_id, 'daily', '{}'::jsonb, '{}'::jsonb, now(), now() + interval '2 days')
-  on conflict (id) do nothing;
-end;
-$$;
-
-create or replace function public.gamesweb_merge_quest_progress(p_existing jsonb, p_updates jsonb)
-returns jsonb
-language plpgsql
-immutable
-set search_path = public
-as $$
-declare
-  result jsonb := coalesce(p_existing, '{}'::jsonb);
-  k text;
-  v numeric;
-  n int := 0;
-begin
-  if (p_updates is null or jsonb_typeof(p_updates) <> 'object') then
-    return result;
-  end if;
-  if (select count(*) from jsonb_each(p_updates)) > 48 then
-    raise exception 'payload_too_large';
-  end if;
-  for k, v in select key, (value #>> '{}')::numeric from jsonb_each(p_updates)
-  loop
-    n := n + 1;
-    if n > 48 or k is null or char_length(k) > 96 then
-      continue;
-    end if;
-    result := jsonb_set(
-      result,
-      array[k],
-      to_jsonb(greatest(coalesce((result ->> k)::numeric, 0), coalesce(v, 0))),
-      true
-    );
-  end loop;
-  return result;
-end;
-$$;
-
-create or replace function public.gamesweb_apply_stats_delta(p_existing jsonb, p_delta jsonb, p_game_id text)
-returns jsonb
-language plpgsql
-immutable
-set search_path = public
-as $$
-declare
-  games_played int;
-  pb_count int;
-  played jsonb;
-begin
-  games_played := greatest(0, coalesce((p_existing ->> 'gamesPlayed')::int, 0))
-    + least(greatest(coalesce((p_delta ->> 'gamesPlayed')::int, 0), 0), 1);
-  pb_count := greatest(0, coalesce((p_existing ->> 'pbCount')::int, 0))
-    + least(greatest(coalesce((p_delta ->> 'pbCount')::int, 0), 0), 1);
-  played := coalesce(p_existing -> 'playedGameIds', '[]'::jsonb);
-  if p_game_id is not null
-     and char_length(p_game_id) > 0
-     and jsonb_typeof(played) = 'array'
-     and jsonb_array_length(played) < 8
-     and not (played ? p_game_id)
-  then
-    played := played || to_jsonb(p_game_id);
-  end if;
-  return jsonb_build_object(
-    'gamesPlayed', games_played,
-    'pbCount', pb_count,
-    'playedGameIds', played
-  );
-end;
-$$;
-
-revoke all on function public.gamesweb_ensure_quest(text) from public, anon, authenticated;
-revoke all on function public.gamesweb_merge_quest_progress(jsonb, jsonb) from public, anon, authenticated;
-revoke all on function public.gamesweb_apply_stats_delta(jsonb, jsonb, text) from public, anon, authenticated;
-grant execute on function public.gamesweb_ensure_quest(text) to service_role;
-grant execute on function public.gamesweb_merge_quest_progress(jsonb, jsonb) to service_role;
-grant execute on function public.gamesweb_apply_stats_delta(jsonb, jsonb, text) to service_role;
-
--- ---------------------------------------------------------------------------
--- finalize_game_run: relative XP, guest or profile, same transaction as score
+-- finalize_game_run: lock identity, then pay one-shot XP from DB state
 -- ---------------------------------------------------------------------------
 create or replace function public.finalize_game_run(
   p_session_id uuid,
@@ -342,6 +145,17 @@ declare
   quest_progress double precision;
   quest_done boolean;
   current_xp int := 0;
+  today_count int := 0;
+  prev_pb bigint;
+  is_pb boolean := false;
+  first_play boolean := false;
+  new_game boolean := false;
+  played jsonb;
+  ach_xp int;
+  inserted int;
+  already_completed boolean;
+  quest_xp int;
+  unlocks jsonb;
 begin
   if p_session_id is null then
     raise exception 'session_missing';
@@ -408,8 +222,144 @@ begin
     raise exception 'session_closed';
   end if;
 
+  if p_identity_user_id is not null then
+    select * into prof from public.profiles where user_id = p_identity_user_id for update;
+    if not found then
+      raise exception 'profile_missing';
+    end if;
+  else
+    insert into public.guest_progress (anonymous_id)
+    values (p_identity_anonymous_id)
+    on conflict (anonymous_id) do nothing;
+    select * into gp from public.guest_progress where anonymous_id = p_identity_anonymous_id for update;
+    if gp.migrated_at is not null then
+      raise exception 'guest_migrated';
+    end if;
+  end if;
+
+  if jsonb_typeof(coalesce(p_progression -> 'achievementsToUnlock', p_progression -> 'achievements')) = 'array'
+     and jsonb_array_length(coalesce(p_progression -> 'achievementsToUnlock', p_progression -> 'achievements')) > 32 then
+    raise exception 'payload_too_large';
+  end if;
+  if jsonb_typeof(p_progression -> 'questsCompleted') = 'array'
+     and jsonb_array_length(p_progression -> 'questsCompleted') > 32 then
+    raise exception 'payload_too_large';
+  end if;
+
   if v_verified then
-    v_xp_earned := least(greatest(coalesce((p_progression ->> 'xpEarned')::int, 0), 0), 2500);
+    select count(*) into today_count
+    from public.scores s
+    where s.verified_status = 'verified'
+      and s.created_at >= (date_trunc('day', timezone('utc', now())) at time zone 'utc')
+      and (
+        (p_identity_user_id is not null and s.user_id = p_identity_user_id)
+        or (p_identity_user_id is null and s.anonymous_id = p_identity_anonymous_id and s.user_id is null)
+      );
+    first_play := today_count = 0 and coalesce((p_progression ->> 'firstPlayClaim')::boolean, true);
+
+    if sess.game_id = 'velocity-run' then
+      select min(s.score) into prev_pb
+      from public.scores s
+      where s.verified_status = 'verified'
+        and s.game_id = sess.game_id
+        and s.mode = p_mode
+        and (
+          (p_identity_user_id is not null and s.user_id = p_identity_user_id)
+          or (p_identity_user_id is null and s.anonymous_id = p_identity_anonymous_id and s.user_id is null)
+        );
+      is_pb := prev_pb is null or p_score < prev_pb;
+    else
+      select max(s.score) into prev_pb
+      from public.scores s
+      where s.verified_status = 'verified'
+        and s.game_id = sess.game_id
+        and s.mode = p_mode
+        and (
+          (p_identity_user_id is not null and s.user_id = p_identity_user_id)
+          or (p_identity_user_id is null and s.anonymous_id = p_identity_anonymous_id and s.user_id is null)
+        );
+      is_pb := prev_pb is null or p_score > prev_pb;
+    end if;
+    is_pb := is_pb and coalesce((p_progression ->> 'pbClaim')::boolean, true);
+
+    if p_identity_user_id is not null then
+      new_game := not exists (
+        select 1 from public.player_stats ps
+        where ps.user_id = p_identity_user_id
+          and ps.game_id = sess.game_id
+          and ps.stat_key = 'games_played'
+          and ps.value > 0
+      ) and coalesce((p_progression ->> 'newGameClaim')::boolean, true);
+    else
+      played := coalesce(gp.stats -> 'playedGameIds', '[]'::jsonb);
+      new_game := jsonb_typeof(played) = 'array'
+        and not (played ? sess.game_id)
+        and coalesce((p_progression ->> 'newGameClaim')::boolean, true);
+    end if;
+
+    v_xp_earned := least(greatest(coalesce((p_progression ->> 'runXp')::int, 0), 0), 400);
+    if first_play then
+      v_xp_earned := v_xp_earned + 40;
+    end if;
+    if new_game then
+      v_xp_earned := v_xp_earned + 45;
+    end if;
+    if is_pb then
+      v_xp_earned := v_xp_earned + 35;
+    end if;
+
+    for ach in select jsonb_array_elements_text(
+      coalesce(p_progression -> 'achievementsToUnlock', p_progression -> 'achievements', '[]'::jsonb)
+    )
+    loop
+      if exists (select 1 from public.achievements a where a.id = ach)
+         and coalesce(array_length(v_applied, 1), 0) < 32 then
+        if p_identity_user_id is not null then
+          if not exists (
+            select 1 from public.player_achievements pa
+            where pa.user_id = p_identity_user_id and pa.achievement_id = ach
+          ) then
+            v_applied := array_append(v_applied, ach);
+          end if;
+        else
+          if not (ach = any (coalesce(gp.achievements, '{}'::text[]))) then
+            v_applied := array_append(v_applied, ach);
+          end if;
+        end if;
+      end if;
+    end loop;
+
+    foreach ach in array v_applied
+    loop
+      select a.xp_reward into ach_xp from public.achievements a where a.id = ach;
+      v_xp_earned := v_xp_earned + least(greatest(coalesce(ach_xp, 25), 0), 200);
+    end loop;
+
+    for quest_id in select jsonb_array_elements_text(coalesce(p_progression -> 'questsCompleted', '[]'::jsonb))
+    loop
+      if quest_id is null or char_length(quest_id) not between 8 and 96 then
+        continue;
+      end if;
+      if coalesce(array_length(v_quests, 1), 0) >= 32 then
+        continue;
+      end if;
+      already_completed := false;
+      if p_identity_user_id is not null then
+        already_completed := exists (
+          select 1 from public.quest_progress qp
+          where qp.user_id = p_identity_user_id and qp.quest_id = quest_id and qp.completed_at is not null
+        );
+      else
+        already_completed := quest_id = any (coalesce(gp.quest_completed, '{}'::text[]));
+      end if;
+      if not already_completed then
+        v_quests := array_append(v_quests, quest_id);
+        quest_xp := least(greatest(coalesce((p_progression -> 'questXp' ->> quest_id)::int, 0), 0), 200);
+        v_xp_earned := v_xp_earned + quest_xp;
+      end if;
+    end loop;
+
+    v_xp_earned := least(v_xp_earned, 2500);
   else
     v_xp_earned := 0;
   end if;
@@ -443,39 +393,7 @@ begin
     metadata = coalesce(p_metadata, '{}'::jsonb)
   where id = p_session_id;
 
-  if jsonb_typeof(coalesce(p_progression -> 'achievementsToUnlock', p_progression -> 'achievements')) = 'array'
-     and jsonb_array_length(coalesce(p_progression -> 'achievementsToUnlock', p_progression -> 'achievements')) > 32 then
-    raise exception 'payload_too_large';
-  end if;
-  if jsonb_typeof(p_progression -> 'questsCompleted') = 'array'
-     and jsonb_array_length(p_progression -> 'questsCompleted') > 32 then
-    raise exception 'payload_too_large';
-  end if;
-
-  if v_verified then
-    for ach in select jsonb_array_elements_text(
-      coalesce(p_progression -> 'achievementsToUnlock', p_progression -> 'achievements', '[]'::jsonb)
-    )
-    loop
-      if exists (select 1 from public.achievements a where a.id = ach)
-         and coalesce(array_length(v_applied, 1), 0) < 32 then
-        v_applied := array_append(v_applied, ach);
-      end if;
-    end loop;
-    for quest_id in select jsonb_array_elements_text(coalesce(p_progression -> 'questsCompleted', '[]'::jsonb))
-    loop
-      if quest_id is not null and char_length(quest_id) between 8 and 96
-         and coalesce(array_length(v_quests, 1), 0) < 32 then
-        v_quests := array_append(v_quests, quest_id);
-      end if;
-    end loop;
-  end if;
-
   if p_identity_user_id is not null then
-    select * into prof from public.profiles where user_id = p_identity_user_id for update;
-    if not found then
-      raise exception 'profile_missing';
-    end if;
     v_new_xp := prof.xp + v_xp_earned;
     v_new_level := public.gamesweb_level_from_xp(v_new_xp);
     update public.profiles
@@ -491,9 +409,17 @@ begin
     if v_verified then
       foreach ach in array v_applied
       loop
-        insert into public.player_achievements (user_id, achievement_id)
-        values (p_identity_user_id, ach)
+        insert into public.player_achievements (user_id, achievement_id, unlocked_at)
+        values (p_identity_user_id, ach, now())
         on conflict do nothing;
+        get diagnostics inserted = row_count;
+        if inserted = 0 then
+          select a.xp_reward into ach_xp from public.achievements a where a.id = ach;
+          v_xp_earned := greatest(v_xp_earned - least(greatest(coalesce(ach_xp, 25), 0), 200), 0);
+          v_new_xp := prof.xp + v_xp_earned;
+          update public.profiles set xp = v_new_xp, level = public.gamesweb_level_from_xp(v_new_xp)
+            where user_id = p_identity_user_id;
+        end if;
       end loop;
 
       if p_progression -> 'questProgressUpdates' is not null
@@ -525,7 +451,7 @@ begin
         values (p_identity_user_id, sess.game_id, 'games_played', least(greatest(coalesce((p_progression -> 'statsDelta' ->> 'gamesPlayed')::int, 1), 0), 1))
         on conflict (user_id, game_id, stat_key) do update
           set value = public.player_stats.value + excluded.value;
-        if coalesce((p_progression -> 'statsDelta' ->> 'pbCount')::int, 0) > 0 then
+        if is_pb then
           insert into public.player_stats (user_id, game_id, stat_key, value)
           values (p_identity_user_id, sess.game_id, 'pb_count', 1)
           on conflict (user_id, game_id, stat_key) do update
@@ -534,13 +460,13 @@ begin
       end if;
     end if;
   else
-    insert into public.guest_progress (anonymous_id)
-    values (p_identity_anonymous_id)
-    on conflict (anonymous_id) do nothing;
-    select * into gp from public.guest_progress where anonymous_id = p_identity_anonymous_id for update;
-    if gp.migrated_at is not null then
-      raise exception 'guest_migrated';
-    end if;
+    unlocks := coalesce(gp.achievement_unlocks, '{}'::jsonb);
+    foreach ach in array v_applied
+    loop
+      if not (unlocks ? ach) then
+        unlocks := jsonb_set(unlocks, array[ach], to_jsonb(now()), true);
+      end if;
+    end loop;
     v_new_xp := gp.xp + v_xp_earned;
     v_new_level := public.gamesweb_level_from_xp(v_new_xp);
     update public.guest_progress set
@@ -558,6 +484,7 @@ begin
         )
         else gp.achievements
       end,
+      achievement_unlocks = case when v_verified then unlocks else gp.achievement_unlocks end,
       quest_progress = case
         when v_verified then public.gamesweb_merge_quest_progress(
           gp.quest_progress,
@@ -589,8 +516,8 @@ begin
     'xpEarned', v_xp_earned,
     'newXp', v_new_xp,
     'newLevel', v_new_level,
-    'achievementsApplied', to_jsonb(v_applied),
-    'questsCompleted', to_jsonb(v_quests)
+    'achievementsApplied', to_jsonb(coalesce(v_applied, '{}')),
+    'questsCompleted', to_jsonb(coalesce(v_quests, '{}'))
   );
 end;
 $$;
@@ -603,10 +530,8 @@ grant execute on function public.finalize_game_run(
 ) to service_role;
 
 -- ---------------------------------------------------------------------------
--- merge_guest_progress: lock guest + account, XP = account.xp + guest.xp once
+-- merge_guest_progress: skip scores that already exist by local_session_id
 -- ---------------------------------------------------------------------------
-drop function if exists public.merge_guest_progress(uuid, text, int, int, int, text[], jsonb, text[], jsonb);
-
 create or replace function public.merge_guest_progress(
   p_user_id uuid,
   p_anonymous_id text,
@@ -628,6 +553,8 @@ declare
   quest_id text;
   quest_progress double precision;
   offline_count int := 0;
+  local_id text;
+  unlocked timestamptz;
 begin
   if p_user_id is null or p_anonymous_id is null or char_length(p_anonymous_id) < 8 then
     raise exception 'invalid_identity';
@@ -661,7 +588,6 @@ begin
   select * into gp from public.guest_progress where anonymous_id = p_anonymous_id for update;
 
   xp_before := prof.xp;
-  -- guest_progress.xp is the only guest XP source. Do not add reconstructed achievement XP.
   xp_after := least(xp_before + coalesce(gp.xp, 0), 5000000);
 
   update public.scores
@@ -685,8 +611,16 @@ begin
     foreach ach in array gp.achievements
     loop
       if exists (select 1 from public.achievements a where a.id = ach) then
-        insert into public.player_achievements (user_id, achievement_id)
-        values (p_user_id, ach)
+        unlocked := null;
+        if gp.achievement_unlocks ? ach then
+          begin
+            unlocked := (gp.achievement_unlocks ->> ach)::timestamptz;
+          exception when others then
+            unlocked := null;
+          end;
+        end if;
+        insert into public.player_achievements (user_id, achievement_id, unlocked_at)
+        values (p_user_id, ach, coalesce(unlocked, now()))
         on conflict do nothing;
       end if;
     end loop;
@@ -721,6 +655,17 @@ begin
       if coalesce(run ->> 'gameId', '') not in ('neon-drift', 'velocity-run', 'swarm-protocol') then
         continue;
       end if;
+      local_id := nullif(left(coalesce(run ->> 'localSessionId', ''), 80), '');
+      if local_id is not null and exists (
+        select 1 from public.scores s
+        where s.local_session_id = local_id
+          and (
+            s.anonymous_id = p_anonymous_id
+            or s.user_id = p_user_id
+          )
+      ) then
+        continue;
+      end if;
       insert into public.scores (
         user_id, anonymous_id, game_id, mode, score, metadata, verified_status,
         offline_submission, client_started_at, client_ended_at, local_session_id, game_version
@@ -735,7 +680,7 @@ begin
         true,
         to_timestamp(coalesce((run ->> 'startedAt')::bigint, 0) / 1000.0),
         to_timestamp(coalesce((run ->> 'endedAt')::bigint, 0) / 1000.0),
-        left(coalesce(run ->> 'localSessionId', ''), 80),
+        local_id,
         left(coalesce(run ->> 'gameVersion', ''), 32)
       );
     end loop;
@@ -761,8 +706,3 @@ $$;
 
 revoke all on function public.merge_guest_progress(uuid, text, jsonb) from public, anon, authenticated;
 grant execute on function public.merge_guest_progress(uuid, text, jsonb) to service_role;
-
-revoke all on function public.best_verified_scores(text, text, int) from public, anon, authenticated;
-revoke all on function public.personal_verified_rank(uuid, text, text) from public, anon, authenticated;
-grant execute on function public.best_verified_scores(text, text, int) to service_role;
-grant execute on function public.personal_verified_rank(uuid, text, text) to service_role;

@@ -136,20 +136,13 @@ export default function SettingsPage() {
                 value={s.shake}
                 onChange={(shake) => store.update({ settings: { ...s, shake } })}
               />
-              <SwitchControl
-                label="Haptics"
-                checked={s.haptics}
-                onChange={(haptics) => store.update({ settings: { ...s, haptics } })}
-              />
             </section>
           ) : null}
 
           {cat === "video" ? (
             <section>
               <h2 className="meta">Video</h2>
-              <p className="mt-3 text-[13px] text-[var(--text-dim)]">
-                Quality follows the device. Games drop effects on their own when frames slip.
-              </p>
+              <p className="mt-3 text-[13px] text-[var(--text-dim)]">Automatic quality. Effects drop if frames slip.</p>
               <button
                 type="button"
                 className="mt-4 min-h-11 text-[13px] underline"
@@ -163,7 +156,7 @@ export default function SettingsPage() {
           {cat === "controls" ? (
             <section>
               <h2 className="meta">Controls</h2>
-              <p className="mt-2 text-[13px] text-[var(--text-dim)]">Current controls. Remapping comes later.</p>
+              <p className="mt-2 text-[13px] text-[var(--text-dim)]">Current controls for each game.</p>
               <div className="mt-4 flex gap-1 overflow-x-auto scrollbar-none" role="tablist" aria-label="Game controls">
                 {GAME_MANIFESTS.map((g) => (
                   <button
@@ -193,12 +186,12 @@ export default function SettingsPage() {
             <section>
               <h2 className="meta">Social</h2>
               <SwitchControl
-                label="Share activity"
-                description="Friends can see which game you are in. Presence stays offline when this is off."
-                checked={s.shareActivity}
-                onChange={(shareActivity) => {
-                  store.update({ settings: { ...s, shareActivity } });
-                  if (!player.isGuest) void store.updateProfileRemote({ shareActivity });
+                label="Share game presence"
+                description="Friends can see when you are online or playing a game."
+                checked={s.sharePresence}
+                onChange={(sharePresence) => {
+                  store.update({ settings: { ...s, sharePresence } });
+                  if (!player.isGuest) void store.updateProfileRemote({ sharePresence });
                 }}
               />
             </section>
@@ -208,12 +201,12 @@ export default function SettingsPage() {
             <section>
               <h2 className="meta">Privacy</h2>
               <SwitchControl
-                label="Show activity on public profile"
-                description="Your name, records, and achievements stay visible. Recent runs hide when this is off."
-                checked={s.shareActivity}
-                onChange={(shareActivity) => {
-                  store.update({ settings: { ...s, shareActivity } });
-                  if (!player.isGuest) void store.updateProfileRemote({ shareActivity });
+                label="Show recent activity on profile"
+                description="Recent verified runs can appear on your public profile."
+                checked={s.sharePublicActivity}
+                onChange={(sharePublicActivity) => {
+                  store.update({ settings: { ...s, sharePublicActivity } });
+                  if (!player.isGuest) void store.updateProfileRemote({ sharePublicActivity });
                 }}
               />
             </section>
@@ -229,9 +222,10 @@ export default function SettingsPage() {
                 onChange={(reducedMotion) => store.update({ settings: { ...s, reducedMotion } })}
               />
               <SwitchControl
-                label="Haptics off"
-                checked={!s.haptics}
-                onChange={(off) => store.update({ settings: { ...s, haptics: !off } })}
+                label="Haptics"
+                description="Controller and phone vibration during play."
+                checked={s.haptics}
+                onChange={(haptics) => store.update({ settings: { ...s, haptics } })}
               />
             </section>
           ) : null}

@@ -31,6 +31,8 @@ function emptyGuestProfile(anonymousId: string): StoredProfile {
     streak: 0,
     isGuest: true,
     shareActivity: true,
+    sharePresence: true,
+    sharePublicActivity: true,
     achievements: [],
     questProgress: {},
     questCompleted: [],
@@ -40,6 +42,7 @@ function emptyGuestProfile(anonymousId: string): StoredProfile {
     gamesPlayedToday: 0,
     dayKey: utcDayKey(),
     playedGameIds: [],
+    achievementUnlocks: {},
   };
 }
 
@@ -50,6 +53,7 @@ function guestFromRow(anonymousId: string, data: {
   quest_completed: string[] | null;
   stats: Record<string, unknown> | null;
   achievements: string[] | null;
+  achievement_unlocks: Record<string, string> | null;
   migrated_at: string | null;
 }): StoredProfile {
   const raw = data.stats ?? {};
@@ -68,6 +72,9 @@ function guestFromRow(anonymousId: string, data: {
     stats,
     pbCount: stats.pbCount,
     playedGameIds: played.filter((id) => typeof id === "string").slice(0, 8),
+    achievementUnlocks: Object.fromEntries(
+      Object.entries(data.achievement_unlocks ?? {}).map(([id, at]) => [id, new Date(at).getTime()]).filter(([, n]) => Number.isFinite(n)),
+    ),
   };
 }
 
@@ -75,7 +82,7 @@ async function loadProfileRow(userId: string): Promise<StoredProfile | null> {
   const sb = admin();
   const { data } = await sb.from("profiles").select("*").eq("user_id", userId).maybeSingle();
   if (!data) return null;
-  const { data: ach } = await sb.from("player_achievements").select("achievement_id").eq("user_id", userId);
+  const { data: ach } = await sb.from("player_achievements").select("achievement_id, unlocked_at").eq("user_id", userId);
   const { data: quests } = await sb.from("quest_progress").select("*").eq("user_id", userId);
   const { data: stats } = await sb.from("player_stats").select("*").eq("user_id", userId);
   return {
@@ -88,6 +95,8 @@ async function loadProfileRow(userId: string): Promise<StoredProfile | null> {
     streak: data.streak,
     isGuest: data.is_guest,
     shareActivity: data.share_activity ?? true,
+    sharePresence: data.share_presence ?? data.share_activity ?? true,
+    sharePublicActivity: data.share_public_activity ?? data.share_activity ?? true,
     achievements: (ach ?? []).map((a: { achievement_id: string }) => a.achievement_id),
     questProgress: Object.fromEntries((quests ?? []).map((q: { quest_id: string; progress: number }) => [q.quest_id, q.progress])),
     questCompleted: (quests ?? []).filter((q: { completed_at: string | null }) => q.completed_at).map((q: { quest_id: string }) => q.quest_id),
@@ -97,6 +106,11 @@ async function loadProfileRow(userId: string): Promise<StoredProfile | null> {
     gamesPlayedToday: 0,
     dayKey: utcDayKey(),
     playedGameIds: [],
+    achievementUnlocks: Object.fromEntries(
+      (ach ?? [])
+        .filter((a: { unlocked_at: string | null }) => a.unlocked_at)
+        .map((a: { achievement_id: string; unlocked_at: string }) => [a.achievement_id, new Date(a.unlocked_at).getTime()]),
+    ),
   };
 }
 
@@ -187,6 +201,8 @@ export class SupabaseBackend implements BackendStore {
       avatar: "orb-0",
       is_guest: false,
       share_activity: true,
+      share_presence: true,
+      share_public_activity: true,
     });
     return (await loadProfileRow(identity.userId))!;
   }
@@ -274,9 +290,14 @@ export class SupabaseBackend implements BackendStore {
 
     const relativeProgression = {
       xpEarned: Math.max(0, Math.min(2500, proposed.xpEarned)),
+      runXp: Math.max(0, Math.min(400, proposed.runXp)),
+      firstPlayClaim: proposed.firstPlayOfDay,
+      newGameClaim: proposed.newGameTried,
+      pbClaim: proposed.pbImproved,
       achievementsToUnlock: proposed.achievements.slice(0, 32),
       questProgressUpdates: proposed.questProgress,
       questsCompleted: proposed.questsCompleted.slice(0, 32),
+      questXp: proposed.questXp,
       pbImproved: proposed.pbImproved,
       statsDelta: {
         gamesPlayed: input.verified === "verified" ? 1 : 0,
@@ -446,7 +467,7 @@ export class SupabaseBackend implements BackendStore {
     await sb.from("presence").upsert({
       user_id: identity.userId,
       status,
-      game_id: profile.shareActivity ? gameId : null,
+      game_id: profile.sharePresence ? gameId : null,
       updated_at: new Date().toISOString(),
     });
   }
@@ -571,14 +592,16 @@ export class SupabaseBackend implements BackendStore {
     const ids = [...new Set(visible.flatMap((f: { requester_id: string; addressee_id: string }) => [f.requester_id, f.addressee_id]))].filter(
       (id) => id !== identity.userId,
     );
-    const { data: profiles } = ids.length ? await sb.from("profiles").select("user_id, username, display_name, avatar, share_activity").in("user_id", ids) : { data: [] };
+    const { data: profiles } = ids.length
+      ? await sb.from("profiles").select("user_id, username, display_name, avatar, share_presence").in("user_id", ids)
+      : { data: [] };
     const { data: presence } = ids.length ? await sb.from("presence").select("*").in("user_id", ids) : { data: [] };
     const pmap = new Map((profiles ?? []).map((p: { user_id: string }) => [p.user_id, p]));
     const prmap = new Map((presence ?? []).map((p: { user_id: string }) => [p.user_id, p]));
     return visible.map((f: { requester_id: string; addressee_id: string; status: string }) => {
       const otherId = f.requester_id === identity.userId ? f.addressee_id : f.requester_id;
       const p = pmap.get(otherId) as
-        | { username: string; display_name: string; avatar: string; share_activity: boolean }
+        | { username: string; display_name: string; avatar: string; share_presence: boolean }
         | undefined;
       const pr = prmap.get(otherId) as { status: string; game_id: string | null; updated_at: string } | undefined;
       const stale = !pr || Date.now() - new Date(pr.updated_at).getTime() > PRESENCE_STALE_MS;
@@ -594,8 +617,8 @@ export class SupabaseBackend implements BackendStore {
         displayName: p?.display_name ?? "Player",
         avatar: p?.avatar ?? "orb-0",
         status,
-        presence: (stale || !p?.share_activity ? "offline" : pr?.status) as "online" | "away" | "playing" | "offline",
-        gameId: stale || !p?.share_activity ? undefined : (pr?.game_id ?? undefined),
+        presence: (stale || !p?.share_presence ? "offline" : pr?.status) as "online" | "away" | "playing" | "offline",
+        gameId: stale || !p?.share_presence ? undefined : (pr?.game_id ?? undefined),
       };
     });
   }
@@ -661,16 +684,20 @@ export class SupabaseBackend implements BackendStore {
     };
   }
 
-  async updateProfile(identity: Identity, patch: Partial<Pick<StoredProfile, "username" | "displayName" | "avatar" | "shareActivity">>) {
+  async updateProfile(identity: Identity, patch: Partial<Pick<StoredProfile, "username" | "displayName" | "avatar" | "shareActivity" | "sharePresence" | "sharePublicActivity">>) {
     if (!identity.userId) return { error: "auth_required" };
     const sb = admin();
+    const sharePresence = patch.sharePresence ?? patch.shareActivity;
+    const sharePublicActivity = patch.sharePublicActivity ?? patch.shareActivity;
     const { error } = await sb
       .from("profiles")
       .update({
         username: patch.username,
         display_name: patch.displayName,
         avatar: patch.avatar,
-        share_activity: patch.shareActivity,
+        share_presence: sharePresence,
+        share_public_activity: sharePublicActivity,
+        share_activity: sharePublicActivity ?? sharePresence,
       })
       .eq("user_id", identity.userId);
     if (error) return { error: error.code === "23505" ? "username_taken" : "update_failed" };
@@ -778,7 +805,7 @@ export class SupabaseBackend implements BackendStore {
     if (!pub) return null;
     const { data: owner } = await sb
       .from("profiles")
-      .select("user_id, share_activity, xp")
+      .select("user_id, share_activity, share_presence, share_public_activity, xp")
       .ilike("username", pub.username)
       .maybeSingle();
     const { data: scores } = await sb
@@ -808,7 +835,7 @@ export class SupabaseBackend implements BackendStore {
     const { data: ach } = owner?.user_id
       ? await sb.from("player_achievements").select("achievement_id").eq("user_id", owner.user_id)
       : { data: [] as Array<{ achievement_id: string }> };
-    const share = owner?.share_activity !== false;
+    const share = owner?.share_public_activity !== false;
     const activity = share
       ? rows
           .slice()

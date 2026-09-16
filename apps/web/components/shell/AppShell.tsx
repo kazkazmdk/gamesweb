@@ -69,6 +69,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh">
+      {player.backend === "local" ? (
+        <p className="bg-[color-mix(in_srgb,var(--accent)_16%,var(--bg))] px-5 py-2 text-center text-[12px] text-[var(--text-dim)] md:px-8">
+          Guest / this device. Scores stay local. No account sync.
+        </p>
+      ) : null}
       <header className="sticky top-0 z-40 flex h-[var(--header-h)] items-center justify-between px-5 pt-[var(--safe-top)] md:px-8">
         <div className="flex items-center gap-8">
           <Link href="/" className="display text-[22px] tracking-[-0.06em]">

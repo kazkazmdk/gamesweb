@@ -284,6 +284,70 @@ describe("memory backend", () => {
     expect(await store.friendAction(a, b.userId!, "unblock")).toMatchObject({ ok: true });
     expect(await store.sendFriendRequest(b, (await store.getOrCreateProfile(a)).username)).toMatchObject({ ok: true });
   });
+
+  it("splits presence and public activity", async () => {
+    const store = new MemoryBackend();
+    const a = identity;
+    const b = { userId: "66666666-6666-4666-8666-666666666666", anonymousId: "priv-b", email: null };
+    await store.getOrCreateProfile(a);
+    await store.getOrCreateProfile(b);
+    await store.updateProfile(b, { sharePresence: false, sharePublicActivity: true });
+    await store.sendFriendRequest(a, (await store.getOrCreateProfile(b)).username);
+    await store.friendAction(b, a.userId!, "accept");
+    await store.upsertPresence(b, "playing", "neon-drift");
+    const friends = await store.listFriends(a);
+    expect(friends.find((f) => f.userId === b.userId)?.presence).toBe("offline");
+    const session = await store.startSession({ identity: b, gameId: "neon-drift", gameVersion: "1.0.0", device: "desktop" });
+    await store.submitScore({
+      identity: b,
+      session,
+      gameId: "neon-drift",
+      mode: "circuit",
+      score: 18000,
+      durationMs: 40000,
+      metadata: { laps: 1, combo: 1, wallHits: 0 },
+      verified: "verified",
+    });
+    const pub = await store.getPublicProfile((await store.getOrCreateProfile(b)).username);
+    expect(pub?.activity?.length).toBeGreaterThan(0);
+    await store.updateProfile(b, { sharePublicActivity: false });
+    const hidden = await store.getPublicProfile((await store.getOrCreateProfile(b)).username);
+    expect(hidden?.activity).toBeNull();
+  });
+
+  it("dedupes the same guest run persisted and included in merge", async () => {
+    const store = new MemoryBackend();
+    const guest = { userId: null, anonymousId: "guest-dedupe-1", email: null };
+    await store.submitScore({
+      identity: guest,
+      session: null,
+      gameId: "neon-drift",
+      mode: "circuit",
+      score: 3333,
+      durationMs: 10000,
+      metadata: {},
+      verified: "unverified",
+      localSessionId: "local-run-stable-1",
+    });
+    const authed = { ...identity, anonymousId: "guest-dedupe-1" };
+    const merge = await store.mergeGuest(authed, {
+      offlineRuns: [
+        {
+          gameId: "neon-drift",
+          mode: "circuit",
+          score: 3333,
+          durationMs: 10000,
+          startedAt: Date.now(),
+          endedAt: Date.now(),
+          metadata: {},
+          localSessionId: "local-run-stable-1",
+        },
+      ],
+    });
+    expect(merge).toMatchObject({ ok: true });
+    const scores = [...store.scores.values()].filter((s) => s.localSessionId === "local-run-stable-1");
+    expect(scores).toHaveLength(1);
+  });
 });
 
 describe("rls sql", () => {
@@ -323,9 +387,23 @@ describe("authoritative progression sql", () => {
     expect(sql).toContain("grant execute on function public.finalize_game_run");
     expect(sql).toContain("to service_role");
     expect(sql).not.toMatch(/grant execute on function public\.finalize_game_run\([^)]+\) to anon/i);
+    expect(sql).toContain("if (p_updates is null or jsonb_typeof(p_updates) <> 'object') then");
     expect(sql).toContain("pg_advisory_xact_lock");
     expect(sql).toContain("status = 'accepted'");
     expect(sql).toContain("Future cron");
+  });
+});
+
+describe("privacy rewards dedupe sql", () => {
+  it("adds privacy columns, unique local sessions, and transactional finalize", () => {
+    const sql = readFileSync(new URL("../supabase/migrations/0005_privacy_rewards_dedupe.sql", import.meta.url), "utf8");
+    expect(sql).toContain("share_presence");
+    expect(sql).toContain("share_public_activity");
+    expect(sql).toContain("achievement_unlocks");
+    expect(sql).toContain("scores_anon_local_session_uidx");
+    expect(sql).toContain("firstPlayClaim");
+    expect(sql).toContain("runXp");
+    expect(sql).not.toMatch(/grant execute on function public\.finalize_game_run\([^)]+\) to anon/i);
   });
 });
 

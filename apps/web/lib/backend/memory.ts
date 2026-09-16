@@ -115,7 +115,10 @@ export class MemoryBackend implements BackendStore {
       streak: 1,
       isGuest: !identity.userId,
       shareActivity: true,
+      sharePresence: true,
+      sharePublicActivity: true,
       achievements: [],
+      achievementUnlocks: {},
       questProgress: {},
       questCompleted: [],
       stats: {},
@@ -136,6 +139,27 @@ export class MemoryBackend implements BackendStore {
   }
 
   private async submitScoreLocked(input: SubmitScoreInput): Promise<ScoreWriteResult> {
+    if (input.localSessionId) {
+      const existingLocal = [...this.scores.values()].find(
+        (s) =>
+          s.localSessionId === input.localSessionId &&
+          (input.identity.userId ? s.userId === input.identity.userId : s.anonymousId === input.identity.anonymousId),
+      );
+      if (existingLocal) {
+        const profile = await this.getOrCreateProfile(input.identity);
+        return {
+          score: existingLocal,
+          alreadyApplied: true,
+          progression: {
+            xpEarned: 0,
+            newLevel: levelFromXp(profile.xp).level,
+            newXp: profile.xp,
+            achievements: [],
+            questsCompleted: [],
+          },
+        };
+      }
+    }
     if (input.session) {
       if (assertSessionOwnership(input.session, input.identity) !== "ok") {
         throw Object.assign(new Error("forbidden"), { code: "FORBIDDEN" });
@@ -202,6 +226,11 @@ export class MemoryBackend implements BackendStore {
     profile.xp += xpEarned;
     const newLevel = levelFromXp(profile.xp).level;
     profile.achievements = [...new Set([...profile.achievements, ...proposed.achievements])];
+    profile.achievementUnlocks = { ...profile.achievementUnlocks };
+    const now = Date.now();
+    for (const id of proposed.achievements) {
+      if (!profile.achievementUnlocks[id]) profile.achievementUnlocks[id] = now;
+    }
     profile.questProgress = proposed.questProgress;
     profile.questCompleted = [...new Set([...profile.questCompleted, ...proposed.questsCompleted])];
     if (input.verified === "verified") {
@@ -230,6 +259,7 @@ export class MemoryBackend implements BackendStore {
       createdAt: Date.now(),
       verified: input.verified,
       offlineSubmission: Boolean(input.offline),
+      localSessionId: input.localSessionId,
     };
     this.scores.set(score.id, score);
 
@@ -305,7 +335,7 @@ export class MemoryBackend implements BackendStore {
     this.presence.set(profile.userId, {
       userId: profile.userId,
       status,
-      gameId: profile.shareActivity ? gameId : null,
+      gameId: profile.sharePresence ? gameId : null,
       updatedAt: Date.now(),
     });
   }
@@ -317,7 +347,7 @@ export class MemoryBackend implements BackendStore {
     for (const row of this.presence.values()) {
       if (!accepted.has(row.userId)) continue;
       const profile = this.profiles.get(row.userId);
-      if (!profile?.shareActivity) continue;
+      if (!profile?.sharePresence) continue;
       const stale = Date.now() - row.updatedAt > PRESENCE_STALE_MS;
       out.push({
         ...row,
@@ -433,8 +463,8 @@ export class MemoryBackend implements BackendStore {
           displayName: other?.displayName ?? "Player",
           avatar: other?.avatar ?? "orb-0",
           status,
-          presence: (stale || !other?.shareActivity ? "offline" : presence?.status) ?? "offline",
-          gameId: stale || !other?.shareActivity ? undefined : (presence?.gameId ?? undefined),
+          presence: (stale || !other?.sharePresence ? "offline" : presence?.status) ?? "offline",
+          gameId: stale || !other?.sharePresence ? undefined : (presence?.gameId ?? undefined),
         };
       });
   }
@@ -477,7 +507,7 @@ export class MemoryBackend implements BackendStore {
     return row;
   }
 
-  async updateProfile(identity: Identity, patch: Partial<Pick<StoredProfile, "username" | "displayName" | "avatar" | "shareActivity">>) {
+  async updateProfile(identity: Identity, patch: Partial<Pick<StoredProfile, "username" | "displayName" | "avatar" | "shareActivity" | "sharePresence" | "sharePublicActivity">>) {
     const me = await this.getOrCreateProfile(identity);
     if (patch.username) {
       const taken = this.usernameIndex.get(patch.username.toLowerCase());
@@ -488,7 +518,13 @@ export class MemoryBackend implements BackendStore {
     }
     if (patch.displayName) me.displayName = patch.displayName;
     if (patch.avatar) me.avatar = patch.avatar;
-    if (typeof patch.shareActivity === "boolean") me.shareActivity = patch.shareActivity;
+    if (typeof patch.shareActivity === "boolean") {
+      me.shareActivity = patch.shareActivity;
+      me.sharePresence = patch.shareActivity;
+      me.sharePublicActivity = patch.shareActivity;
+    }
+    if (typeof patch.sharePresence === "boolean") me.sharePresence = patch.sharePresence;
+    if (typeof patch.sharePublicActivity === "boolean") me.sharePublicActivity = patch.sharePublicActivity;
     return me;
   }
 
@@ -561,6 +597,10 @@ export class MemoryBackend implements BackendStore {
 
     profile.xp = merged.xp;
     profile.achievements = merged.achievements;
+    profile.achievementUnlocks = {
+      ...profile.achievementUnlocks,
+      ...(guestProfile?.achievementUnlocks ?? {}),
+    };
     profile.questProgress = merged.questProgress;
     profile.questCompleted = merged.questCompleted;
     profile.stats = merged.stats;
@@ -587,13 +627,15 @@ export class MemoryBackend implements BackendStore {
       });
     }
     for (const run of input.offlineRuns ?? []) {
+      const localId = run.localSessionId;
       const dup = [...this.scores.values()].some(
         (s) =>
-          s.userId === identity.userId &&
-          s.gameId === run.gameId &&
-          s.mode === run.mode &&
-          s.score === run.score &&
-          Math.abs(s.createdAt - run.endedAt) < 5_000,
+          (localId && s.localSessionId === localId) ||
+          (s.userId === identity.userId &&
+            s.gameId === run.gameId &&
+            s.mode === run.mode &&
+            s.score === run.score &&
+            Math.abs(s.createdAt - run.endedAt) < 5_000),
       );
       if (dup) continue;
       const id = crypto.randomUUID();
@@ -609,6 +651,7 @@ export class MemoryBackend implements BackendStore {
         createdAt: run.endedAt,
         verified: "unverified",
         offlineSubmission: true,
+        localSessionId: localId,
       });
     }
 
@@ -678,7 +721,7 @@ export class MemoryBackend implements BackendStore {
         n = c;
       }
     }
-    const activity = profile.shareActivity
+    const activity = profile.sharePublicActivity
       ? mine
           .slice()
           .sort((a, b) => b.createdAt - a.createdAt)

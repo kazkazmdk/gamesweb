@@ -23,7 +23,10 @@ export async function GET() {
       level: levelFromXp(profile.xp).level,
       streak: profile.streak,
       shareActivity: profile.shareActivity,
+      sharePresence: profile.sharePresence,
+      sharePublicActivity: profile.sharePublicActivity,
       achievements: profile.achievements,
+      achievementUnlocks: profile.achievementUnlocks,
       questCompleted: profile.questCompleted,
       questProgress: profile.questProgress,
     },
@@ -53,5 +56,7 @@ export async function PATCH(req: Request) {
     displayName: result.displayName,
     avatar: result.avatar,
     shareActivity: result.shareActivity,
+    sharePresence: result.sharePresence,
+    sharePublicActivity: result.sharePublicActivity,
   });
 }

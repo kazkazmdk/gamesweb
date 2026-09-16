@@ -16,6 +16,10 @@ type GwDebug = {
   deaths?: number;
   speed?: number;
   throttle?: number;
+  tick?: number;
+  longFrames?: number;
+  frozen?: boolean;
+  fps?: number;
 };
 
 type GwCmd = {
@@ -25,6 +29,20 @@ type GwCmd = {
   grantXp?: (n: number) => void;
   pickUpgrade?: (i: number) => void;
 };
+
+const BENIGN = [/Download the React DevTools/i, /\[Phaser\]/i, /Failed to load resource/i];
+
+function attachConsoleGuard(page: Page) {
+  const errors: string[] = [];
+  page.on("pageerror", (err) => errors.push(err.message));
+  page.on("console", (msg) => {
+    if (msg.type() === "error") errors.push(msg.text());
+  });
+  return () => {
+    const real = errors.filter((e) => !BENIGN.some((r) => r.test(e)));
+    expect(real, real.join("\n")).toEqual([]);
+  };
+}
 
 async function debugOf(page: Page): Promise<GwDebug | null> {
   return page.evaluate(() => (window as unknown as { __GW_DEBUG__?: GwDebug }).__GW_DEBUG__ ?? null);
@@ -56,13 +74,24 @@ async function waitReady(page: Page, gameId: string) {
   await page.locator("canvas").click({ position: { x: 200, y: 200 }, timeout: 5_000 });
 }
 
+async function assertAlive(page: Page) {
+  const start = await debugOf(page);
+  await expect
+    .poll(async () => (await debugOf(page))?.tick ?? 0, { timeout: 6_000 })
+    .toBeGreaterThan((start?.tick ?? 0) + 8);
+  const later = await debugOf(page);
+  expect(later?.frozen).not.toBe(true);
+  expect(later?.longFrames ?? 0).toBeLessThan(90);
+  console.log(`gw-metrics game=${later?.gameId} fps=${later?.fps ?? "n/a"} longFrames=${later?.longFrames ?? 0} tick=${later?.tick ?? 0}`);
+}
+
 test("neon drift steers, scores, pauses, and retries", async ({ page }) => {
+  const done = attachConsoleGuard(page);
   await waitReady(page, "neon-drift");
   const before = await debugOf(page);
   expect(before?.runState).toBe("playing");
   await page.keyboard.down("KeyW");
   await page.keyboard.down("KeyD");
-  await cmd(page, "setDrive", 1, 1);
   await expect
     .poll(async () => {
       const d = await debugOf(page);
@@ -75,6 +104,7 @@ test("neon drift steers, scores, pauses, and retries", async ({ page }) => {
     .toBeGreaterThan(before?.score ?? 0);
   await page.keyboard.up("KeyD");
   await page.keyboard.up("KeyW");
+  await assertAlive(page);
 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
@@ -89,9 +119,29 @@ test("neon drift steers, scores, pauses, and retries", async ({ page }) => {
     .toBeLessThanOrEqual(mid?.score ?? 0);
   const after = await debugOf(page);
   expect(after?.runState).toBe("playing");
+  done();
+});
+
+test("neon drift keyboard-only movement", async ({ page }) => {
+  const done = attachConsoleGuard(page);
+  await waitReady(page, "neon-drift");
+  const before = await debugOf(page);
+  await page.keyboard.down("KeyW");
+  await page.keyboard.down("KeyD");
+  await expect
+    .poll(async () => {
+      const d = await debugOf(page);
+      if (!d || !before) return 0;
+      return Math.abs((d.playerAngle ?? 0) - (before.playerAngle ?? 0)) + Math.abs(d.playerX - before.playerX);
+    }, { timeout: 8_000 })
+    .toBeGreaterThan(2);
+  await page.keyboard.up("KeyD");
+  await page.keyboard.up("KeyW");
+  done();
 });
 
 test("velocity run moves, jumps, dies, and starts a new attempt", async ({ page }) => {
+  const done = attachConsoleGuard(page);
   await waitReady(page, "velocity-run");
   const before = await debugOf(page);
   await page.keyboard.down("KeyD");
@@ -100,12 +150,12 @@ test("velocity run moves, jumps, dies, and starts a new attempt", async ({ page 
     .toBeGreaterThan(before!.playerX);
   await page.keyboard.up("KeyD");
   const moved = await debugOf(page);
-  await cmd(page, "jump");
   await page.keyboard.down("Space");
   await expect
     .poll(async () => (await debugOf(page))?.playerY ?? moved!.playerY, { timeout: 8_000 })
     .not.toBe(moved!.playerY);
   await page.keyboard.up("Space");
+  await assertAlive(page);
 
   const jumped = await debugOf(page);
   const deathsBefore = jumped!.sessionDeaths ?? jumped!.deaths ?? 0;
@@ -118,9 +168,29 @@ test("velocity run moves, jumps, dies, and starts a new attempt", async ({ page 
     .toBeLessThan(50);
   const next = await debugOf(page);
   expect(next?.runState).toBe("playing");
+  done();
+});
+
+test("velocity run keyboard-only move and jump", async ({ page }) => {
+  const done = attachConsoleGuard(page);
+  await waitReady(page, "velocity-run");
+  const before = await debugOf(page);
+  await page.keyboard.down("KeyD");
+  await page.keyboard.down("Space");
+  await expect
+    .poll(async () => {
+      const d = await debugOf(page);
+      if (!d || !before) return 0;
+      return Math.abs(d.playerX - before.playerX) + Math.abs(d.playerY - before.playerY);
+    }, { timeout: 8_000 })
+    .toBeGreaterThan(2);
+  await page.keyboard.up("Space");
+  await page.keyboard.up("KeyD");
+  done();
 });
 
 test("swarm protocol moves, levels, and takes an upgrade", async ({ page }) => {
+  const done = attachConsoleGuard(page);
   await waitReady(page, "swarm-protocol");
   const before = await debugOf(page);
   await page.keyboard.down("KeyW");
@@ -132,6 +202,7 @@ test("swarm protocol moves, levels, and takes an upgrade", async ({ page }) => {
     })
     .toBeGreaterThan(4);
   await page.keyboard.up("KeyW");
+  await assertAlive(page);
 
   await cmd(page, "grantXp", 400);
   await expect.poll(async () => (await debugOf(page))?.runState).toBe("choosing");
@@ -139,4 +210,5 @@ test("swarm protocol moves, levels, and takes an upgrade", async ({ page }) => {
   await expect.poll(async () => (await debugOf(page))?.runState).toBe("playing");
   const after = await debugOf(page);
   expect(after!.level ?? 1).toBeGreaterThanOrEqual(2);
+  done();
 });
