@@ -67,12 +67,16 @@ console.log("W+A angle", afterWA.debug?.playerAngle);
 console.log("Space", afterSpace.debug?.speed, afterSpace.debug?.score, afterSpace.debug?.ended);
 
 await page.keyboard.up("Space");
+await page.keyboard.up("KeyW");
+await page.keyboard.up("KeyA");
+await page.keyboard.up("KeyD");
 if ((await inspect(page)).debug?.ended) {
   await page.keyboard.press("r");
   await page.waitForFunction(() => window.__GW_DEBUG__?.runState === "playing" && !window.__GW_DEBUG__?.ended, null, {
     timeout: 8000,
   });
   await page.locator("canvas").click({ position: { x: 420, y: 280 }, force: true });
+  await page.waitForTimeout(200);
   await page.keyboard.down("KeyW");
 }
 
@@ -81,7 +85,7 @@ const start = Date.now();
 let lastSteer = "D";
 while (Date.now() - start < 30000) {
   const now = await inspect(page);
-  if (now.debug?.ended || now.resultsUi) {
+  if (now.debug?.ended) {
     console.log("ended during 30s", now.debug?.score, now.debug?.ended, now.resultsUi);
     break;
   }

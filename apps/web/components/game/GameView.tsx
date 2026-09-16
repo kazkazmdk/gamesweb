@@ -170,6 +170,7 @@ export function GameView({ slug }: { slug: string }) {
       }
       if (e.key === "r" || e.key === "R") {
         setPaused(false);
+        setResult(null);
         phaser.current?.events.emit("platform-resume");
       }
     };
