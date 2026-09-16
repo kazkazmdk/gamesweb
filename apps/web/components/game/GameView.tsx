@@ -32,7 +32,10 @@ export function GameView({ slug }: { slug: string }) {
     metadata?: Record<string, number | string | boolean>;
   }>(null);
   const [intense, setIntense] = useState(false);
-  const historyLen = useRef<number | null>(null);
+  const historyLen = useRef(0);
+  const acceptHistory = useRef(false);
+  const historyCount = useRef(0);
+  historyCount.current = player.history.length;
   const runEndedAt = useRef(0);
   const retries = useRef(0);
   const loadedRef = useRef(false);
@@ -63,6 +66,8 @@ export function GameView({ slug }: { slug: string }) {
         loadedRef.current = true;
         setLoadPct(100);
         analytics.track("game_loaded", { gameId: game.id });
+        acceptHistory.current = true;
+        historyLen.current = historyCount.current;
         window.requestAnimationFrame(() => {
           const canvas = wrap.current?.querySelector("canvas");
           if (canvas instanceof HTMLCanvasElement) {
@@ -133,7 +138,7 @@ export function GameView({ slug }: { slug: string }) {
   }, [game, store, boot]);
 
   useEffect(() => {
-    if (historyLen.current === null) {
+    if (!acceptHistory.current) {
       historyLen.current = player.history.length;
       return;
     }
@@ -162,6 +167,10 @@ export function GameView({ slug }: { slug: string }) {
           phaser.current?.events.emit(next ? "platform-pause" : "platform-resume");
           return next;
         });
+      }
+      if (e.key === "r" || e.key === "R") {
+        setPaused(false);
+        phaser.current?.events.emit("platform-resume");
       }
     };
     const onVis = () => {
