@@ -1,5 +1,5 @@
 {
-  "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm --filter @gamesweb/web build",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "installCommand": "corepack enable && pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @gamesweb/web build"
 }
