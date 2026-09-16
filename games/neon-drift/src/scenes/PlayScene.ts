@@ -273,7 +273,6 @@ export class DriftPlayScene extends Phaser.Scene {
       if (Phaser.Input.Keyboard.JustDown(this.keys.two)) this.switchTrack(1);
       if (Phaser.Input.Keyboard.JustDown(this.keys.three)) this.switchTrack(2);
     }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.esc)) this.platform.pause.request();
     if (this.paused || this.ended) {
       this.draw(0);
       this.publishDebug(delta);

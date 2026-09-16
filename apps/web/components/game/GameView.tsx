@@ -32,7 +32,7 @@ export function GameView({ slug }: { slug: string }) {
     metadata?: Record<string, number | string | boolean>;
   }>(null);
   const [intense, setIntense] = useState(false);
-  const historyLen = useRef(player.history.length);
+  const historyLen = useRef<number | null>(null);
   const runEndedAt = useRef(0);
   const retries = useRef(0);
   const loadedRef = useRef(false);
@@ -133,6 +133,10 @@ export function GameView({ slug }: { slug: string }) {
   }, [game, store, boot]);
 
   useEffect(() => {
+    if (historyLen.current === null) {
+      historyLen.current = player.history.length;
+      return;
+    }
     if (player.history.length > historyLen.current) {
       const last = player.history[0];
       if (last && last.gameId === game?.id) {

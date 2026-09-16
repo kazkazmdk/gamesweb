@@ -5,7 +5,7 @@ test.describe("visual regression", () => {
   test("Games Home Neon 1440", async ({ page }) => {
     await stabilizeVisual(page, { width: 1440, height: 900 });
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Neon Drift" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Neon Drift" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Play|Continue/ }).first()).toBeVisible();
     await page.screenshot({ path: "test-results/visual-home-neon-1440.png", fullPage: false });
     await expect(page).toHaveScreenshot("home-neon-1440.png", shot);
@@ -15,7 +15,7 @@ test.describe("visual regression", () => {
     await stabilizeVisual(page, { width: 1440, height: 900 });
     await page.goto("/");
     await page.keyboard.press("ArrowRight");
-    await expect(page.getByRole("heading", { name: "Velocity Run" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Velocity Run" })).toBeVisible();
     await page.screenshot({ path: "test-results/visual-home-velocity-1440.png", fullPage: false });
     await expect(page).toHaveScreenshot("home-velocity-1440.png", shot);
   });
@@ -25,7 +25,7 @@ test.describe("visual regression", () => {
     await page.goto("/");
     await page.keyboard.press("ArrowRight");
     await page.keyboard.press("ArrowRight");
-    await expect(page.getByRole("heading", { name: "Swarm Protocol" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Swarm Protocol" })).toBeVisible();
     await page.screenshot({ path: "test-results/visual-home-swarm-1440.png", fullPage: false });
     await expect(page).toHaveScreenshot("home-swarm-1440.png", shot);
   });
@@ -33,7 +33,7 @@ test.describe("visual regression", () => {
   test("Games Home Neon 1920", async ({ page }) => {
     await stabilizeVisual(page, { width: 1920, height: 1080 });
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Neon Drift" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Neon Drift" })).toBeVisible();
     await page.screenshot({ path: "test-results/visual-home-neon-1920.png", fullPage: false });
     await expect(page).toHaveScreenshot("home-neon-1920.png", shot);
   });
@@ -41,7 +41,7 @@ test.describe("visual regression", () => {
   test("Games Home mobile 390", async ({ page }) => {
     await stabilizeVisual(page, { width: 390, height: 844 });
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Neon Drift" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Neon Drift" })).toBeVisible();
     await page.screenshot({ path: "test-results/visual-home-neon-390.png", fullPage: false });
     await expect(page).toHaveScreenshot("home-neon-390.png", shot);
   });
@@ -49,7 +49,7 @@ test.describe("visual regression", () => {
   test("Games Home Neon activities", async ({ page }) => {
     await stabilizeVisual(page, { width: 1440, height: 900 });
     await page.goto("/");
-    await page.getByRole("heading", { name: "Neon Drift" }).waitFor();
+    await page.getByRole("heading", { level: 1, name: "Neon Drift" }).waitFor();
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await expect(page.getByText("Activities")).toBeVisible();
     await page.screenshot({ path: "test-results/visual-home-neon-activities-1440.png", fullPage: false });
@@ -105,7 +105,7 @@ test.describe("visual regression", () => {
   test("Game Hub Neon 1440", async ({ page }) => {
     await stabilizeVisual(page, { width: 1440, height: 900 });
     await page.goto("/games/neon-drift");
-    await expect(page.getByRole("heading", { name: "Neon Drift" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Neon Drift" })).toBeVisible();
     await page.screenshot({ path: "test-results/visual-hub-neon-1440.png", fullPage: false });
     await expect(page).toHaveScreenshot("hub-neon-1440.png", shot);
   });

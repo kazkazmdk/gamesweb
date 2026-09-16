@@ -2,12 +2,12 @@ import { test, expect } from "@playwright/test";
 
 test("games home is focus-driven", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Neon Drift" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Neon Drift" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Play|Continue/ }).first()).toBeVisible();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("heading", { name: "Velocity Run" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Velocity Run" })).toBeVisible();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("heading", { name: "Swarm Protocol" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Swarm Protocol" })).toBeVisible();
 });
 
 test("desktop chrome stays console-minimal", async ({ page }) => {

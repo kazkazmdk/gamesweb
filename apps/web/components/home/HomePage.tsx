@@ -121,39 +121,41 @@ export default function HomePage() {
           <div className="mt-6">
             <QuickAction href={`/play/${game.slug}`}>{ctx.playLabel}</QuickAction>
           </div>
-          <p className="mt-3 text-[13px] text-white/55">{line || "Set a first record"}</p>
-          {modes.length > 1 ? (
-            <div className="relative mt-2">
+          <p className="mt-3 text-[13px] text-white/55">
+            {line || "Set a first record"}
+            {modes.length > 1 ? (
               <button
                 type="button"
-                className="text-[12px] text-white/45"
+                className="ml-3 text-[12px] text-white/40"
                 aria-expanded={modeOpen}
                 onClick={() => setModeOpen((v) => !v)}
               >
-                {modes.find((m) => String(playIndex) === m.id)?.label ?? "Mode"}
+                Change
               </button>
-              {modeOpen ? (
-                <div className="absolute left-0 top-7 z-10 min-w-[180px] bg-black/80 py-1" role="listbox">
-                  {modes.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      role="option"
-                      aria-selected={String(playIndex) === m.id}
-                      className={`block min-h-9 w-full px-3 text-left text-[12px] ${
-                        String(playIndex) === m.id ? "text-white" : "text-white/50"
-                      }`}
-                      onClick={() => {
-                        setPlayIndex(Number(m.id));
-                        savePlayIndex(game.id, Number(m.id));
-                        setModeOpen(false);
-                      }}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+            ) : null}
+          </p>
+          {modeOpen && modes.length > 1 ? (
+            <div className="relative">
+              <div className="absolute left-0 top-2 z-10 min-w-[180px] bg-black/80 py-1" role="listbox">
+                {modes.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    role="option"
+                    aria-selected={String(playIndex) === m.id}
+                    className={`block min-h-9 w-full px-3 text-left text-[12px] ${
+                      String(playIndex) === m.id ? "text-white" : "text-white/50"
+                    }`}
+                    onClick={() => {
+                      setPlayIndex(Number(m.id));
+                      savePlayIndex(game.id, Number(m.id));
+                      setModeOpen(false);
+                    }}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : null}
         </div>

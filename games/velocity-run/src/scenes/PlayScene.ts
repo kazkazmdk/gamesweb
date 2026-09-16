@@ -222,7 +222,6 @@ export class VelocityPlayScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.one)) this.switchCourse(0);
     if (Phaser.Input.Keyboard.JustDown(this.keys.two)) this.switchCourse(1);
     if (Phaser.Input.Keyboard.JustDown(this.keys.three)) this.switchCourse(2);
-    if (Phaser.Input.Keyboard.JustDown(this.keys.esc)) this.platform.pause.request();
     if (this.paused) {
       this.draw(dt);
       return;

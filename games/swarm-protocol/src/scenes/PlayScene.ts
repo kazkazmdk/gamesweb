@@ -260,7 +260,6 @@ export class SwarmPlayScene extends Phaser.Scene {
       this.retry();
       return;
     }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.esc)) this.platform.pause.request();
     if (this.paused && !this.choosing) {
       this.draw(dt);
       return;
