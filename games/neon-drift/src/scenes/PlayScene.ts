@@ -261,7 +261,7 @@ export class DriftPlayScene extends Phaser.Scene {
 
     const native = this.nativeKeys?.read();
     if (Phaser.Input.Keyboard.JustDown(this.keys.r) || native?.retryPressed) {
-      if (!this.ended) this.retry();
+      this.retry();
       return;
     }
     if (Phaser.Input.Keyboard.JustDown(this.keys.g)) {
