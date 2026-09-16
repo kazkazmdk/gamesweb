@@ -99,15 +99,14 @@ export function ArcadeHub() {
         <section className="lg:col-span-12">
           <SectionHeader title="Recent records" />
           <div className="mt-4 flex gap-4 overflow-x-auto scrollbar-none md:grid md:grid-cols-3 md:overflow-visible">
-            {records.length ? (
-              records.map((r) => (
-                <div key={r.game.id} className="min-w-[260px]">
-                  <RecordWidget game={r.game} score={r.rec.score} modeLabel={r.rec.mode} />
+            {GAME_MANIFESTS.map((g) => {
+              const rec = records.find((r) => r.game.id === g.id)?.rec;
+              return (
+                <div key={g.id} className="min-w-[260px]">
+                  <RecordWidget game={g} score={rec?.score ?? 0} modeLabel={rec?.mode} />
                 </div>
-              ))
-            ) : (
-              <EmptyState title="No records yet" body="Finish a run to pin a personal best." action={<QuickAction href="/">Play</QuickAction>} />
-            )}
+              );
+            })}
           </div>
         </section>
 

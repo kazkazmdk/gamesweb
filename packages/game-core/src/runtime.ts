@@ -26,6 +26,11 @@ export type GwDebugState = {
   canvasW?: number;
   canvasH?: number;
   inputSource?: string;
+  lateral?: number;
+  headingError?: number;
+  surface?: string;
+  drifting?: boolean;
+  lookError?: number;
 };
 
 export type GwDebugCommands = {
@@ -35,6 +40,7 @@ export type GwDebugCommands = {
   finishRun?: () => void;
   setDrive?: (throttle: number, steer: number) => void;
   jump?: () => void;
+  hideHud?: () => void;
 };
 
 type GwDebugWindow = Window & {

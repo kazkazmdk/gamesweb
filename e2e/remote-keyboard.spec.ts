@@ -11,6 +11,10 @@ type GwDebug = {
   speed?: number;
   throttle?: number;
   tick?: number;
+  ended?: boolean;
+  headingError?: number;
+  lateral?: number;
+  lookError?: number;
 };
 
 async function debugOf(page: Page): Promise<GwDebug | null> {
@@ -63,6 +67,44 @@ test("remote neon keyboard drive", async ({ page }) => {
   await page.keyboard.press("r");
   await expect.poll(async () => (await debugOf(page))?.paused).toBe(false);
   expect(errors, errors.join("\n")).toEqual([]);
+});
+
+test("remote neon 30s keyboard session", async ({ page }) => {
+  test.setTimeout(90_000);
+  await waitReady(page, "neon-drift");
+  await page.keyboard.down("KeyW");
+  const startScore = (await debugOf(page))?.score ?? 0;
+  const start = Date.now();
+  while (Date.now() - start < 30_000) {
+    const d = await debugOf(page);
+    expect(d?.ended, "crashed during 30s session").toBeFalsy();
+    const cmd = d?.lookError ?? d?.headingError ?? 0;
+    if (cmd > 0.06) {
+      await page.keyboard.up("KeyD");
+      await page.keyboard.down("KeyA");
+    } else if (cmd < -0.06) {
+      await page.keyboard.up("KeyA");
+      await page.keyboard.down("KeyD");
+    } else {
+      await page.keyboard.up("KeyA");
+      await page.keyboard.up("KeyD");
+    }
+    if (Math.abs(cmd) > 0.5) await page.keyboard.up("KeyW");
+    else await page.keyboard.down("KeyW");
+    if (Math.abs(cmd) > 0.28 && (d?.speed ?? 0) > 120) {
+      await page.keyboard.down("Space");
+    } else {
+      await page.keyboard.up("Space");
+    }
+    await page.waitForTimeout(16);
+  }
+  await page.keyboard.up("Space");
+  await page.keyboard.up("KeyA");
+  await page.keyboard.up("KeyD");
+  await page.keyboard.up("KeyW");
+  const end = await debugOf(page);
+  expect(end?.ended).toBeFalsy();
+  expect(end?.score ?? 0).toBeGreaterThan(startScore);
 });
 
 test("remote velocity keyboard", async ({ page }) => {

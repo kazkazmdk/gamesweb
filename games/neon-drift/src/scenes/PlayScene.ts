@@ -542,6 +542,11 @@ export class DriftPlayScene extends Phaser.Scene {
 
   private publishDebug(delta: number) {
     this.longFrames = countLongFrame(delta, this.longFrames);
+    const q = this.samples?.length ? queryTrack(this.samples, this.car.x, this.car.y) : null;
+    const trackHeading = q ? Math.atan2(q.nearest.ty, q.nearest.tx) : this.car.angle;
+    let headingError = this.car.angle - trackHeading;
+    while (headingError > Math.PI) headingError -= Math.PI * 2;
+    while (headingError < -Math.PI) headingError += Math.PI * 2;
     publishGwDebug(
       {
         gameId: "neon-drift",
@@ -565,12 +570,32 @@ export class DriftPlayScene extends Phaser.Scene {
         canvasW: this.scale.width,
         canvasH: this.scale.height,
         inputSource: this.testDrive ? "debug" : this.nativeKeys?.driving() ? "native" : "phaser",
+        lateral: q?.lateral,
+        headingError,
+        surface: q?.surface,
+        drifting: this.car.drifting,
+        lookError: (() => {
+          if (!q || !this.samples.length) return headingError;
+          const look = this.samples[(q.index + 18) % this.samples.length];
+          const lookHeading = Math.atan2(look.ty, look.tx);
+          let err = this.car.angle - lookHeading;
+          while (err > Math.PI) err -= Math.PI * 2;
+          while (err < -Math.PI) err += Math.PI * 2;
+          return err;
+        })(),
       },
       {
         finishRun: () => this.finish("finish"),
         setDrive: (throttle: number, steer: number) => {
           this.paused = false;
           this.testDrive = { throttle, steer };
+        },
+        hideHud: () => {
+          this.hud.setVisible(false);
+          this.overlay.setVisible(false);
+          this.hint.setVisible(false);
+          this.deltaTxt.setVisible(false);
+          this.floaterGfx.forEach((t) => t.setVisible(false));
         },
       },
     );

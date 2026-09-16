@@ -601,6 +601,10 @@ export class VelocityPlayScene extends Phaser.Scene {
         jump: () => {
           this.touchJump = true;
         },
+        hideHud: () => {
+          this.hud.setVisible(false);
+          this.overlay.setVisible(false);
+        },
       },
     );
   }

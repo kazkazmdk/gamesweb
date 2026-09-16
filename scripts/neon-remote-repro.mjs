@@ -25,6 +25,23 @@ async function inspect(page) {
   });
 }
 
+async function applySteer(page, cmd, speed) {
+  if (cmd > 0.06) {
+    await page.keyboard.up("KeyD");
+    await page.keyboard.down("KeyA");
+  } else if (cmd < -0.06) {
+    await page.keyboard.up("KeyA");
+    await page.keyboard.down("KeyD");
+  } else {
+    await page.keyboard.up("KeyA");
+    await page.keyboard.up("KeyD");
+  }
+  if (Math.abs(cmd) > 0.5) await page.keyboard.up("KeyW");
+  else await page.keyboard.down("KeyW");
+  if (Math.abs(cmd) > 0.28 && speed > 120) await page.keyboard.down("Space");
+  else await page.keyboard.up("Space");
+}
+
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 await page.addInitScript(() => {
@@ -64,7 +81,7 @@ await page.keyboard.up("Space");
 console.log("W throttle/speed", t0.debug?.throttle, afterW.debug?.throttle, t0.debug?.speed, afterW.debug?.speed);
 console.log("W+D angle", t0.debug?.playerAngle, afterWD.debug?.playerAngle);
 console.log("W+A angle", afterWA.debug?.playerAngle);
-console.log("Space", afterSpace.debug?.speed, afterSpace.debug?.score, afterSpace.debug?.ended);
+console.log("Space", afterSpace.debug?.speed, afterSpace.debug?.score, afterSpace.debug?.ended, afterSpace.debug?.inputSource);
 
 await page.keyboard.up("Space");
 await page.keyboard.up("KeyW");
@@ -77,28 +94,20 @@ if ((await inspect(page)).debug?.ended) {
   });
   await page.locator("canvas").click({ position: { x: 420, y: 280 }, force: true });
   await page.waitForTimeout(200);
-  await page.keyboard.down("KeyW");
 }
 
+await page.keyboard.down("KeyW");
 const startScore = (await inspect(page)).debug?.score ?? 0;
 const start = Date.now();
-let lastSteer = "D";
 while (Date.now() - start < 30000) {
   const now = await inspect(page);
   if (now.debug?.ended) {
-    console.log("ended during 30s", now.debug?.score, now.debug?.ended, now.resultsUi);
+    console.log("ended during 30s", now.debug?.score, now.debug?.ended, now.resultsUi, now.debug?.surface);
     break;
   }
-  if (lastSteer === "D") {
-    await page.keyboard.up("KeyA");
-    await page.keyboard.down("KeyD");
-    lastSteer = "A";
-  } else {
-    await page.keyboard.up("KeyD");
-    await page.keyboard.down("KeyA");
-    lastSteer = "D";
-  }
-  await page.waitForTimeout(800);
+  const heading = now.debug?.lookError ?? now.debug?.headingError ?? 0;
+  await applySteer(page, heading, now.debug?.speed ?? 0);
+  await page.waitForTimeout(16);
 }
 await page.keyboard.up("Space");
 await page.keyboard.up("KeyA");
@@ -114,6 +123,9 @@ console.log("30s", {
   ended: end.debug?.ended,
   tick: end.debug?.tick,
   resultsUi: end.resultsUi,
+  headingError: end.debug?.headingError,
+  lateral: end.debug?.lateral,
+  surface: end.debug?.surface,
 });
 
 await page.keyboard.press("Escape");
@@ -144,8 +156,10 @@ console.log("direct W", {
   after: d1.debug?.throttle,
   speed0: d0.debug?.speed,
   speed1: d1.debug?.speed,
+  source: d1.debug?.inputSource,
 });
 
 console.log("errors", errors);
 if (errors.length) process.exitCode = 1;
+if (end.debug?.ended) process.exitCode = 1;
 await browser.close();

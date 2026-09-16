@@ -8,7 +8,7 @@ if (!baseURL) {
 export default defineConfig({
   testDir: "./e2e",
   testMatch: /remote-keyboard\.spec\.ts/,
-  timeout: 60_000,
+  timeout: 90_000,
   retries: 1,
   use: {
     baseURL,

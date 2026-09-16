@@ -41,7 +41,7 @@ function SelfProfile() {
   const lv = levelFromXp(player.xp);
   const stats = playerStatsFromSnapshot(player);
   const favorite = favoriteGameId(player);
-  const favoriteGame = favorite ? getManifest(favorite) : null;
+  const favoriteGame = (favorite ? getManifest(favorite) : null) ?? GAME_MANIFESTS[0];
   const showcase = latestUnlocks(player, 3);
   const activity = activityFromHistory(player.history, 10);
   const friends = player.friends.filter((f) => f.status === "accepted").length;
@@ -64,7 +64,9 @@ function SelfProfile() {
               @{player.username} · {formatLevel(lv.level)}
               {player.streak > 0 ? ` · ${player.streak} day streak` : ""}
             </p>
-            {favoriteGame ? <p className="mt-2 text-[13px] text-[var(--text-dim)]">Main game · {favoriteGame.title}</p> : null}
+            {favorite && favoriteGame ? (
+              <p className="mt-2 text-[13px] text-[var(--text-dim)]">Main game · {favoriteGame.title}</p>
+            ) : null}
           </div>
         </div>
         <div className="mt-4">

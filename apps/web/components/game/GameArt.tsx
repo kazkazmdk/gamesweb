@@ -1,7 +1,7 @@
 const POSITION: Record<string, Record<string, string>> = {
   "neon-drift": { backdrop: "48% 52%", hero: "46% 58%", tile: "46% 58%" },
   "velocity-run": { backdrop: "22% 68%", hero: "18% 70%", tile: "20% 68%" },
-  "swarm-protocol": { backdrop: "82% 58%", hero: "88% 62%", tile: "84% 58%" },
+  "swarm-protocol": { backdrop: "92% 42%", hero: "70% 50%", tile: "60% 48%" },
 };
 
 export function GameArt({

@@ -968,6 +968,10 @@ export class SwarmPlayScene extends Phaser.Scene {
           this.bossDown = true;
           this.die();
         },
+        hideHud: () => {
+          this.hud.setVisible(false);
+          this.overlay.setVisible(false);
+        },
       },
     );
   }

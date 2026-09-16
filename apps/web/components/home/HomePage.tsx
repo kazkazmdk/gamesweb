@@ -69,7 +69,7 @@ export default function HomePage() {
 
   const modes = playModeOptions(game.id);
   const fade = reduced ? "" : "duration-[320ms] ease-[var(--ease-out)]";
-  const line = [ctx.modeLabel, ctx.pbLabel ? `Personal best ${ctx.pbLabel}` : null].filter(Boolean).join(" · ");
+  const line = ctx.pbLabel ? `${ctx.modeLabel} · Personal best ${ctx.pbLabel}` : ctx.modeLabel;
 
   return (
     <div className="relative min-h-dvh" data-testid="games-home">
