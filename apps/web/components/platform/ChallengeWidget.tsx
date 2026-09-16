@@ -4,7 +4,6 @@ import { GameArt } from "@/components/game/GameArt";
 import type { ChallengeView } from "@/lib/platform/adapters";
 import { ProgressWidget } from "./ProgressWidget";
 import { QuickAction } from "./QuickAction";
-import { StatusPill } from "./StatusPill";
 
 export function ChallengeWidget({
   view,
@@ -15,38 +14,36 @@ export function ChallengeWidget({
 }) {
   const done = view.done;
   const href = view.slug ? `/play/${view.slug}` : "/";
-  const tone = done ? "completed" : variant;
+  const featured = variant === "full";
 
   return (
-    <article className={done ? "gw-complete relative overflow-hidden" : "relative overflow-hidden"}>
-      {tone === "full" && view.slug ? (
-        <div className="pointer-events-none absolute inset-0 opacity-25">
-          <GameArt slug={view.slug} className="h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-[var(--bg)]/70" />
+    <article className={`relative overflow-hidden ${featured ? "min-h-[240px]" : "min-h-[132px]"}`}>
+      {view.slug ? (
+        <div className="absolute inset-0">
+          <GameArt slug={view.slug} variant={featured ? "hero" : "tile"} className="h-full w-full" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/20" />
         </div>
       ) : null}
-      <div className="relative py-3">
-        <div className="flex items-center justify-between gap-3">
-          <p className="meta">{done ? "Completed" : view.gameTitle ?? "Daily"}</p>
-          {done ? <StatusPill kind="complete" /> : <p className="meta">+{view.quest.xp} XP</p>}
+      <div className="relative flex h-full flex-col justify-between p-4 md:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <p className="meta text-white/65">{done ? "Complete" : view.gameTitle ?? "Daily"}</p>
+          <p className="text-[12px] text-[var(--accent)]">{done ? "Claimed" : `+${view.quest.xp} XP`}</p>
         </div>
-        <h3 className="display mt-2 text-[26px] md:text-[32px]">{view.quest.title}</h3>
-        {variant === "full" ? (
-          <p className="mt-1 max-w-md text-[13px] text-[var(--text-dim)]">{view.quest.description}</p>
-        ) : null}
-        <p className="stat mt-4 text-[28px] md:text-[36px]">
-          {view.currentLabel}
-          <span className="ml-2 text-[13px] font-normal text-[var(--text-faint)]">/ {view.targetLabel}</span>
-        </p>
-        <div className="mt-3">
-          <ProgressWidget value={view.progress} max={view.quest.target} size={variant === "full" ? "md" : "sm"} />
-        </div>
-        <div className="mt-4">
-          {done ? (
-            <p className="text-[13px] text-[var(--ok)]">Reward claimed</p>
-          ) : (
-            <QuickAction href={href}>{view.gameTitle ? `Play ${view.gameTitle}` : "Play"}</QuickAction>
-          )}
+        <div>
+          <h3 className={`text-white ${featured ? "display mt-6 text-[32px]" : "mt-3 text-[20px] tracking-[-0.03em]"}`}>
+            {view.quest.title}
+          </h3>
+          {featured ? <p className="mt-1 max-w-md text-[13px] text-white/65">{view.quest.description}</p> : null}
+          <div className="mt-4 max-w-sm">
+            <p className="stat text-[24px] text-white">
+              {view.currentLabel}
+              <span className="ml-2 text-[12px] font-normal text-white/45">/ {view.targetLabel}</span>
+            </p>
+            <ProgressWidget value={view.progress} max={view.quest.target} size="sm" />
+          </div>
+          <div className="mt-4">
+            {done ? <p className="text-[13px] text-[var(--ok)]">Reward claimed</p> : <QuickAction href={href}>{view.gameTitle ? `Play ${view.gameTitle}` : "Play"}</QuickAction>}
+          </div>
         </div>
       </div>
     </article>

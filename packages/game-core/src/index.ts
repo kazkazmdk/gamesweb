@@ -1,6 +1,8 @@
 export { Juice, ParticlePool, FloatingTextPool, springScale, audioPitchVariation } from "./juice";
 export { publishGwDebug, clearGwDebug, countLongFrame } from "./runtime";
 export type { GwDebugState, GwDebugCommands } from "./runtime";
+export { createGameKeyboard } from "./keyboard";
+export type { GameKeyboard, GameKeyState } from "./keyboard";
 export type { Particle, FloatingText } from "./juice";
 export { Synth, createSynth } from "./audio";
 export type { MixerSettings } from "./audio";

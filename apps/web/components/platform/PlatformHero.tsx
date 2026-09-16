@@ -34,7 +34,7 @@ export function PlatformHero({
       <div className={`relative flex ${height} flex-col justify-end px-5 pb-10 pt-10 md:px-10 md:pb-16`}>
         {kicker ? <p className="meta text-white/55">{kicker}</p> : null}
         {context}
-        <h1 className="display mt-4 max-w-[16ch] text-[56px] md:text-[88px]">{title}</h1>
+        <h1 className="display mt-4 max-w-[16ch] text-[40px] md:text-[56px]">{title}</h1>
         {tagline ? <p className="mt-3 max-w-md text-[16px] text-white/75">{tagline}</p> : null}
         {metrics ? <p className="mt-4 text-[13px] text-white/55">{metrics}</p> : null}
         {actions ? <div className="mt-6 flex flex-wrap items-center gap-3">{actions}</div> : null}

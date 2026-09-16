@@ -23,7 +23,11 @@
   --motion-fast: 160ms;
   --motion-standard: 260ms;
   --motion-large: 450ms;
-  --header-h: 64px;
+  --header-h: 56px;
+  --surf-base: #0c0c0d;
+  --surf-float: color-mix(in srgb, #141416 82%, transparent);
+  --surf-interactive: color-mix(in srgb, #1a1a1c 70%, transparent);
+  --surf-selected: color-mix(in srgb, var(--accent) 18%, #141416);
   --bottom-nav: 64px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);

@@ -23,8 +23,7 @@ import {
   latestUnlocks,
   playerStatsFromSnapshot,
 } from "@/lib/platform/adapters";
-import { boardModeOptions } from "@/lib/platform/modes";
-import { formatLevel, formatPlayScore, formatRelativeTime, hasRecord } from "@/lib/platform/format";
+import { formatLevel, formatPlayScore, formatRelativeTime } from "@/lib/platform/format";
 import { playerApi } from "@/lib/player-api";
 import type { PublicProfileView } from "@/lib/platform/focus";
 
@@ -89,7 +88,7 @@ function SelfProfile() {
           />
         </div>
 
-        <RecordsBlock playerId="self" />
+        <RecordsBlock />
 
         <section className="mt-12">
           <SectionHeader title="Latest unlocks" action={<QuickAction href="/achievements" tone="quiet">All</QuickAction>} />
@@ -98,7 +97,14 @@ function SelfProfile() {
               <AchievementStrip
                 unlocked={stats.achievements}
                 total={allAchievements().length}
-                items={showcase.map((a) => ({ key: a.key, name: a.name, description: a.description, unlocked: true }))}
+                items={showcase.map((a) => ({
+                  key: a.key,
+                  name: a.name,
+                  description: a.description,
+                  unlocked: true,
+                  gameId: a.gameId ?? "platform",
+                  xp: a.xp,
+                }))}
                 showcase
               />
             ) : (
@@ -118,38 +124,18 @@ function SelfProfile() {
   );
 }
 
-function RecordsBlock({ scores }: { playerId: string; scores?: PublicProfileView["records"] }) {
+function RecordsBlock({ scores }: { scores?: PublicProfileView["records"] }) {
   const player = usePlayer();
   return (
     <section className="mt-12">
       <SectionHeader title="Records" />
-      <div className="mt-6 space-y-8">
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
         {GAME_MANIFESTS.map((g) => {
-          const modes = boardModeOptions(g.id).filter((m) => m.id !== "circuit");
-          const rows = modes
-            .map((m) => {
-              const rec = scores
-                ? scores.find((s) => s.gameId === g.id && s.mode === m.id)
-                : gameRecordFor(player, g.id, m.id);
-              const score = rec && "score" in rec ? rec.score : 0;
-              return { mode: m, score };
-            })
-            .filter((r) => hasRecord(r.score));
-          if (!rows.length) {
-            return (
-              <div key={g.id}>
-                <p className="meta">{g.title}</p>
-                <EmptyState title={`No ${g.title} record`} body="Play a mode to pin a time or score." action={<QuickAction href={`/play/${g.slug}`}>Play</QuickAction>} />
-              </div>
-            );
-          }
-          return (
-            <div key={g.id} className="space-y-4">
-              {rows.map((r) => (
-                <RecordWidget key={`${g.id}-${r.mode.id}`} game={g} score={r.score} modeLabel={r.mode.label} />
-              ))}
-            </div>
-          );
+          const rec = scores
+            ? scores.find((s) => s.gameId === g.id)
+            : gameRecordFor(player, g.id);
+          const score = rec && "score" in rec ? rec.score : 0;
+          return <RecordWidget key={g.id} game={g} score={score} modeLabel={rec && "mode" in rec ? rec.mode : undefined} />;
         })}
       </div>
     </section>
@@ -238,7 +224,7 @@ function PublicProfile({ username }: { username: string }) {
         </div>
       ) : null}
 
-      <RecordsBlock playerId={data.username} scores={data.records} />
+      <RecordsBlock scores={data.records} />
 
       <section className="mt-12">
         <SectionHeader title="Achievements" />
@@ -247,7 +233,14 @@ function PublicProfile({ username }: { username: string }) {
             <AchievementStrip
               unlocked={unlocked.length}
               total={allAchievements().length}
-              items={unlocked.slice(0, 3).map((a) => ({ key: a.key, name: a.name, description: a.description, unlocked: true }))}
+              items={unlocked.slice(0, 3).map((a) => ({
+                key: a.key,
+                name: a.name,
+                description: a.description,
+                unlocked: true,
+                gameId: a.gameId ?? "platform",
+                xp: a.xp,
+              }))}
               showcase
             />
           ) : (

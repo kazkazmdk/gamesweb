@@ -5,12 +5,11 @@ import { levelFromXp } from "@gamesweb/config";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GameArt } from "@/components/game/GameArt";
-import { GameModeSelector, QuickAction } from "@/components/platform";
+import { ActivityCard, ActivityRail, QuickAction } from "@/components/platform";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
 import { focusedGameContext } from "@/lib/platform/focus";
-import { formatLevel } from "@/lib/platform/format";
-import { boardModeFromPlayIndex, loadPlayIndex, playModeOptions, savePlayIndex } from "@/lib/platform/modes";
+import { loadPlayIndex, playModeOptions, savePlayIndex } from "@/lib/platform/modes";
 
 export default function HomePage() {
   const player = usePlayer();
@@ -18,6 +17,7 @@ export default function HomePage() {
   const router = useRouter();
   const [focus, setFocus] = useState(0);
   const [playIndex, setPlayIndex] = useState(0);
+  const [modeOpen, setModeOpen] = useState(false);
   const game = GAME_MANIFESTS[focus] ?? GAME_MANIFESTS[0];
   useAccent(game.accent);
   const lv = levelFromXp(player.xp);
@@ -27,7 +27,7 @@ export default function HomePage() {
     setPlayIndex(loadPlayIndex(game.id));
   }, [game.id]);
 
-  const board = store.leaderboard(game.id, boardModeFromPlayIndex(game.id, playIndex));
+  const board = store.leaderboard(game.id, focusedGameContext(player, game, playIndex, []).boardMode);
   const ctx = useMemo(
     () => focusedGameContext(player, game, playIndex, board),
     [player, game, playIndex, board],
@@ -67,65 +67,27 @@ export default function HomePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [focus, game.slug, router, setFocusSafe]);
 
-  const onlineFriends = player.friends.filter((f) => f.status === "accepted" && f.presence !== "offline").length;
   const modes = playModeOptions(game.id);
-  const next = GAME_MANIFESTS[(focus + 1) % GAME_MANIFESTS.length];
-  const fade = reduced ? "" : "duration-300";
+  const fade = reduced ? "" : "duration-[320ms] ease-[var(--ease-out)]";
+  const line = [ctx.modeLabel, ctx.pbLabel ? `Personal best ${ctx.pbLabel}` : null].filter(Boolean).join(" · ");
 
   return (
-    <div className="relative md:min-h-[calc(100dvh-var(--header-h))]" data-testid="games-home">
-      <div
-        className={`relative h-[42vh] overflow-hidden md:absolute md:inset-0 md:h-auto ${reduced ? "" : "transition-opacity duration-[280ms]"}`}
-      >
-        <GameArt slug={game.slug} variant="backdrop" className="absolute inset-0 h-full w-full origin-center object-cover max-md:scale-125 max-md:object-[68%_42%] md:object-[78%_46%]" />
-        {next && next.id !== game.id ? (
-          <div className="pointer-events-none absolute inset-0 opacity-0" aria-hidden>
-            <GameArt slug={next.slug} variant="backdrop" className="h-full w-full" />
-          </div>
-        ) : null}
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-full md:w-[48%]">
-          <div className="h-full bg-gradient-to-r from-[var(--bg)] via-[color-mix(in_srgb,var(--bg)_62%,transparent)] to-transparent" />
-        </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[var(--bg)] to-transparent md:hidden" />
+    <div className="relative min-h-dvh" data-testid="games-home">
+      <div className={`absolute inset-0 overflow-hidden ${reduced ? "" : "transition-opacity duration-[320ms]"}`}>
+        <GameArt
+          slug={game.slug}
+          variant="backdrop"
+          className="absolute inset-0 h-full w-full max-md:scale-125 max-md:object-[62%_38%]"
+        />
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-[min(52%,36rem)] bg-gradient-to-r from-black/70 via-black/28 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/55 to-transparent" />
       </div>
 
-      <div className="relative flex flex-col px-5 pb-8 pt-4 md:min-h-[calc(100dvh-var(--header-h))] md:px-10 md:pb-12">
-        <div className="flex items-center justify-between gap-4 text-[12px] text-white/60">
-          <p>
-            {formatLevel(lv.level)}
-            {player.streak > 0 ? ` · ${player.streak}d streak` : ""}
-            {onlineFriends > 0 ? ` · ${onlineFriends} online` : ""}
-          </p>
-        </div>
-
-        <div className={`mt-6 max-w-xl md:order-2 md:mt-auto md:pt-10 ${reduced ? "" : "transition-all duration-300"}`}>
-          <p className="meta text-white/55">{game.genre}</p>
-          <h1 className="display mt-2 text-[44px] text-white md:mt-3 md:text-[88px]">{game.title}</h1>
-          <p className="mt-2 max-w-md text-[15px] text-white/75 md:mt-3 md:text-[16px]">{game.tagline}</p>
-
-          <div className="mt-6 flex flex-wrap items-center gap-3 md:mt-8">
-            <QuickAction href={`/play/${game.slug}`}>{ctx.playLabel}</QuickAction>
-            <QuickAction href={`/games/${game.slug}`} tone="quiet">
-              Game Hub
-            </QuickAction>
-          </div>
-        </div>
-
+      <div className="relative flex min-h-dvh flex-col px-5 pb-28 pt-[calc(var(--header-h)+12px)] md:px-10 md:pb-16">
         <div
-          className={`mt-5 flex items-end gap-3 overflow-x-auto pb-3 scrollbar-none md:order-1 md:mt-6 ${fade}`}
+          className={`flex items-end gap-3 overflow-x-auto pb-1 scrollbar-none ${fade}`}
           role="listbox"
           aria-label="Games"
-          onTouchStart={(e) => {
-            const x = e.changedTouches[0]?.clientX ?? 0;
-            (e.currentTarget as HTMLElement).dataset.x = String(x);
-          }}
-          onTouchEnd={(e) => {
-            const start = Number((e.currentTarget as HTMLElement).dataset.x ?? 0);
-            const x = e.changedTouches[0]?.clientX ?? start;
-            const dx = x - start;
-            if (dx < -40) setFocusSafe(focus + 1);
-            if (dx > 40) setFocusSafe(focus - 1);
-          }}
         >
           {GAME_MANIFESTS.map((g, i) => {
             const on = i === focus;
@@ -135,51 +97,128 @@ export default function HomePage() {
                 type="button"
                 role="option"
                 aria-selected={on}
+                aria-label={g.title}
                 onClick={() => setFocus(i)}
-                className={`relative shrink-0 overflow-hidden rounded-sm transition-[width,opacity,transform] ${
-                  reduced ? "" : "duration-300"
-                } ${on ? "w-[168px] md:w-[200px] opacity-100" : "w-[96px] md:w-[112px] opacity-55"}`}
+                className={`relative shrink-0 overflow-hidden transition-[width,height,opacity] ${fade} ${
+                  on ? "h-[88px] w-[148px] opacity-100 md:h-[104px] md:w-[188px]" : "h-[64px] w-[72px] opacity-70 md:h-[72px] md:w-[84px]"
+                }`}
               >
-                <span className="block aspect-[16/10]">
-                  <GameArt slug={g.slug} variant="tile" className="h-full w-full" />
-                </span>
-                <span className={`mt-2 block text-left text-[12px] ${on ? "text-white" : "text-white/55"}`}>{g.title}</span>
+                <GameArt slug={g.slug} variant="tile" className="h-full w-full" />
+                {on ? (
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5 text-left text-[11px] text-white">
+                    {g.title}
+                  </span>
+                ) : null}
               </button>
             );
           })}
         </div>
 
-        <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-4 md:order-3 md:mt-8 md:gap-y-5">
-          <Metric label="PB" value={ctx.pbLabel ?? "—"} />
-          <Metric label="Mode" value={ctx.modeLabel} />
-          {ctx.friendBest?.scoreLabel ? (
-            <Metric label="Friend best" value={`${ctx.friendBest.name} ${ctx.friendBest.scoreLabel}`} />
+        <div className={`mt-auto max-w-lg pb-6 pt-16 ${reduced ? "" : "transition-all duration-[300ms]"}`}>
+          <p className="meta text-white/60">{game.genre}</p>
+          <h1 className="display mt-2 text-[40px] text-white md:text-[56px]">{game.title}</h1>
+          <p className="mt-2 max-w-sm text-[15px] text-white/72">{game.tagline}</p>
+          <div className="mt-6">
+            <QuickAction href={`/play/${game.slug}`}>{ctx.playLabel}</QuickAction>
+          </div>
+          <p className="mt-3 text-[13px] text-white/55">{line || "Set a first record"}</p>
+          {modes.length > 1 ? (
+            <div className="relative mt-2">
+              <button
+                type="button"
+                className="text-[12px] text-white/45"
+                aria-expanded={modeOpen}
+                onClick={() => setModeOpen((v) => !v)}
+              >
+                {modes.find((m) => String(playIndex) === m.id)?.label ?? "Mode"}
+              </button>
+              {modeOpen ? (
+                <div className="absolute left-0 top-7 z-10 min-w-[180px] bg-black/80 py-1" role="listbox">
+                  {modes.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      role="option"
+                      aria-selected={String(playIndex) === m.id}
+                      className={`block min-h-9 w-full px-3 text-left text-[12px] ${
+                        String(playIndex) === m.id ? "text-white" : "text-white/50"
+                      }`}
+                      onClick={() => {
+                        setPlayIndex(Number(m.id));
+                        savePlayIndex(game.id, Number(m.id));
+                        setModeOpen(false);
+                      }}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           ) : null}
-          {ctx.daily ? <Metric label="Daily" value={`${ctx.daily.current} / ${ctx.daily.target}`} /> : null}
-        </dl>
-
-        <div className="mt-5 hidden max-w-lg md:order-4 md:block">
-          <GameModeSelector
-            label={game.id === "neon-drift" ? "Track" : game.id === "velocity-run" ? "Course" : "Mode"}
-            options={modes}
-            value={String(playIndex)}
-            onChange={(id) => {
-              const index = Number(id);
-              setPlayIndex(index);
-              savePlayIndex(game.id, index);
-            }}
-          />
         </div>
       </div>
-    </div>
-  );
-}
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="meta text-white/45">{label}</dt>
-      <dd className="stat mt-1 text-[24px] text-white md:text-[36px]">{value}</dd>
+      <section className="relative px-5 pb-16 md:px-10" aria-label="Activities">
+        <p className="meta">Activities</p>
+        <div className="mt-4">
+          <ActivityRail>
+            {ctx.daily ? (
+              <ActivityCard
+                featured
+                slug={game.slug}
+                kicker="Daily"
+                title={ctx.daily.label}
+                progress={Number(ctx.daily.current.replace(/[^\d.-]/g, "")) || 0}
+                target={Number(ctx.daily.target.replace(/[^\d.-]/g, "")) || 1}
+                reward={ctx.daily.done ? "Complete" : "+XP"}
+                href={`/play/${game.slug}`}
+                cta={ctx.daily.done ? "Replay" : "Continue"}
+              />
+            ) : (
+              <ActivityCard
+                featured
+                slug={game.slug}
+                kicker="Session"
+                title={game.title}
+                meta={`${lv.level} · set a first record`}
+                href={`/play/${game.slug}`}
+                cta={ctx.playLabel}
+              />
+            )}
+            {ctx.nextTrophy ? (
+              <ActivityCard
+                slug={game.slug}
+                kicker="Next trophy"
+                title={ctx.nextTrophy.name}
+                meta={ctx.nextTrophy.description}
+                href={`/achievements`}
+                cta="Trophies"
+                reward=""
+              />
+            ) : null}
+            {ctx.friendBest?.scoreLabel ? (
+              <ActivityCard
+                slug={game.slug}
+                kicker="Friend score"
+                title={ctx.friendBest.name}
+                meta={ctx.friendBest.scoreLabel}
+                href={`/friends`}
+                cta="Friends"
+              />
+            ) : (
+              <ActivityCard
+                slug={game.slug}
+                kicker="Record"
+                title={ctx.pbLabel ? ctx.pbLabel : "No record yet"}
+                meta={ctx.pbLabel ? ctx.modeLabel : `Set your first ${game.title} score.`}
+                href={`/play/${game.slug}`}
+                cta="Play"
+              />
+            )}
+          </ActivityRail>
+        </div>
+      </section>
     </div>
   );
 }

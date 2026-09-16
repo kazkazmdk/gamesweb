@@ -30,6 +30,7 @@ export function RankWidget({
       <EmptyState
         title="No board yet"
         body={`Play ${gameTitle} to set the pace.`}
+        slug={slug}
         action={<QuickAction href={`/play/${slug}`}>Play</QuickAction>}
       />
     );
@@ -38,27 +39,23 @@ export function RankWidget({
   if (variant === "compact") {
     return (
       <div>
-        <p className="stat text-[40px]">{formatRank(rank ?? null)}</p>
-        <p className="meta mt-1">{scoreLabel ?? "YOUR RANK"}</p>
+        <p className="stat text-[52px]">{formatRank(rank ?? null)}</p>
+        <p className="meta mt-2">{scoreLabel ?? "YOUR RANK"}</p>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="stat text-[48px]">{formatRank(rank ?? null)}</p>
-          <p className="meta mt-1">{scoreLabel ? `${scoreLabel} · your best` : "YOUR RANK"}</p>
-        </div>
-        {gap !== null && gap !== undefined && rank && rank > 1 ? (
-          <p className="text-right text-[13px] text-[var(--text-dim)]">
-            {formatPlayScore(gameId, Math.abs(gap)) ?? Math.abs(gap)}
-            <span className="meta mt-1 block">to next</span>
-          </p>
-        ) : null}
-      </div>
-      <ol className="mt-5 space-y-2">
+    <div className="gw-float p-5">
+      <p className="meta">Global</p>
+      <p className="stat mt-2 text-[64px] leading-none">{formatRank(rank ?? null)}</p>
+      <p className="mt-2 text-[15px] text-[var(--text-dim)]">{scoreLabel ? `${scoreLabel}` : "Unranked"}</p>
+      {gap !== null && gap !== undefined && rank && rank > 1 ? (
+        <p className="mt-3 text-[13px] text-[var(--accent)]">
+          ↑ {formatPlayScore(gameId, Math.abs(gap)) ?? Math.abs(gap)} to #{rank - 1}
+        </p>
+      ) : null}
+      <ol className="mt-6 space-y-3">
         {rows.slice(0, 3).map((row, i) => (
           <li key={`${row.name}-${i}`} className="flex items-baseline justify-between text-[14px]">
             <span className={row.isYou ? "text-[var(--text)]" : "text-[var(--text-dim)]"}>
@@ -70,11 +67,11 @@ export function RankWidget({
         ))}
       </ol>
       {friend ? (
-        <p className="mt-4 text-[13px] text-[var(--text-dim)]">
-          Friend best · {friend.name} · {formatPlayScore(gameId, friend.score)}
+        <p className="mt-5 text-[13px] text-[var(--text-dim)]">
+          Beat {friend.name} · {formatPlayScore(gameId, friend.score)}
         </p>
       ) : null}
-      <Link href="/leaderboards" className="mt-4 inline-flex min-h-11 items-center text-[13px] text-[var(--accent)]">
+      <Link href="/leaderboards" className="mt-5 inline-flex min-h-11 items-center text-[13px] text-[var(--accent)]">
         View leaderboard
       </Link>
     </div>

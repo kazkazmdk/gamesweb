@@ -21,6 +21,11 @@ export type GwDebugState = {
   throttle?: number;
   frozen?: boolean;
   tick?: number;
+  scene?: string;
+  ended?: boolean;
+  canvasW?: number;
+  canvasH?: number;
+  inputSource?: string;
 };
 
 export type GwDebugCommands = {

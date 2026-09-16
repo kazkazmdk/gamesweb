@@ -10,6 +10,18 @@ test("games home is focus-driven", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Swarm Protocol" })).toBeVisible();
 });
 
+test("desktop chrome stays console-minimal", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  await expect(nav.getByRole("link", { name: "Games" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Arcade" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Boards" })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "Friends" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Search games" })).toBeVisible();
+  await expect(page.getByText("Guest / this device")).toHaveCount(0);
+});
+
 test("play index redirects to games home", async ({ page }) => {
   await page.goto("/play");
   await expect(page).toHaveURL(/\/$/);
@@ -20,7 +32,7 @@ test("arcade hub is the widget surface", async ({ page }) => {
   await page.goto("/arcade");
   await expect(page.getByRole("heading", { name: "Arcade" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Daily challenges" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Friends playing" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Player" })).toBeVisible();
 });
 
 test("achievements is a real destination", async ({ page }) => {

@@ -127,7 +127,9 @@ export function AchievementsPage() {
                 <button
                   type="button"
                   onClick={() => setOpen(expanded ? null : a.id)}
-                  className={`flex w-full items-start gap-3 border-t border-[var(--line)] py-4 text-left ${a.unlocked ? "" : "opacity-70"}`}
+                  className={`flex w-full items-start gap-4 px-4 py-4 text-left ${
+                    a.unlocked ? "gw-selected" : "gw-float"
+                  }`}
                 >
                   <AchievementIcon id={a.id} gameId={a.gameId} unlocked={a.unlocked} />
                   <div className="min-w-0 flex-1">
@@ -136,7 +138,7 @@ export function AchievementsPage() {
                         <p className="meta">
                           {a.gameTitle} · {a.xp} XP
                         </p>
-                        <p className={`mt-1 text-[16px] ${a.unlocked ? "text-[var(--text)]" : "text-[var(--text-dim)]"}`}>{a.name}</p>
+                        <p className={`mt-1 text-[16px] ${a.unlocked ? "text-[var(--text)]" : "text-[var(--text)]"}`}>{a.name}</p>
                         <p className="mt-1 text-[13px] text-[var(--text-dim)]">{a.description}</p>
                         {date ? <p className="mt-1 text-[12px] text-[var(--text-faint)]">Unlocked {date}</p> : null}
                       </div>

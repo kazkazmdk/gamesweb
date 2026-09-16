@@ -47,7 +47,7 @@ export default function SettingsPage() {
   return (
     <div className="px-5 py-8 md:px-10">
       <h1 className="display text-[44px] md:text-[64px]">Settings</h1>
-      <div className="mt-8 md:grid md:grid-cols-[200px_minmax(0,32rem)] md:gap-12">
+      <div className="mt-8 md:grid md:grid-cols-[220px_minmax(520px,640px)_minmax(0,1fr)] md:gap-12">
         <nav className="mb-6 flex gap-1 overflow-x-auto scrollbar-none md:mb-0 md:flex-col" aria-label="Settings">
           {CATS.map((c) => (
             <button
@@ -230,7 +230,79 @@ export default function SettingsPage() {
             </section>
           ) : null}
         </form>
+        <aside className="mt-10 hidden md:block">
+          <SettingsContext cat={cat} controlGame={controlGame} />
+        </aside>
       </div>
+    </div>
+  );
+}
+
+function SettingsContext({ cat, controlGame }: { cat: string; controlGame: string }) {
+  const player = usePlayer();
+  const s = player.settings;
+  const game = GAME_MANIFESTS.find((g) => g.id === controlGame) ?? GAME_MANIFESTS[0];
+  return (
+    <div className="sticky top-24 text-[13px] text-[var(--text-dim)]">
+      {cat === "account" ? (
+        <div>
+          <p className="meta">Profile</p>
+          <p className="mt-3 text-[15px] text-[var(--text)]">{player.displayName}</p>
+          <p className="mt-1">@{player.username}</p>
+          <p className="mt-3">{player.isGuest ? "Guest identity stays on this device." : "Signed-in profile."}</p>
+        </div>
+      ) : null}
+      {cat === "audio" ? (
+        <div>
+          <p className="meta">Output</p>
+          <p className="mt-3">Master {Math.round(s.master * 100)} · Music {Math.round(s.music * 100)} · SFX {Math.round(s.sfx * 100)}</p>
+          <div className="mt-4 flex items-end gap-1">
+            {[s.master, s.music, s.sfx].map((v, i) => (
+              <span key={i} className="inline-block w-4 bg-[var(--accent)]" style={{ height: `${12 + v * 36}px` }} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {cat === "gameplay" ? (
+        <div>
+          <p className="meta">Feel</p>
+          <p className="mt-3">Ghost {s.ghost ? "on" : "off"} · Shake {Math.round(s.shake * 100)}</p>
+        </div>
+      ) : null}
+      {cat === "controls" ? (
+        <div>
+          <p className="meta">{game.title}</p>
+          <ul className="mt-3 space-y-1">
+            {game.controls.slice(0, 4).map((c) => (
+              <li key={c.input}>{c.input} · {c.action}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {cat === "privacy" ? (
+        <div>
+          <p className="meta">Public profile</p>
+          <p className="mt-3">{s.sharePublicActivity ? "Recent verified runs can appear." : "Activity stays private."}</p>
+        </div>
+      ) : null}
+      {cat === "social" ? (
+        <div>
+          <p className="meta">Presence</p>
+          <p className="mt-3">{s.sharePresence ? "Friends can see when you play." : "You appear offline to friends."}</p>
+        </div>
+      ) : null}
+      {cat === "accessibility" ? (
+        <div>
+          <p className="meta">Motion</p>
+          <p className="mt-3">{s.reducedMotion ? "Transitions are cut." : "Focus and camera motion stay on."}</p>
+        </div>
+      ) : null}
+      {cat === "video" ? (
+        <div>
+          <p className="meta">Display</p>
+          <p className="mt-3">Automatic quality. Fullscreen from the play chrome.</p>
+        </div>
+      ) : null}
     </div>
   );
 }

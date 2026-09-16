@@ -42,7 +42,8 @@ export function GameView({ slug }: { slug: string }) {
   useEffect(() => {
     if (!game) return;
     const host = window.location.hostname;
-    if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+    const params = new URLSearchParams(window.location.search);
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1" || params.has("gwinput")) {
       (window as Window & { __GW_ALLOW_DEBUG__?: boolean }).__GW_ALLOW_DEBUG__ = true;
     }
     analytics.track("game_selected", { gameId: game.id });
@@ -62,6 +63,13 @@ export function GameView({ slug }: { slug: string }) {
         loadedRef.current = true;
         setLoadPct(100);
         analytics.track("game_loaded", { gameId: game.id });
+        window.requestAnimationFrame(() => {
+          const canvas = wrap.current?.querySelector("canvas");
+          if (canvas instanceof HTMLCanvasElement) {
+            canvas.tabIndex = 0;
+            canvas.focus({ preventScroll: true });
+          }
+        });
       },
     });
 
@@ -158,11 +166,17 @@ export function GameView({ slug }: { slug: string }) {
         phaser.current?.events.emit("platform-pause");
       }
     };
+    const onWindowBlur = () => {
+      const kb = phaser.current?.input?.keyboard as { resetKeys?: () => void } | undefined;
+      kb?.resetKeys?.();
+    };
     window.addEventListener("keydown", onKey);
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("blur", onWindowBlur);
     return () => {
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("blur", onWindowBlur);
     };
   }, []);
 
@@ -234,15 +248,15 @@ export function GameView({ slug }: { slug: string }) {
   return (
     <div className="relative h-dvh bg-black text-white" style={{ ["--accent" as string]: game.accent }}>
       <div
-        className={`absolute inset-x-0 top-0 z-20 flex items-center justify-between px-3 py-2 transition-opacity ${intense && !paused && !result ? "opacity-0 hover:opacity-100" : "opacity-100"}`}
+        className={`pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between px-3 py-2 transition-opacity ${intense && !paused && !result ? "opacity-0 hover:opacity-100" : "opacity-100"}`}
       >
-        <div className="flex items-center gap-3">
+        <div className="pointer-events-auto flex items-center gap-3">
           <button type="button" onClick={() => router.push(`/games/${game.slug}`)} className="text-[13px] text-white/70">
             Back
           </button>
           <p className="text-[13px]">{game.title}</p>
         </div>
-        <div className="flex items-center gap-3 text-[12px] text-white/70">
+        <div className="pointer-events-auto flex items-center gap-3 text-[12px] text-white/70">
           {friendsHere[0] ? <span>{friendsHere[0].displayName} is playing</span> : null}
           <Link href="/settings">Settings</Link>
           <button
@@ -300,10 +314,17 @@ export function GameView({ slug }: { slug: string }) {
         </div>
       ) : null}
 
-      <div ref={wrap} className="absolute inset-0 overflow-hidden [&_canvas]:!h-full [&_canvas]:!w-full [&_canvas]:!max-h-full [&_canvas]:!max-w-full" />
+      <div
+        ref={wrap}
+        className="absolute inset-0 z-0 overflow-hidden [&_canvas]:!h-full [&_canvas]:!w-full [&_canvas]:!max-h-full [&_canvas]:!max-w-full"
+        onPointerDown={() => {
+          const canvas = wrap.current?.querySelector("canvas");
+          if (canvas instanceof HTMLCanvasElement) canvas.focus({ preventScroll: true });
+        }}
+      />
 
       <div
-        className={`absolute inset-x-0 bottom-0 z-20 flex justify-between px-4 py-3 text-[11px] text-white/55 transition-opacity ${intense && !paused && !result ? "opacity-0" : "opacity-100"}`}
+        className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-between px-4 py-3 text-[11px] text-white/55 transition-opacity ${intense && !paused && !result ? "opacity-0" : "opacity-100"}`}
       >
         <span>
           Record {Number.isFinite(pb) && pb > 0 && pb < 1e12 ? formatScore(game.id, pb) : "—"}
@@ -313,7 +334,7 @@ export function GameView({ slug }: { slug: string }) {
         </span>
         <button
           type="button"
-          className="text-white/80"
+          className="pointer-events-auto text-white/80"
           onClick={async () => {
             await navigator.clipboard.writeText(store.inviteLink(game.slug));
             store.markInvite();
@@ -325,7 +346,12 @@ export function GameView({ slug }: { slug: string }) {
       </div>
 
       {paused && !result ? (
-        <div className="absolute inset-0 z-40 grid place-items-center bg-black/55 backdrop-blur-sm">
+        <div
+          className="absolute inset-0 z-40 grid place-items-center bg-black/55 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) resume();
+          }}
+        >
           <div className="w-[min(360px,90vw)] rounded-2xl border border-white/10 bg-[#121214] p-6">
             <p className="display text-[32px]">Paused</p>
             <div className="mt-5 flex flex-col gap-2 text-[14px]">
@@ -368,6 +394,7 @@ export function GameView({ slug }: { slug: string }) {
           nextTitle={next?.title}
         />
       ) : null}
+      <InputProbe />
     </div>
   );
 }
@@ -509,5 +536,35 @@ function Results({
         <p className="mt-4 text-center text-[11px] text-white/35">R or Space retries</p>
       </div>
     </div>
+  );
+}
+
+function InputProbe() {
+  const [on, setOn] = useState(false);
+  const [line, setLine] = useState("");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!new URLSearchParams(window.location.search).has("gwinput")) return;
+    setOn(true);
+    const t = window.setInterval(() => {
+      const d = (window as Window & { __GW_DEBUG__?: Record<string, unknown> }).__GW_DEBUG__;
+      const a = document.activeElement;
+      const canvas = document.querySelector("canvas");
+      const kb = (window as Window & { __GW_KEYS__?: Record<string, boolean> }).__GW_KEYS__;
+      setLine(
+        [
+          `doc=${document.hasFocus()} win=${document.hasFocus()} el=${a?.tagName ?? "?"}`,
+          `canvas=${canvas instanceof HTMLCanvasElement ? `${canvas.width}x${canvas.height} tab=${canvas.tabIndex}` : "none"}`,
+          `th=${d?.throttle ?? "-"} st=${d?.speed ?? "-"} x=${Math.round(Number(d?.playerX ?? 0))} y=${Math.round(Number(d?.playerY ?? 0))} ang=${Number(d?.playerAngle ?? 0).toFixed?.(2) ?? "-"}`,
+          `tick=${d?.tick ?? "-"} paused=${d?.paused ?? "-"} ended=${d?.ended ?? "-"} scene=${d?.scene ?? "-"} src=${d?.inputSource ?? "-"}`,
+          kb ? `W${kb.up ? 1 : 0}A${kb.left ? 1 : 0}S${kb.down ? 1 : 0}D${kb.right ? 1 : 0}Sp${kb.jump ? 1 : 0}` : "",
+        ].join(" | "),
+      );
+    }, 120);
+    return () => window.clearInterval(t);
+  }, []);
+  if (!on) return null;
+  return (
+    <p className="pointer-events-none absolute bottom-14 left-3 z-50 font-mono text-[10px] text-white/70">{line}</p>
   );
 }
