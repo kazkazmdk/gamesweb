@@ -20,13 +20,14 @@ export function readDriveInput(
   const touch = pointers.some((p) => p.isDown && p.wasTouch);
   let steer =
     Number(Boolean(keys.right?.isDown || keys.right2?.isDown)) -
-    Number(Boolean(keys.left?.isDown || keys.left2?.isDown));
+    Number(Boolean(keys.left?.isDown || keys.left2?.isDown || keys.left3?.isDown));
   let throttle = 0;
-  if (keys.up?.isDown || keys.up2?.isDown) throttle = 1;
+  if (keys.up?.isDown || keys.up2?.isDown || keys.up3?.isDown) throttle = 1;
   else if (keys.down?.isDown || keys.down2?.isDown) throttle = -1;
   let handbrake = Boolean(keys.space?.isDown);
+  const keyDrive = throttle !== 0 || steer !== 0 || handbrake;
 
-  if (touch) {
+  if (touch && !keyDrive) {
     throttle = 1;
     steer = 0;
     handbrake = false;

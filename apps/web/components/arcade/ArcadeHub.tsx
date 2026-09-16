@@ -9,7 +9,6 @@ import {
   ChallengeWidget,
   EmptyState,
   FriendPresence,
-  InviteWidget,
   PlayerCard,
   ProgressWidget,
   QuickAction,
@@ -49,62 +48,65 @@ export function ArcadeHub() {
         Progression, dailies, friends, and records — the meta layer around the games.
       </p>
 
-      <div className="mt-10 grid gap-10 lg:grid-cols-12">
-        <section className="lg:col-span-7">
+      <div className="mt-10 grid gap-8 lg:grid-cols-12">
+        <section className="lg:col-span-5">
           <SectionHeader title="Player" action={<QuickAction href="/me" tone="quiet">Profile</QuickAction>} />
-          <div className="mt-4">
+          <div className="mt-5">
             <PlayerCard
               name={player.displayName}
               username={player.username}
               avatar={player.avatar}
               level={lv.level}
               stat={player.streak > 0 ? `${player.streak}d streak` : formatLevel(lv.level)}
-              size="md"
+              size="hero"
             />
-            <div className="mt-5 max-w-md">
+            <div className="mt-6 max-w-md">
               <ProgressWidget value={lv.intoLevel} max={Math.max(1, lv.needed)} caption="Into next level" />
             </div>
+            <p className="mt-4 text-[13px] text-[var(--text-dim)]">
+              {dailies.done}/{dailies.total} dailies · {ach.unlocked} trophies
+            </p>
           </div>
         </section>
 
-        <section className="lg:col-span-5">
+        <section className="lg:col-span-7">
           <SectionHeader
             title="Daily challenges"
             meta={`${dailies.done}/${dailies.total} · ${formatCountdown(remain)}`}
             action={<QuickAction href="/challenges" tone="quiet">All</QuickAction>}
           />
-          <div className="mt-2 divide-y divide-[var(--line)]">
-            {dailies.quests.map((q) => (
-              <ChallengeWidget key={q.id} view={challengeViewModel(player, q)} variant="compact" />
-            ))}
+          <div className="mt-4 grid gap-4">
+            {dailies.quests[0] ? <ChallengeWidget view={challengeViewModel(player, dailies.quests[0])} /> : null}
+            <div className="grid gap-4 md:grid-cols-2">
+              {dailies.quests.slice(1).map((q) => (
+                <ChallengeWidget key={q.id} view={challengeViewModel(player, q)} variant="compact" />
+              ))}
+            </div>
           </div>
         </section>
 
-        <section className="lg:col-span-6">
-          <SectionHeader title="Friends playing" action={<QuickAction href="/friends" tone="quiet">All</QuickAction>} />
-          {friendsNow.length ? (
-            <div className="mt-2 divide-y divide-[var(--line)]">
+        {friendsNow.length ? (
+          <section className="lg:col-span-12">
+            <SectionHeader title="Friends playing" action={<QuickAction href="/friends" tone="quiet">All</QuickAction>} />
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
               {friendsNow.map((f) => (
-                <FriendPresence key={f.id} friend={f} compact />
+                <FriendPresence key={f.id} friend={f} />
               ))}
             </div>
-          ) : (
-            <EmptyState
-              title="No friends playing"
-              body="Invite someone to chase your Neon score."
-              action={<InviteWidget compact />}
-            />
-          )}
-        </section>
+          </section>
+        ) : null}
 
-        <section className="lg:col-span-6">
+        <section className="lg:col-span-12">
           <SectionHeader title="Recent records" />
-          <div className="mt-4 space-y-5">
-            {records.length ? (
-              records.map((r) => <RecordWidget key={r.game.id} game={r.game} score={r.rec.score} modeLabel={r.rec.mode} />)
-            ) : (
-              <EmptyState title="No records yet" body="Finish a run to pin a personal best." action={<QuickAction href="/">Play</QuickAction>} />
-            )}
+          <div className="mt-4 flex gap-4 overflow-x-auto scrollbar-none md:grid md:grid-cols-3 md:overflow-visible">
+            {GAME_MANIFESTS.map((g) => {
+              const rec = records.find((r) => r.game.id === g.id)?.rec;
+              return (
+                <div key={g.id} className="min-w-[260px]">
+                  <RecordWidget game={g} score={rec?.score ?? 0} modeLabel={rec?.mode} />
+                </div>
+              );
+            })}
           </div>
         </section>
 
@@ -129,7 +131,14 @@ export function ArcadeHub() {
               <AchievementStrip
                 unlocked={ach.unlocked}
                 total={ach.total}
-                items={unlocks.map((a) => ({ key: a.key, name: a.name, description: a.description, unlocked: true }))}
+                items={unlocks.map((a) => ({
+                  key: a.key,
+                  name: a.name,
+                  description: a.description,
+                  unlocked: true,
+                  gameId: a.gameId ?? "platform",
+                  xp: a.xp,
+                }))}
                 showcase
               />
             ) : (

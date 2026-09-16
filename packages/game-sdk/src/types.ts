@@ -40,6 +40,11 @@ export type GameManifest = {
   gameplayStill?: string;
   tileImage?: string;
   backdropImage?: string;
+  media?: {
+    backdrop?: string;
+    tile?: string;
+    hero?: string;
+  };
   version: string;
   achievements: AchievementDefinition[];
   supportedDevices: Array<"desktop" | "laptop" | "tablet" | "mobile">;

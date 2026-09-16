@@ -1,3 +1,4 @@
+export { ActivityCard, ActivityRail } from "./ActivityCard";
 export { PlatformHero } from "./PlatformHero";
 export { GameTile } from "./GameTile";
 export { PlayerCard } from "./PlayerCard";

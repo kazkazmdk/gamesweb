@@ -1,5 +1,5 @@
 {
   "framework": "nextjs",
-  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "installCommand": "cd ../.. && corepack enable && pnpm install --frozen-lockfile",
   "buildCommand": "cd ../.. && pnpm --filter @gamesweb/web build"
 }

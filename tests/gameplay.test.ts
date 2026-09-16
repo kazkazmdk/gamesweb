@@ -102,6 +102,27 @@ describe("neon drive input", () => {
     expect(drive.throttle).toBe(1);
     expect(drive.touch).toBe(false);
   });
+
+  it("accepts Z/Q aliases and does not let touch override keys", () => {
+    const keys = {
+      up3: { isDown: true },
+      left3: { isDown: true },
+      up: { isDown: false },
+      right: { isDown: false },
+      left: { isDown: false },
+      down: { isDown: false },
+      space: { isDown: false },
+    } as unknown as Record<string, { isDown: boolean }>;
+    const input = {
+      activePointer: { isDown: true, wasTouch: true, x: 900, y: 200 },
+      pointer1: undefined,
+      pointer2: undefined,
+    };
+    const drive = readDriveInput(keys as never, input as never, 1280, 720);
+    expect(drive.throttle).toBe(1);
+    expect(drive.steer).toBe(-1);
+    expect(drive.touch).toBe(true);
+  });
 });
 
 describe("velocity jump", () => {

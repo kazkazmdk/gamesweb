@@ -170,13 +170,15 @@ export function friendsBoard(rows: BoardRow[], friends: Friend[]) {
 
 export function latestUnlocks(player: PlayerSnapshot, limit = 3) {
   const defs = allAchievements();
-  const unlocked = [...player.achievements].reverse();
+  const ranked = player.achievements
+    .map((id) => ({ id, at: player.achievementUnlocks?.[id] ?? 0 }))
+    .sort((a, b) => b.at - a.at || player.achievements.indexOf(b.id) - player.achievements.indexOf(a.id));
   const items = [];
-  for (const id of unlocked) {
+  for (const { id, at } of ranked) {
     const [scope, ...rest] = id.split(":");
     const key = rest.join(":");
     const def = defs.find((a) => a.key === key && (a.gameId ?? "platform") === scope);
-    if (def) items.push({ id, ...def, unlocked: true });
+    if (def) items.push({ id, ...def, unlocked: true, unlockedAt: at || undefined });
     if (items.length >= limit) break;
   }
   return items;

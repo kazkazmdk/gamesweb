@@ -63,6 +63,8 @@ export const ProfileUpdateSchema = z.object({
     .optional(),
   avatar: z.string().max(32).optional(),
   shareActivity: z.boolean().optional(),
+  sharePresence: z.boolean().optional(),
+  sharePublicActivity: z.boolean().optional(),
 });
 
 export const GuestMergeSchema = z
@@ -77,6 +79,8 @@ export const GuestMergeSchema = z
           startedAt: z.number().int(),
           endedAt: z.number().int(),
           metadata: ScoreMetadataSchema.default({}),
+          localSessionId: z.string().max(80).optional(),
+          gameVersion: z.string().max(32).optional(),
         }),
       )
       .max(40)

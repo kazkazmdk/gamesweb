@@ -10,7 +10,7 @@ import {
   latestUnlocks,
   type BoardRow,
 } from "./adapters";
-import { boardModeFromPlayIndex, boardModeLabel, lowerIsBetter, playModeOptions } from "./modes";
+import { boardModeFromPlayIndex, boardModeLabel, playModeOptions } from "./modes";
 import { formatPlayScore, hasRecord } from "./format";
 import type { PlayerSnapshot } from "@/lib/player-store";
 
@@ -25,8 +25,8 @@ export type FocusedGameContext = {
   playLabel: "Play" | "Continue";
   daily: { label: string; current: string; target: string; done: boolean } | null;
   friendBest: { name: string; username: string; score: number; scoreLabel: string | null } | null;
-  achievements: { unlocked: number; total: number };
-};
+    nextTrophy: { name: string; description: string } | null;
+  };
 
 export function focusedGameContext(
   player: PlayerSnapshot,
@@ -42,6 +42,11 @@ export function focusedGameContext(
   const daily = dailyQuest ? challengeViewModel(player, dailyQuest) : null;
   const friend = friendOnBoard(board, player.friends);
   const played = player.history.some((h) => h.gameId === game.id);
+  const nextTrophy =
+    allAchievements().find((a) => {
+      if (a.gameId !== game.id) return false;
+      return !player.achievements.includes(`${a.gameId}:${a.key}`);
+    }) ?? null;
   return {
     game,
     playIndex,
@@ -67,7 +72,7 @@ export function focusedGameContext(
           scoreLabel: formatPlayScore(game.id, friend.score),
         }
       : null,
-    achievements: achievementProgress(player, game.id),
+    nextTrophy: nextTrophy ? { name: nextTrophy.name, description: nextTrophy.description } : null,
   };
 }
 
@@ -85,6 +90,7 @@ export function achievementCatalog(player: PlayerSnapshot) {
       gameId,
       gameTitle: game?.title ?? "Platform",
       unlocked: player.achievements.includes(id),
+      unlockedAt: player.achievementUnlocks?.[id],
       how: a.description,
     };
   });

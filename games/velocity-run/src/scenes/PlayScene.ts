@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { clamp, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug } from "@gamesweb/game-core";
+import { clamp, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, type GameKeyboard } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { velocityRunManifest } from "@gamesweb/game-sdk";
 import { COURSES, medalFor, nextMedalTarget, type Course, type Rect } from "../systems/courses";
@@ -53,6 +53,7 @@ export class VelocityPlayScene extends Phaser.Scene {
   private audioReady = false;
   private signaledReady = false;
   private longFrames = 0;
+  private ticks = 0;
   private sessionDeaths = 0;
   private recorder = new GhostRecorder();
   private tape: GhostTape | null = null;
@@ -61,6 +62,7 @@ export class VelocityPlayScene extends Phaser.Scene {
   private splits: number[] = [];
   private shownHint = true;
   private endedAt = 0;
+  private nativeKeys: GameKeyboard | null = null;
 
   constructor() {
     super("velocity-run-play");
@@ -124,6 +126,7 @@ export class VelocityPlayScene extends Phaser.Scene {
     this.keys = {
       left: kb.addKey("A"),
       left2: kb.addKey("LEFT"),
+      left3: kb.addKey("Q"),
       right: kb.addKey("D"),
       right2: kb.addKey("RIGHT"),
       jump: kb.addKey("SPACE"),
@@ -137,6 +140,10 @@ export class VelocityPlayScene extends Phaser.Scene {
       two: kb.addKey("TWO"),
       three: kb.addKey("THREE"),
     };
+    this.nativeKeys?.destroy();
+    this.nativeKeys = createGameKeyboard();
+    this.game.canvas.tabIndex = 0;
+    this.game.canvas.focus({ preventScroll: true });
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
       this.ensureAudio();
@@ -199,6 +206,7 @@ export class VelocityPlayScene extends Phaser.Scene {
   update(_: number, delta: number) {
     const dt = Math.min(0.033, delta / 1000);
     this.longFrames = countLongFrame(delta, this.longFrames);
+    this.ticks += 1;
     if (!this.signaledReady) {
       this.signaledReady = true;
       this.platform.events.emit({ name: "game_ready", props: { gameId: "velocity-run" } });
@@ -214,7 +222,6 @@ export class VelocityPlayScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.one)) this.switchCourse(0);
     if (Phaser.Input.Keyboard.JustDown(this.keys.two)) this.switchCourse(1);
     if (Phaser.Input.Keyboard.JustDown(this.keys.three)) this.switchCourse(2);
-    if (Phaser.Input.Keyboard.JustDown(this.keys.esc)) this.platform.pause.request();
     if (this.paused) {
       this.draw(dt);
       return;
@@ -236,15 +243,16 @@ export class VelocityPlayScene extends Phaser.Scene {
       return;
     }
 
+    const native = this.nativeKeys?.read();
     const move =
-      Number(this.keys.right.isDown || this.keys.right2.isDown) -
-      Number(this.keys.left.isDown || this.keys.left2.isDown) || this.touchMove;
+      Number(this.keys.right.isDown || this.keys.right2.isDown || Boolean(native?.right)) -
+      Number(this.keys.left.isDown || this.keys.left2.isDown || this.keys.left3?.isDown || Boolean(native?.left)) || this.touchMove;
     const jumpDown =
-      Phaser.Input.Keyboard.JustDown(this.keys.jump) || Phaser.Input.Keyboard.JustDown(this.keys.jump2) || this.touchJump;
+      Phaser.Input.Keyboard.JustDown(this.keys.jump) || Phaser.Input.Keyboard.JustDown(this.keys.jump2) || Boolean(native?.jumpPressed) || this.touchJump;
     if (this.touchJump) this.touchJump = false;
-    const jumpHeld = this.keys.jump.isDown || this.keys.jump2.isDown;
+    const jumpHeld = this.keys.jump.isDown || this.keys.jump2.isDown || Boolean(native?.jump);
     const jumpReleased = Phaser.Input.Keyboard.JustUp(this.keys.jump) || Phaser.Input.Keyboard.JustUp(this.keys.jump2);
-    const down = this.keys.down.isDown || this.keys.down2.isDown;
+    const down = this.keys.down.isDown || this.keys.down2.isDown || Boolean(native?.down);
 
     if (!this.running && (move !== 0 || jumpDown)) {
       this.running = true;
@@ -584,12 +592,18 @@ export class VelocityPlayScene extends Phaser.Scene {
         sessionDeaths: this.sessionDeaths,
         timeMs: this.timeMs,
         courseId: this.course.id,
+        tick: this.ticks,
+        frozen: false,
       },
       {
         killPlayer: () => this.die(),
         finishRun: () => this.win(),
         jump: () => {
           this.touchJump = true;
+        },
+        hideHud: () => {
+          this.hud.setVisible(false);
+          this.overlay.setVisible(false);
         },
       },
     );
@@ -598,6 +612,8 @@ export class VelocityPlayScene extends Phaser.Scene {
   shutdown() {
     this.game.events.off("platform-pause", this.onPause, this);
     this.game.events.off("platform-resume", this.onResume, this);
+    this.nativeKeys?.destroy();
+    this.nativeKeys = null;
     clearGwDebug();
   }
 }
@@ -613,7 +629,10 @@ export function mountVelocityRun(parent: HTMLElement, platform: PlatformSDK, cou
     scene: [VelocityPlayScene],
     disableContextMenu: true,
     banner: false,
+    autoFocus: true,
+    input: { keyboard: { target: typeof window !== "undefined" ? window : undefined } },
     fps: { target: 60 },
+    render: { preserveDrawingBuffer: true },
   });
   game.registry.set("platform", platform);
   game.registry.set("courseIndex", courseIndex);

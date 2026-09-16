@@ -2,12 +2,24 @@ import { test, expect } from "@playwright/test";
 
 test("games home is focus-driven", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Neon Drift" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Neon Drift" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Play|Continue/ }).first()).toBeVisible();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("heading", { name: "Velocity Run" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Velocity Run" })).toBeVisible();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("heading", { name: "Swarm Protocol" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Swarm Protocol" })).toBeVisible();
+});
+
+test("desktop chrome stays console-minimal", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  await expect(nav.getByRole("link", { name: "Games" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Arcade" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Boards" })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "Friends" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Search games" })).toBeVisible();
+  await expect(page.getByText("Guest / this device")).toHaveCount(0);
 });
 
 test("play index redirects to games home", async ({ page }) => {
@@ -20,7 +32,7 @@ test("arcade hub is the widget surface", async ({ page }) => {
   await page.goto("/arcade");
   await expect(page.getByRole("heading", { name: "Arcade" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Daily challenges" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Friends playing" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Player" })).toBeVisible();
 });
 
 test("achievements is a real destination", async ({ page }) => {
@@ -66,8 +78,12 @@ test("settings keep labeled controls", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
   await expect(page.getByLabel("Display name")).toBeVisible();
   await page.getByRole("button", { name: "Audio" }).click();
-  await expect(page.getByRole("switch", { name: "Mute" })).toBeVisible();
-  await expect(page.getByLabel("Master")).toBeVisible();
+  await page.getByRole("button", { name: "Social" }).click();
+  await expect(page.getByRole("switch", { name: "Share game presence" })).toBeVisible();
+  await page.getByRole("button", { name: "Privacy" }).click();
+  await expect(page.getByRole("switch", { name: "Show recent activity on profile" })).toBeVisible();
+  await page.getByRole("button", { name: "Accessibility" }).click();
+  await expect(page.getByRole("switch", { name: "Haptics" })).toBeVisible();
 });
 
 test("auth previews local progress", async ({ page }) => {

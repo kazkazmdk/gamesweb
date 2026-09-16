@@ -43,21 +43,21 @@ export function SliderControl({
   onChange: (next: number) => void;
 }) {
   return (
-    <label className="mt-3 block">
-      <span className="flex items-center justify-between text-[14px]">
-        {label}
-        <span className="text-[12px] text-[var(--text-faint)]">{Math.round(value * 100)}</span>
+    <label className="mt-3 flex items-center justify-between gap-6 py-2">
+      <span className="text-[14px]">{label}</span>
+      <span className="flex min-w-[180px] flex-1 items-center gap-3">
+        <input
+          className="gw-slider w-full"
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={value}
+          aria-label={label}
+          onChange={(e) => onChange(Number(e.target.value))}
+        />
+        <span className="w-8 text-right text-[12px] text-[var(--text-faint)]">{Math.round(value * 100)}</span>
       </span>
-      <input
-        className="gw-slider mt-2 w-full"
-        type="range"
-        min={0}
-        max={1}
-        step={0.01}
-        value={value}
-        aria-label={label}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
     </label>
   );
 }

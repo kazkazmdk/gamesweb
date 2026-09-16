@@ -20,6 +20,8 @@ export type ProfileRow = {
   is_guest: boolean;
   is_seed: boolean;
   share_activity: boolean;
+  share_presence: boolean;
+  share_public_activity: boolean;
   created_at: string;
   last_seen_at: string;
 };

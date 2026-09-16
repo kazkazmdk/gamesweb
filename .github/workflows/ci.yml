@@ -39,3 +39,45 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: End-to-end smoke
         run: pnpm test:e2e
+      - name: Upload visual QA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gamesweb-visual-qa
+          path: |
+            test-results/visual-*.png
+            test-results/**/*.png
+            e2e/**/*-snapshots/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gamesweb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/gamesweb
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Apply migrations and run DB security tests
+        run: pnpm test:db

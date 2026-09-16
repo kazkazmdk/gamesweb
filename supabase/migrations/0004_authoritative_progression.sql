@@ -237,7 +237,7 @@ declare
   v numeric;
   n int := 0;
 begin
-  if (p_updates is null or jsonb_typeof(p_updates) <> 'object' then
+  if (p_updates is null or jsonb_typeof(p_updates) <> 'object') then
     return result;
   end if;
   if (select count(*) from jsonb_each(p_updates)) > 48 then

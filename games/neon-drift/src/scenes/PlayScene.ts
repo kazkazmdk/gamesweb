@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug } from "@gamesweb/game-core";
+import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, type GameKeyboard } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { neonDriftManifest } from "@gamesweb/game-sdk";
 import { CAMERA, NEON, VEHICLE } from "../config";
@@ -80,6 +80,7 @@ export class DriftPlayScene extends Phaser.Scene {
   private onGrass = false;
   private testDrive: { throttle: number; steer: number } | null = null;
   private boardMode = "foundation";
+  private nativeKeys: GameKeyboard | null = null;
 
   constructor() {
     super("neon-drift-play");
@@ -165,10 +166,12 @@ export class DriftPlayScene extends Phaser.Scene {
     this.keys = {
       up: kb.addKey(code.W),
       up2: kb.addKey(code.UP),
+      up3: kb.addKey(code.Z),
       down: kb.addKey(code.S),
       down2: kb.addKey(code.DOWN),
       left: kb.addKey(code.A),
       left2: kb.addKey(code.LEFT),
+      left3: kb.addKey(code.Q),
       right: kb.addKey(code.D),
       right2: kb.addKey(code.RIGHT),
       space: kb.addKey(code.SPACE),
@@ -179,6 +182,12 @@ export class DriftPlayScene extends Phaser.Scene {
       two: kb.addKey(code.TWO),
       three: kb.addKey(code.THREE),
     };
+    this.nativeKeys?.destroy();
+    this.nativeKeys = createGameKeyboard();
+    const canvas = this.game.canvas;
+    canvas.tabIndex = 0;
+    canvas.setAttribute("aria-label", "Neon Drift");
+    canvas.focus({ preventScroll: true });
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
       this.ensureAudio();
@@ -250,8 +259,9 @@ export class DriftPlayScene extends Phaser.Scene {
       this.publishDebug(delta);
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.keys.r)) {
-      if (!this.ended) this.retry();
+    const native = this.nativeKeys?.read();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.r) || native?.retryPressed) {
+      this.retry();
       return;
     }
     if (Phaser.Input.Keyboard.JustDown(this.keys.g)) {
@@ -263,7 +273,6 @@ export class DriftPlayScene extends Phaser.Scene {
       if (Phaser.Input.Keyboard.JustDown(this.keys.two)) this.switchTrack(1);
       if (Phaser.Input.Keyboard.JustDown(this.keys.three)) this.switchTrack(2);
     }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.esc)) this.platform.pause.request();
     if (this.paused || this.ended) {
       this.draw(0);
       this.publishDebug(delta);
@@ -276,6 +285,12 @@ export class DriftPlayScene extends Phaser.Scene {
     }
 
     const drive = readDriveInput(this.keys, this.input, this.scale.width, this.scale.height);
+    if (native && (native.up || native.down || native.left || native.right || native.jump)) {
+      drive.throttle = native.up ? 1 : native.down ? -1 : 0;
+      drive.steer = Number(native.right) - Number(native.left);
+      drive.handbrake = native.jump;
+      drive.touch = false;
+    }
     this.car.steer = this.testDrive?.steer ?? drive.steer;
     this.car.throttle = this.testDrive?.throttle ?? drive.throttle;
     this.car.handbrake = this.testDrive ? false : drive.handbrake;
@@ -527,6 +542,11 @@ export class DriftPlayScene extends Phaser.Scene {
 
   private publishDebug(delta: number) {
     this.longFrames = countLongFrame(delta, this.longFrames);
+    const q = this.samples?.length ? queryTrack(this.samples, this.car.x, this.car.y) : null;
+    const trackHeading = q ? Math.atan2(q.nearest.ty, q.nearest.tx) : this.car.angle;
+    let headingError = this.car.angle - trackHeading;
+    while (headingError > Math.PI) headingError -= Math.PI * 2;
+    while (headingError < -Math.PI) headingError += Math.PI * 2;
     publishGwDebug(
       {
         gameId: "neon-drift",
@@ -545,12 +565,37 @@ export class DriftPlayScene extends Phaser.Scene {
         throttle: this.testDrive?.throttle ?? this.car.throttle,
         frozen: this.juice.isFrozen(this.time.now),
         tick: this.ticks,
+        scene: this.scene.key,
+        ended: this.ended,
+        canvasW: this.scale.width,
+        canvasH: this.scale.height,
+        inputSource: this.testDrive ? "debug" : this.nativeKeys?.driving() ? "native" : "phaser",
+        lateral: q?.lateral,
+        headingError,
+        surface: q?.surface,
+        drifting: this.car.drifting,
+        lookError: (() => {
+          if (!q || !this.samples.length) return headingError;
+          const look = this.samples[(q.index + 18) % this.samples.length];
+          const lookHeading = Math.atan2(look.ty, look.tx);
+          let err = this.car.angle - lookHeading;
+          while (err > Math.PI) err -= Math.PI * 2;
+          while (err < -Math.PI) err += Math.PI * 2;
+          return err;
+        })(),
       },
       {
         finishRun: () => this.finish("finish"),
         setDrive: (throttle: number, steer: number) => {
           this.paused = false;
           this.testDrive = { throttle, steer };
+        },
+        hideHud: () => {
+          this.hud.setVisible(false);
+          this.overlay.setVisible(false);
+          this.hint.setVisible(false);
+          this.deltaTxt.setVisible(false);
+          this.floaterGfx.forEach((t) => t.setVisible(false));
         },
       },
     );
@@ -646,6 +691,8 @@ export class DriftPlayScene extends Phaser.Scene {
   shutdown() {
     this.game.events.off("platform-pause", this.onPause, this);
     this.game.events.off("platform-resume", this.onResume, this);
+    this.nativeKeys?.destroy();
+    this.nativeKeys = null;
     clearGwDebug();
   }
 }
@@ -667,12 +714,15 @@ export function mountNeonDrift(
     scene: [DriftPlayScene],
     disableContextMenu: true,
     banner: false,
+    autoFocus: true,
+    input: { keyboard: { target: typeof window !== "undefined" ? window : undefined } },
     audio: { disableWebAudio: false },
     fps: { target: 60 },
     render: {
       antialias: !mobile,
       roundPixels: false,
       pixelArt: false,
+      preserveDrawingBuffer: true,
     },
   });
   game.registry.set("platform", platform);

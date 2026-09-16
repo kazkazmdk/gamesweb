@@ -35,11 +35,19 @@ export function isPersonalBest(gameId: string, score: number, pbBefore: number):
 export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
   questProgress: Record<string, number>;
   pbImproved: boolean;
+  runXp: number;
+  firstPlayOfDay: boolean;
+  newGameTried: boolean;
+  questXp: Record<string, number>;
 } {
   if (ctx.verified === "flagged") {
     const lv = levelFromXp(ctx.existingXp);
     return {
       xpEarned: 0,
+      runXp: 0,
+      firstPlayOfDay: false,
+      newGameTried: false,
+      questXp: {},
       newLevel: lv.level,
       newXp: ctx.existingXp,
       achievements: [],
@@ -55,6 +63,10 @@ export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
     const lv = levelFromXp(ctx.existingXp);
     return {
       xpEarned: 0,
+      runXp: 0,
+      firstPlayOfDay: false,
+      newGameTried: false,
+      questXp: {},
       newLevel: lv.level,
       newXp: ctx.existingXp,
       achievements: [],
@@ -67,11 +79,14 @@ export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
   let xp = 0;
   const unlocked: string[] = [];
   const have = new Set(ctx.existingAchievements);
+  const questXp: Record<string, number> = {};
 
   const scale = Math.min(1, ctx.durationMs / (xpRewards.minRunSecondsForFullXp * 1000));
-  xp += Math.round(xpRewards.runComplete * scale + (ctx.durationMs / 60000) * xpRewards.runCompletePerMinute);
+  const runXp = Math.round(xpRewards.runComplete * scale + (ctx.durationMs / 60000) * xpRewards.runCompletePerMinute);
+  xp += runXp;
 
-  if (ctx.gamesPlayedToday === 0) xp += xpRewards.firstPlayOfDay;
+  const firstPlayOfDay = ctx.gamesPlayedToday === 0;
+  if (firstPlayOfDay) xp += xpRewards.firstPlayOfDay;
 
   const firstThisGame = !ctx.playedGameIds.includes(ctx.gameId);
   if (firstThisGame) xp += xpRewards.newGameTried;
@@ -149,6 +164,7 @@ export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
     if (value >= q.target) {
       questsCompleted.push(q.id);
       xp += q.xp;
+      questXp[q.id] = q.xp;
     }
   }
 
@@ -156,6 +172,10 @@ export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
   const lv = levelFromXp(newXp);
   return {
     xpEarned: Math.max(0, Math.round(xp)),
+    runXp,
+    firstPlayOfDay,
+    newGameTried: firstThisGame,
+    questXp,
     newLevel: lv.level,
     newXp,
     achievements: unlocked,

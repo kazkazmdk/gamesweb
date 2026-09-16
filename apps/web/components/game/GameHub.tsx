@@ -6,9 +6,9 @@ import { useEffect, useState } from "react";
 import { PlayButton } from "@/components/game/GameCard";
 import {
   AchievementStrip,
-  EmptyState,
+  ActivityCard,
+  ActivityRail,
   FriendPresence,
-  GameModeSelector,
   GameTile,
   InlineError,
   PlatformHero,
@@ -17,8 +17,9 @@ import {
 } from "@/components/platform";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
-import { achievementProgress, dailySummary, friendOnBoard, rankViewModel } from "@/lib/platform/adapters";
-import { formatFraction, formatPlayScore } from "@/lib/platform/format";
+import { achievementProgress, friendOnBoard, rankViewModel } from "@/lib/platform/adapters";
+import { formatPlayScore } from "@/lib/platform/format";
+import { focusedGameContext } from "@/lib/platform/focus";
 import { boardModeFromPlayIndex, loadPlayIndex, lowerIsBetter, playModeOptions, savePlayIndex } from "@/lib/platform/modes";
 
 export function GameHub({ game }: { game: GameManifest }) {
@@ -40,7 +41,7 @@ export function GameHub({ game }: { game: GameManifest }) {
   const personal = store.personalRank(game.id, boardMode);
   const rank = rankViewModel(board, game.id, personal);
   const friend = friendOnBoard(board, player.friends);
-  const dailies = dailySummary(player);
+  const ctx = focusedGameContext(player, game, Number(playMode), board);
   const ach = achievementProgress(player, game.id);
   const friendsHere = player.friends.filter(
     (f) => f.status === "accepted" && f.presence === "playing" && f.gameId === game.id,
@@ -68,28 +69,78 @@ export function GameHub({ game }: { game: GameManifest }) {
 
       <section className="border-y border-[var(--line)] px-5 py-6 md:px-10">
         <SectionHeader title="Your run" />
-        <div className="mt-4 flex flex-wrap items-end gap-8">
-          <Metric value={formatPlayScore(game.id, pb) ?? "—"} label="Personal best" />
-          <Metric value={rank.rank ? `#${rank.rank}` : "—"} label="Rank" />
-          <Metric value={selected?.label ?? "—"} label="Mode" />
-          <Metric value={formatFraction(dailies.done, dailies.total)} label="Daily" />
-          <Metric
-            value={friend ? `${friend.name}` : "—"}
-            label={friend ? `Friend · ${formatPlayScore(game.id, friend.score)}` : "Friend to beat"}
-          />
-          <PlayButton href={`/play/${game.slug}`}>Play</PlayButton>
+        <div className="mt-4 flex flex-wrap items-end gap-6">
+          <PlayButton href={`/play/${game.slug}`}>{player.history.some((h) => h.gameId === game.id) ? "Continue" : "Play"}</PlayButton>
+          <p className="text-[14px] text-[var(--text-dim)]">
+            {formatPlayScore(game.id, pb) ?? "No record yet"} · {selected?.label ?? "Mode"}
+          </p>
         </div>
-        <div className="mt-6 max-w-xl">
-          <GameModeSelector
-            label={game.id === "neon-drift" ? "Track" : game.id === "velocity-run" ? "Course" : "Mode"}
-            options={modes}
-            value={playMode}
-            onChange={(id) => {
-              setPlayMode(id);
-              savePlayIndex(game.id, Number(id));
-            }}
-          />
-          {selected?.hint ? <p className="mt-2 text-[12px] text-[var(--text-dim)]">{selected.hint}</p> : null}
+        <div className="mt-5 flex flex-wrap gap-2" role="tablist" aria-label={game.id === "neon-drift" ? "Track" : game.id === "velocity-run" ? "Course" : "Mode"}>
+          {modes.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              role="tab"
+              aria-selected={playMode === m.id}
+              className={`min-h-11 px-3 text-[13px] ${playMode === m.id ? "text-[var(--text)] shadow-[inset_0_-2px_0_var(--accent)]" : "text-[var(--text-dim)]"}`}
+              onClick={() => {
+                setPlayMode(m.id);
+                savePlayIndex(game.id, Number(m.id));
+              }}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        {selected?.hint ? <p className="mt-2 text-[12px] text-[var(--text-dim)]">{selected.hint}</p> : null}
+      </section>
+
+      <section className="px-5 py-8 md:px-10" aria-label="Activities">
+        <SectionHeader title="Activities" />
+        <div className="mt-4">
+          <ActivityRail>
+            {ctx.daily ? (
+              <ActivityCard
+                featured
+                slug={game.slug}
+                kicker="Daily"
+                title={ctx.daily.label}
+                progress={Number(ctx.daily.current.replace(/[^\d.-]/g, "")) || 0}
+                target={Number(ctx.daily.target.replace(/[^\d.-]/g, "")) || 1}
+                reward={ctx.daily.done ? "Complete" : "+XP"}
+                href={`/play/${game.slug}`}
+                cta={ctx.daily.done ? "Replay" : "Continue"}
+              />
+            ) : (
+              <ActivityCard
+                featured
+                slug={game.slug}
+                kicker="Session"
+                title={game.title}
+                meta={ctx.pbLabel ? `${ctx.modeLabel} · ${ctx.pbLabel}` : "Set a first record"}
+                href={`/play/${game.slug}`}
+                cta={ctx.playLabel}
+              />
+            )}
+            {ctx.nextTrophy ? (
+              <ActivityCard
+                slug={game.slug}
+                kicker="Next trophy"
+                title={ctx.nextTrophy.name}
+                meta={ctx.nextTrophy.description}
+                href="/achievements"
+                cta="Trophies"
+              />
+            ) : null}
+            <ActivityCard
+              slug={game.slug}
+              kicker="Record"
+              title={ctx.pbLabel ?? "No record yet"}
+              meta={ctx.modeLabel}
+              href={`/play/${game.slug}`}
+              cta="Play"
+            />
+          </ActivityRail>
         </div>
       </section>
 
@@ -106,6 +157,8 @@ export function GameHub({ game }: { game: GameManifest }) {
                   name: a.name,
                   description: a.description,
                   unlocked: player.achievements.includes(`${game.id}:${a.key}`),
+                  gameId: game.id,
+                  xp: a.xp,
                 }))}
               />
             </div>
@@ -177,18 +230,16 @@ export function GameHub({ game }: { game: GameManifest }) {
               )}
             </div>
           </section>
+          {friendsHere.length ? (
           <section>
             <SectionHeader title="Friends" />
-            {friendsHere.length ? (
-              <div className="mt-2 divide-y divide-[var(--line)]">
-                {friendsHere.map((f) => (
-                  <FriendPresence key={f.id} friend={f} compact />
-                ))}
-              </div>
-            ) : (
-              <EmptyState title="No friends in this world right now." />
-            )}
+            <div className="mt-2 divide-y divide-[var(--line)]">
+              {friendsHere.map((f) => (
+                <FriendPresence key={f.id} friend={f} compact />
+              ))}
+            </div>
           </section>
+          ) : null}
           <section>
             <SectionHeader title="Related" />
             <div className="mt-3 space-y-2">
@@ -200,14 +251,5 @@ export function GameHub({ game }: { game: GameManifest }) {
         </aside>
       </div>
     </article>
-  );
-}
-
-function Metric({ value, label }: { value: string; label: string }) {
-  return (
-    <div>
-      <p className="stat text-[32px] md:text-[40px]">{value}</p>
-      <p className="meta mt-1">{label}</p>
-    </div>
   );
 }

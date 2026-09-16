@@ -48,6 +48,7 @@ export type StoredScore = {
   createdAt: number;
   verified: VerifiedStatus;
   offlineSubmission?: boolean;
+  localSessionId?: string;
 };
 
 export type StoredProfile = {
@@ -60,6 +61,8 @@ export type StoredProfile = {
   streak: number;
   isGuest: boolean;
   shareActivity: boolean;
+  sharePresence: boolean;
+  sharePublicActivity: boolean;
   achievements: string[];
   questProgress: Record<string, number>;
   questCompleted: string[];
@@ -69,6 +72,7 @@ export type StoredProfile = {
   gamesPlayedToday: number;
   dayKey: string;
   playedGameIds: string[];
+  achievementUnlocks: Record<string, number>;
 };
 
 export type StoredFriend = {
@@ -156,7 +160,7 @@ export type BackendStore = {
   getSave(identity: Identity, gameId: string): Promise<StoredSave | null>;
   putSave(identity: Identity, save: Omit<StoredSave, "userId"> & { userId?: string }): Promise<StoredSave | { error: string }>;
   getOrCreateProfile(identity: Identity): Promise<StoredProfile>;
-  updateProfile(identity: Identity, patch: Partial<Pick<StoredProfile, "username" | "displayName" | "avatar" | "shareActivity">>): Promise<StoredProfile | { error: string }>;
+  updateProfile(identity: Identity, patch: Partial<Pick<StoredProfile, "username" | "displayName" | "avatar" | "shareActivity" | "sharePresence" | "sharePublicActivity">>): Promise<StoredProfile | { error: string }>;
   mergeGuest(identity: Identity, input?: { offlineRuns?: OfflineRun[] }): Promise<{ ok: true; profile: StoredProfile; alreadyMerged: boolean } | { error: string }>;
   getIdempotency(scope: string, key: string): Promise<{ status: number; response: unknown } | null>;
   putIdempotency(scope: string, key: string, endpoint: string, status: number, response: unknown, identity: Identity): Promise<void>;

@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug } from "@gamesweb/game-core";
+import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, type GameKeyboard } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { swarmProtocolManifest } from "@gamesweb/game-sdk";
 import {
@@ -67,12 +67,14 @@ export class SwarmPlayScene extends Phaser.Scene {
   private choosing: UpgradeDef[] | null = null;
   private dead = false;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
+  private nativeKeys: GameKeyboard | null = null;
   private camX = ARENA / 2;
   private camY = ARENA / 2;
   private stick = { x: 0, y: 0, originX: 0, originY: 0, active: false, pointerId: -1 };
   private cardHits: Array<{ x: number; y: number; w: number; h: number }> = [];
   private signaledReady = false;
   private longFrames = 0;
+  private ticks = 0;
   private shieldA = 0;
   private pulseT = 0;
   private elites = 0;
@@ -115,10 +117,12 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.keys = {
       up: kb.addKey("W"),
       up2: kb.addKey("UP"),
+      up3: kb.addKey("Z"),
       down: kb.addKey("S"),
       down2: kb.addKey("DOWN"),
       left: kb.addKey("A"),
       left2: kb.addKey("LEFT"),
+      left3: kb.addKey("Q"),
       right: kb.addKey("D"),
       right2: kb.addKey("RIGHT"),
       dash: kb.addKey("SHIFT"),
@@ -128,6 +132,10 @@ export class SwarmPlayScene extends Phaser.Scene {
       two: kb.addKey("TWO"),
       three: kb.addKey("THREE"),
     };
+    this.nativeKeys?.destroy();
+    this.nativeKeys = createGameKeyboard();
+    this.game.canvas.tabIndex = 0;
+    this.game.canvas.focus({ preventScroll: true });
     if (!this.enemies.length) {
       for (let i = 0; i < 110; i += 1) this.enemies.push(emptyEnemy());
       for (let i = 0; i < 140; i += 1) {
@@ -242,15 +250,16 @@ export class SwarmPlayScene extends Phaser.Scene {
       this.frames = 0;
     }
     this.longFrames = countLongFrame(delta, this.longFrames);
+    this.ticks += 1;
     if (!this.signaledReady) {
       this.signaledReady = true;
       this.platform.events.emit({ name: "game_ready", props: { gameId: "swarm-protocol" } });
     }
-    if (this.dead && Phaser.Input.Keyboard.JustDown(this.keys.r)) {
+    const native = this.nativeKeys?.read();
+    if (this.dead && (Phaser.Input.Keyboard.JustDown(this.keys.r) || native?.retryPressed)) {
       this.retry();
       return;
     }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.esc)) this.platform.pause.request();
     if (this.paused && !this.choosing) {
       this.draw(dt);
       return;
@@ -268,12 +277,12 @@ export class SwarmPlayScene extends Phaser.Scene {
     }
 
     let mx =
-      Number(this.keys.right.isDown || this.keys.right2.isDown) -
-      Number(this.keys.left.isDown || this.keys.left2.isDown);
+      Number(this.keys.right.isDown || this.keys.right2.isDown || Boolean(native?.right)) -
+      Number(this.keys.left.isDown || this.keys.left2.isDown || this.keys.left3?.isDown || Boolean(native?.left));
     let my =
-      Number(this.keys.down.isDown || this.keys.down2.isDown) -
-      Number(this.keys.up.isDown || this.keys.up2.isDown);
-    if (this.stick.x || this.stick.y) {
+      Number(this.keys.down.isDown || this.keys.down2.isDown || Boolean(native?.down)) -
+      Number(this.keys.up.isDown || this.keys.up2.isDown || this.keys.up3?.isDown || Boolean(native?.up));
+    if ((this.stick.x || this.stick.y) && !(native?.up || native?.down || native?.left || native?.right)) {
       mx = this.stick.x;
       my = this.stick.y;
     }
@@ -290,7 +299,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.px = clamp(this.px + this.vx * dt, 40, ARENA - 40);
     this.py = clamp(this.py + this.vy * dt, 40, ARENA - 40);
 
-    if (Phaser.Input.Keyboard.JustDown(this.keys.dash)) this.tryDash();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.dash) || native?.dashPressed) this.tryDash();
     this.dashCd = Math.max(0, this.dashCd - dt * 1000);
     this.dashing = Math.max(0, this.dashing - dt * 1000);
     this.iFrames = Math.max(0, this.iFrames - dt * 1000);
@@ -940,6 +949,8 @@ export class SwarmPlayScene extends Phaser.Scene {
         longFrames: this.longFrames,
         kills: this.kills,
         level: this.level,
+        tick: this.ticks,
+        frozen: false,
       },
       {
         pickUpgrade: (i) => this.take(i),
@@ -957,8 +968,18 @@ export class SwarmPlayScene extends Phaser.Scene {
           this.bossDown = true;
           this.die();
         },
+        hideHud: () => {
+          this.hud.setVisible(false);
+          this.overlay.setVisible(false);
+        },
       },
     );
+  }
+
+  shutdown() {
+    this.nativeKeys?.destroy();
+    this.nativeKeys = null;
+    clearGwDebug();
   }
 }
 
@@ -973,7 +994,10 @@ export function mountSwarmProtocol(parent: HTMLElement, platform: PlatformSDK) {
     scene: [SwarmPlayScene],
     disableContextMenu: true,
     banner: false,
+    autoFocus: true,
+    input: { keyboard: { target: typeof window !== "undefined" ? window : undefined } },
     fps: { target: 60 },
+    render: { preserveDrawingBuffer: true },
   });
   game.registry.set("platform", platform);
   game.registry.set("manifest", swarmProtocolManifest);

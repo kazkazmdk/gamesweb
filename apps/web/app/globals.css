@@ -115,6 +115,27 @@ html.reduce-motion *::after {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.gw-float {
+  background: var(--surf-float);
+}
+.gw-interactive {
+  background: var(--surf-interactive);
+  transition: transform var(--motion-fast) var(--ease-out), filter var(--motion-fast) var(--ease-out);
+}
+.gw-interactive:hover,
+.gw-interactive:focus-within {
+  transform: scale(1.02);
+  filter: brightness(1.06);
+}
+.gw-selected {
+  background: var(--surf-selected);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+html.reduce-motion .gw-interactive:hover,
+html.reduce-motion .gw-interactive:focus-within {
+  transform: none;
+}
+
 .progress-fill {
   height: 100%;
   background: var(--accent);
