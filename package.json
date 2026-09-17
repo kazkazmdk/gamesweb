@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "test:e2e:remote": "playwright test -c playwright.remote.config.ts",
     "test:db": "node --experimental-strip-types scripts/db/run-integration.ts",
-    "test:supabase": "node --experimental-strip-types scripts/verify-supabase-security.ts"
+    "test:supabase": "node --experimental-strip-types scripts/verify-supabase-security.ts",
+    "vercel-should-build": "node scripts/vercel-should-build.mjs"
   },
   "engines": {
     "node": ">=20"

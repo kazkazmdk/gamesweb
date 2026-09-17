@@ -101,9 +101,11 @@ Velocity Run is lower-is-better. Neon Drift uses `circuit` / `daily`. Swarm uses
 
 ## Vercel
 
-Root directory: repository root. `vercel.json` sets `pnpm install --frozen-lockfile` and `pnpm --filter @gamesweb/web build`. Framework: Next.js.
+Root directory: repository root. `vercel.json` sets `pnpm install --frozen-lockfile`, `pnpm --filter @gamesweb/web build`, and `ignoreCommand` `node scripts/vercel-should-build.mjs`.
 
-No Vercel project is claimed deployed from this repository state unless you can open the production URL.
+Routine `cursor/**` / `claude/**` / `codex/**` agent branches skip Vercel. Validate with local `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build`. Production deploys from `main` when `apps/web` (or a package it consumes) changes.
+
+Policy: [`docs/VERCEL_DEPLOY_POLICY.md`](docs/VERCEL_DEPLOY_POLICY.md) and [`AGENTS.md`](AGENTS.md).
 
 ## CI
 
