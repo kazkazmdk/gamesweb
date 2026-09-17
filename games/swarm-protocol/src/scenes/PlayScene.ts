@@ -1,7 +1,7 @@
 import Phaser from "phaser";
-import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, type GameKeyboard } from "@gamesweb/game-core";
+import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, seededRng, type GameKeyboard } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
-import { swarmProtocolManifest } from "@gamesweb/game-sdk";
+import { readRunContext, swarmProtocolManifest, utcDayKey } from "@gamesweb/game-sdk";
 import {
   applyUpgrade,
   BASE_BUILD,
@@ -19,6 +19,9 @@ import {
   recommendBuild,
   spawnEnemy,
   xpToLevel,
+  setSimRng,
+  resetSimRng,
+  simRand,
   type Build,
   type Bullet,
   type Enemy,
@@ -81,6 +84,10 @@ export class SwarmPlayScene extends Phaser.Scene {
   private audioReady = false;
   private bossSpawned = false;
   private bossDown = false;
+  private victorious = false;
+  private victoryT = 0;
+  private endless = false;
+  private seed = "";
   private lastEliteWarn = 0;
   private retries = 0;
   private endedAt = 0;
@@ -99,6 +106,11 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.game.registry.set("synth", this.synth);
     this.synth.setSettings(this.platform.audio.getSettings());
     this.resetRun();
+    const ctx = readRunContext();
+    this.endless = Boolean(this.game.registry.get("endless")) || Boolean(ctx.endless);
+    this.seed = ctx.seed ?? ctx.challengeCode ?? (ctx.daily ? utcDayKey() : "");
+    if (this.seed) setSimRng(seededRng(this.seed));
+    else resetSimRng();
     this.cameras.main.setBackgroundColor("#120c10");
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
@@ -158,6 +170,7 @@ export class SwarmPlayScene extends Phaser.Scene {
       for (let i = 0; i < 140; i += 1) this.orbs.push({ active: false, x: 0, y: 0, vx: 0, vy: 0, value: 1 });
     }
 
+    this.input.addPointer(3);
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
       this.ensureAudio();
       if (this.choosing) {
@@ -175,6 +188,17 @@ export class SwarmPlayScene extends Phaser.Scene {
         }
       }
     });
+    this.input.on("pointerup", (p: Phaser.Input.Pointer) => {
+      if (this.choosing) {
+        const hit = this.cardHits.findIndex((c) => p.x >= c.x && p.x <= c.x + c.w && p.y >= c.y && p.y <= c.y + c.h);
+        if (hit >= 0) this.take(hit);
+      }
+      if (p.id !== this.stick.pointerId) return;
+      this.stick.active = false;
+      this.stick.pointerId = -1;
+      this.stick.x = 0;
+      this.stick.y = 0;
+    });
     this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
       if (!this.stick.active || p.id !== this.stick.pointerId) return;
       const dx = p.x - this.stick.originX;
@@ -184,13 +208,6 @@ export class SwarmPlayScene extends Phaser.Scene {
       this.stick.x = (dx / m) * Math.min(1, m / cap);
       this.stick.y = (dy / m) * Math.min(1, m / cap);
     });
-    this.input.on("pointerup", (p: Phaser.Input.Pointer) => {
-      if (p.id !== this.stick.pointerId) return;
-      this.stick.active = false;
-      this.stick.pointerId = -1;
-      this.stick.x = 0;
-      this.stick.y = 0;
-    });
 
     this.platform.session.start();
     this.platform.events.emit({ name: "gameplay_started", props: { gameId: "swarm-protocol" } });
@@ -198,6 +215,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.scale.on("resize", (gs: Phaser.Structs.Size) => this.fitCam(gs.width, gs.height));
     this.game.events.on("platform-pause", () => (this.paused = true));
     this.game.events.on("platform-resume", () => (this.paused = false));
+    this.game.events.on("continue-endless", () => this.continueEndless());
     this.started = this.time.now;
   }
 
@@ -217,8 +235,8 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.dead = false;
     this.choosing = null;
     this.elites = 0;
-    this.bossSpawned = false;
-    this.bossDown = false;
+    this.bossSpawned = this.endless;
+    this.bossDown = this.endless;
     this.shotN = 0;
     this.trails = [];
     for (const e of this.enemies) e.active = false;
@@ -265,10 +283,18 @@ export class SwarmPlayScene extends Phaser.Scene {
       return;
     }
     if (this.choosing) {
-      if (Phaser.Input.Keyboard.JustDown(this.keys.one)) this.take(0);
-      if (Phaser.Input.Keyboard.JustDown(this.keys.two)) this.take(1);
-      if (Phaser.Input.Keyboard.JustDown(this.keys.three)) this.take(2);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.one) || native?.onePressed) this.take(0);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.two) || native?.twoPressed) this.take(1);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.three) || native?.threePressed) this.take(2);
       this.draw(dt);
+      return;
+    }
+    if (this.victorious) {
+      this.victoryT -= dt * 1000;
+      this.parts.update(dt * 0.35);
+      this.floaters.update(dt);
+      this.draw(dt);
+      if (this.victoryT <= 0) this.finishVictory();
       return;
     }
     if (this.dead) {
@@ -346,7 +372,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     const elapsed = (this.time.now - this.started) / 1000;
     const live = this.enemies.reduce((n, e) => n + (e.active && e.kind !== "boss" ? 1 : 0), 0);
     const want = desiredCount(elapsed);
-    if (!this.bossSpawned && elapsed >= BOSS_AT) {
+    if (!this.endless && !this.bossSpawned && elapsed >= BOSS_AT) {
       const slot = this.enemies.find((e) => !e.active);
       if (slot) {
         spawnEnemy(slot, "boss", ARENA / 2, 120, 1);
@@ -357,7 +383,7 @@ export class SwarmPlayScene extends Phaser.Scene {
       }
     }
     if (live >= want) return;
-    if (Math.random() > dt * (2.2 + elapsed * 0.01)) return;
+    if (simRand() > dt * (2.2 + elapsed * 0.01)) return;
     const slot = this.enemies.find((e) => !e.active);
     if (!slot) return;
     const kind = pickKind(elapsed, elapsed > 90);
@@ -365,8 +391,8 @@ export class SwarmPlayScene extends Phaser.Scene {
       this.lastEliteWarn = this.time.now;
       this.synth.tone(140, 0.16, "sawtooth", 0.05, 0.1);
     }
-    const a = Math.random() * Math.PI * 2;
-    const dist = 540 + Math.random() * 160;
+    const a = simRand() * Math.PI * 2;
+    const dist = 540 + simRand() * 160;
     const scale = 1 + Math.min(1.4, elapsed / 240);
     spawnEnemy(slot, kind, this.px + Math.cos(a) * dist, this.py + Math.sin(a) * dist, scale);
     slot.x = clamp(slot.x, 30, ARENA - 30);
@@ -670,7 +696,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.kills += 1;
     this.parts.burst(e.x, e.y, e.kind === "boss" || e.kind === "elite" ? 18 : 10, KIND[e.kind].color, 170, 280);
     this.synth.tone(160 + Math.random() * 90, 0.05, "sawtooth", 0.03, 0.22);
-    if (fromDash) void this.platform.achievement.unlock("dash-kill");
+    if (fromDash && this.dashing > 0) void this.platform.achievement.unlock("dash-kill");
     const orb = this.orbs.find((o) => !o.active);
     if (orb) {
       orb.active = true;
@@ -697,7 +723,11 @@ export class SwarmPlayScene extends Phaser.Scene {
       pulseHaptic([20, 40, 30]);
       this.platform.events.emit({ name: "boss_defeated", props: { gameId: "swarm-protocol" } });
       this.synth.personalBest();
-      this.die();
+      this.victorious = true;
+      this.victoryT = 1400;
+      this.juice.flash(0.35);
+      this.juice.hitStop(180);
+      this.floaters.spawn(this.px, this.py - 48, "CORE DOWN", "#ffd4a8");
       return;
     }
     if (this.kills >= 10) void this.platform.achievement.unlock("first-blood");
@@ -792,8 +822,25 @@ export class SwarmPlayScene extends Phaser.Scene {
         pbDelta: pb ? survive - pb : survive,
         retryHint: hintParts.join(" · ").slice(0, 118),
         buildHint: (rec || (bestId ? `Core: ${bestId}` : "Build something weirder.")).slice(0, 118),
+        seed: this.seed,
+        continueEndless: this.bossDown && !this.endless,
       },
     });
+  }
+
+  private finishVictory() {
+    this.victorious = false;
+    this.die();
+  }
+
+  private continueEndless() {
+    if (!this.bossDown) return;
+    this.dead = false;
+    this.victorious = false;
+    this.endless = true;
+    this.game.registry.set("endless", true);
+    this.endedAt = 0;
+    this.platform.session.start();
   }
 
   private retry() {
@@ -908,7 +955,7 @@ export class SwarmPlayScene extends Phaser.Scene {
       const count = this.choosing.length;
       const gap = 12;
       const cardW = Math.min(210, Math.max(148, (this.scale.width - 40 - gap * (count - 1)) / count));
-      const cardH = 168;
+      const cardH = Math.min(210, Math.max(176, this.scale.height * 0.32));
       const total = count * cardW + (count - 1) * gap;
       const left = (this.scale.width - total) / 2;
       const top = this.scale.height / 2 - cardH / 2;
@@ -966,7 +1013,7 @@ export class SwarmPlayScene extends Phaser.Scene {
         killPlayer: () => this.die(),
         finishRun: () => {
           this.bossDown = true;
-          this.die();
+          this.finishVictory();
         },
         hideHud: () => {
           this.hud.setVisible(false);
@@ -995,7 +1042,7 @@ export function mountSwarmProtocol(parent: HTMLElement, platform: PlatformSDK) {
     disableContextMenu: true,
     banner: false,
     autoFocus: true,
-    input: { keyboard: { target: typeof window !== "undefined" ? window : undefined } },
+    input: { keyboard: { target: typeof window !== "undefined" ? window : undefined }, activePointers: 4 },
     fps: { target: 60 },
     render: { preserveDrawingBuffer: true },
   });

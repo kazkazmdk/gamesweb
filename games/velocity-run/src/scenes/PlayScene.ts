@@ -145,6 +145,7 @@ export class VelocityPlayScene extends Phaser.Scene {
     this.game.canvas.tabIndex = 0;
     this.game.canvas.focus({ preventScroll: true });
 
+    this.input.addPointer(3);
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
       this.ensureAudio();
       if (this.handleChromeTap(p.x, p.y)) return;
@@ -359,7 +360,23 @@ export class VelocityPlayScene extends Phaser.Scene {
     this.juice.flash(0.22);
     this.parts.burst(this.runner.x + 8, this.runner.y + 12, 16, this.course.theme.accent, 240, 260);
     this.synth.impact(0.7);
-    this.platform.events.emit({ name: "death", props: { gameId: "velocity-run", deaths: this.deaths } });
+    this.platform.events.emit({ name: "death", props: { gameId: "velocity-run", deaths: this.deaths, sessionDeaths: this.sessionDeaths } });
+    if (this.running) {
+      void this.platform.session.end({
+        mode: this.course.id,
+        score: Math.floor(this.timeMs),
+        result: "attempt-death",
+        metadata: {
+          competitive: false,
+          hideResult: true,
+          attemptDeaths: this.deaths,
+          sessionDeaths: this.sessionDeaths,
+          attemptDurationMs: Math.floor(this.timeMs),
+          verificationLevel: "practice",
+          course: this.courseIndex,
+        },
+      });
+    }
   }
 
   private win() {
@@ -385,7 +402,7 @@ export class VelocityPlayScene extends Phaser.Scene {
     if (medal === "gold" || medal === "platinum") void this.platform.achievement.unlock("gold");
     if (medal === "platinum") void this.platform.achievement.unlock("platinum");
     if (this.courseIndex === 0 && this.timeMs < 40000) void this.platform.achievement.unlock("sub-40");
-    if (this.sessionDeaths === 0) void this.platform.achievement.unlock("no-death");
+    if (this.deaths === 0) void this.platform.achievement.unlock("no-death");
     this.markCourseCleared();
     if (pb && prev > 0) this.markSecondPb();
     void this.platform.quest.progress("velocity-run:gold", medal === "gold" || medal === "platinum" ? 1 : 0);
@@ -411,7 +428,10 @@ export class VelocityPlayScene extends Phaser.Scene {
       metadata: {
         medal: medal ?? "none",
         deaths: this.deaths,
+        attemptDeaths: this.deaths,
         sessionDeaths: this.sessionDeaths,
+        attemptDurationMs: Math.floor(this.timeMs),
+        verificationLevel: "verified",
         course: this.courseIndex,
         lowerIsBetter: true,
         pbDelta: prev > 0 ? this.timeMs - prev : 0,
@@ -630,7 +650,7 @@ export function mountVelocityRun(parent: HTMLElement, platform: PlatformSDK, cou
     disableContextMenu: true,
     banner: false,
     autoFocus: true,
-    input: { keyboard: { target: typeof window !== "undefined" ? window : undefined } },
+    input: { keyboard: { target: typeof window !== "undefined" ? window : undefined }, activePointers: 4 },
     fps: { target: 60 },
     render: { preserveDrawingBuffer: true },
   });
