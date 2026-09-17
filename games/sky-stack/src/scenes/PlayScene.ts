@@ -62,6 +62,9 @@ export class SkyStackScene extends Phaser.Scene {
   private scraps: Array<{ x: number; y: number; w: number; vx: number; vy: number; rot: number; vr: number; color: number }> = [];
   private clouds: Array<{ x: number; y: number; r: number; a: number; s: number }> = [];
   private halo = 0;
+  private event: "none" | "wind" | "narrow" | "fast" | "mirror" = "none";
+  private eventT = 0;
+  private theme = 0;
 
   constructor() {
     super("sky-stack-play");
@@ -140,7 +143,10 @@ export class SkyStackScene extends Phaser.Scene {
       a: 0.08 + this.rng() * 0.1,
       s: 8 + this.rng() * 14,
     }));
-    this.banner.setAlpha(0.85);
+    this.banner.setText("TAP").setAlpha(0.9);
+    this.event = "none";
+    this.eventT = 0;
+    this.theme = Math.floor(this.rng() * 3);
   }
 
   private tryPlace() {
@@ -182,9 +188,11 @@ export class SkyStackScene extends Phaser.Scene {
       this.halo = 1;
       this.pitch = Math.min(880, this.pitch + 28);
       this.synth.tone(this.pitch, 0.07, "sine", 0.05, 0.18);
+      this.synth.tone(this.pitch * 1.5, 0.09, "triangle", 0.03, 0.04);
       pulseHaptic(8);
-      this.juice.flash(0.08);
-      this.parts.burst(result.next.x + result.next.w / 2, result.next.y, 14, 0xffffff, 90, 240);
+      this.juice.flash(0.16);
+      this.juice.cameraPunch(1.2);
+      this.parts.burst(result.next.x + result.next.w / 2, result.next.y, 22, 0xffffff, 110, 280);
       if (this.streak >= 5) void this.platform.achievement.unlock("perfect-5");
       if (this.streak >= 8 && !this.fever) {
         this.fever = true;
@@ -204,8 +212,14 @@ export class SkyStackScene extends Phaser.Scene {
     if (this.floors >= 30) void this.platform.achievement.unlock("floor-30");
     if (this.floors >= 67) void this.platform.achievement.unlock("floor-67");
     this.speed = Math.min(420, 200 + this.floors * 4.2);
-    const w = result.next.w;
-    this.dir = this.rng() > 0.5 ? 1 : -1;
+    if (this.floors > 4 && this.rng() < 0.12) {
+      const roll = this.rng();
+      this.event = roll < 0.3 ? "wind" : roll < 0.55 ? "narrow" : roll < 0.8 ? "fast" : "mirror";
+      this.eventT = 1;
+    } else this.event = "none";
+    if (this.event === "fast") this.speed *= 1.28;
+    const w = this.event === "narrow" ? result.next.w * 0.78 : result.next.w;
+    this.dir = this.event === "mirror" ? -this.dir : this.rng() > 0.5 ? 1 : -1;
     this.moving = {
       x: this.dir > 0 ? 8 : this.scale.width - w - 8,
       y: result.next.y - SLAB_H - 6,
@@ -280,7 +294,8 @@ export class SkyStackScene extends Phaser.Scene {
       } else this.tryPlace();
     }
     if (!this.ended) {
-      this.moving.x += this.dir * this.speed * dt * (this.fever ? 1.18 : 1);
+      const wind = this.event === "wind" ? Math.sin(this.time.now / 180) * 40 : 0;
+      this.moving.x += (this.dir * this.speed + wind) * dt * (this.fever ? 1.18 : 1);
       if (this.moving.x <= 6) {
         this.moving.x = 6;
         this.dir = 1;
@@ -311,10 +326,14 @@ export class SkyStackScene extends Phaser.Scene {
   }
 
   private colorFor(i: number) {
+    const mats = [0x8ec8e8, 0xb8b0a4, 0xc8d0d8, 0x6ad0ff, 0xf0f4ff];
+    const band = this.floors < 10 ? 0 : this.floors < 25 ? 1 : this.floors < 40 ? 2 : this.floors < 60 ? 3 : 4;
+    const base = mats[(band + this.theme) % mats.length];
     const h = (this.hue + i * 7) % 360;
-    const s = this.fever ? 70 : 42;
+    const s = this.fever ? 70 : 38;
     const l = 58 + (i % 3) * 4;
-    return Phaser.Display.Color.HSLToColor(h / 360, s / 100, l / 100).color;
+    const tint = Phaser.Display.Color.HSLToColor(h / 360, s / 100, l / 100).color;
+    return mixColor(base, tint, 0.45);
   }
 
   private draw(dt: number) {
@@ -322,25 +341,30 @@ export class SkyStackScene extends Phaser.Scene {
     g.clear();
     const w = this.scale.width;
     const h = this.scale.height;
-    const dusk = Math.min(1, this.floors / 40);
+    const alt = this.floors;
+    const skyTop =
+      alt < 10 ? 0x6aa8d8 : alt < 25 ? 0x8ec4e8 : alt < 40 ? 0xf0a060 : alt < 60 ? 0x1a2040 : 0x070b18;
+    const mid =
+      alt < 10 ? 0x1a2a44 : alt < 25 ? 0x3a5068 : alt < 40 ? 0x6a3040 : alt < 60 ? 0x10162a : 0x04060e;
+    const bottom = alt < 40 ? 0x101826 : 0x020308;
     fillBackdrop(
       g,
       w,
       h,
       {
-        top: mixColor(0x6aa8d8, 0x0a1020, dusk),
-        mid: mixColor(0x1a2a44, 0x070b14, dusk),
-        bottom: mixColor(0x101826, 0x04060c, dusk),
+        top: skyTop,
+        mid,
+        bottom,
         grain: 0.045,
         blobs: [
-          { color: 0xffc38a, x: 0.16, y: 0.18, r: 52, alpha: 0.12 * (1 - dusk * 0.5), parallax: 0.04 },
-          { color: 0x7ec8ff, x: 0.72, y: 0.12, r: 80, alpha: 0.1 * (1 - dusk), parallax: 0.06 },
+          { color: alt < 40 ? 0xffc38a : 0xa0c8ff, x: 0.16, y: 0.18, r: 52, alpha: 0.14, parallax: 0.04 },
+          { color: 0x7ec8ff, x: 0.72, y: 0.12, r: 80, alpha: alt < 25 ? 0.12 : 0.06, parallax: 0.06 },
         ],
       },
       { y: this.camY },
     );
     for (const c of this.clouds) {
-      g.fillStyle(0xffffff, c.a * (1 - dusk * 0.4));
+      g.fillStyle(0xffffff, c.a * (alt < 40 ? 0.9 : 0.35));
       g.fillCircle(c.x, c.y + this.camY * 0.12, c.r);
       g.fillCircle(c.x + c.r * 0.55, c.y + 8 + this.camY * 0.12, c.r * 0.7);
     }
@@ -371,7 +395,7 @@ export class SkyStackScene extends Phaser.Scene {
       g.fillRoundedRect(this.moving.x, this.moving.y + this.camY, this.moving.w, SLAB_H - 4, 6);
     }
     drawParticles(g, this.parts, 0, this.camY);
-    fillVignette(g, w, h, 0.22 + dusk * 0.12);
+    fillVignette(g, w, h, 0.22 + Math.min(0.2, alt / 80));
     const mark = (floors: number, color: number, label: string) => {
       if (!floors) return;
       const y = this.stack[0].y - floors * (SLAB_H + 6) + this.camY;
