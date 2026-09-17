@@ -1,7 +1,9 @@
 "use client";
 
-import { GAME_MANIFESTS } from "@gamesweb/game-sdk";
+import { GAME_MANIFESTS, nextBestAction, utcDayKey, dailyArcadeEvents } from "@gamesweb/game-sdk";
+import { arcadeStore } from "@/lib/social/arcade-store";
 import { levelFromXp } from "@gamesweb/config";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GameArt } from "@/components/game/GameArt";
@@ -70,6 +72,19 @@ export default function HomePage() {
   const modes = playModeOptions(game.id);
   const fade = reduced ? "" : "duration-[320ms] ease-[var(--ease-out)]";
   const line = ctx.pbLabel ? `${ctx.modeLabel} · Personal best ${ctx.pbLabel}` : ctx.modeLabel;
+  const snap = arcadeStore.view();
+  const day = utcDayKey();
+  const openCh = snap.challenges.find((c) => c.status === "open");
+  const nba = nextBestAction({
+    recentRuns: player.history.slice(0, 8).map((h) => ({ gameId: h.gameId, score: h.score, result: h.result, at: h.at })),
+    retries: player.history.filter((h) => h.gameId === game.id).length,
+    lastGameId: player.history[0]?.gameId,
+    gamesPlayed: store.playedIds(),
+    daily: { remaining: Math.max(0, dailyArcadeEvents(day).length - (snap.daily.day === day ? snap.daily.completed.length : 0)) },
+    openChallenge: openCh
+      ? { code: openCh.publicCode, gameId: openCh.gameId, from: openCh.challengerName }
+      : undefined,
+  });
 
   return (
     <div className="relative min-h-dvh" data-testid="games-home">
@@ -121,6 +136,23 @@ export default function HomePage() {
           <div className="mt-6">
             <QuickAction href={`/play/${game.slug}`}>{ctx.playLabel}</QuickAction>
           </div>
+          {nba.type !== "play" ? (
+            <p className="mt-3 text-[13px] text-white/80">
+              <Link href={nba.href} className="underline decoration-white/25">
+                {nba.label}
+              </Link>
+              <span className="text-white/45"> · {nba.reason}</span>
+            </p>
+          ) : null}
+          <p className="mt-3 text-[13px] text-white/70">
+            <Link href="/daily" className="underline decoration-white/20">Daily Arcade</Link>
+            {" · "}
+            <Link href="/grand-prix" className="underline decoration-white/20">Grand Prix</Link>
+            {" · "}
+            <Link href="/party" className="underline decoration-white/20">Party</Link>
+            {" · "}
+            <Link href="/inbox" className="underline decoration-white/20">Inbox</Link>
+          </p>
           <p className="mt-3 text-[13px] text-white/55">
             {line || "Set a first record"}
             {modes.length > 1 ? (

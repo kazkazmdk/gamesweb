@@ -1,14 +1,26 @@
 "use client";
 
 import { analytics } from "@gamesweb/analytics";
-import { dailyQuests, GAME_MANIFESTS, getManifest, recommend } from "@gamesweb/game-sdk";
+import {
+  dailyArcadeEvents,
+  dailyQuests,
+  defaultChallengeType,
+  GAME_MANIFESTS,
+  getManifest,
+  nextBestAction,
+  normalizePerformance,
+  recommend,
+  utcDayKey,
+} from "@gamesweb/game-sdk";
+import { lowerIsBetter } from "@gamesweb/database";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
-import { loadPlayIndex, neonBoardMode } from "@/lib/platform/modes";
+import { loadPlayIndex, boardModeFromPlayIndex } from "@/lib/platform/modes";
 import { formatScore } from "@/lib/player-store";
+import { arcadeStore } from "@/lib/social/arcade-store";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import type Phaser from "phaser";
 
@@ -85,18 +97,39 @@ export function GameView({ slug }: { slug: string }) {
       let instance: Phaser.Game | null = null;
       stage = "import";
       const daily = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("daily") === "1";
+      const playIndex = loadPlayIndex(game!.id);
       if (game!.id === "neon-drift") {
         const mod = await import("@gamesweb/neon-drift");
         stage = "mount";
-        instance = mod.mountNeonDrift(parent, platform, daily, loadPlayIndex("neon-drift"));
+        instance = mod.mountNeonDrift(parent, platform, daily, playIndex);
       } else if (game!.id === "velocity-run") {
         const mod = await import("@gamesweb/velocity-run");
         stage = "mount";
-        instance = mod.mountVelocityRun(parent, platform, loadPlayIndex("velocity-run"));
-      } else {
+        instance = mod.mountVelocityRun(parent, platform, playIndex);
+      } else if (game!.id === "swarm-protocol") {
         const mod = await import("@gamesweb/swarm-protocol");
         stage = "mount";
         instance = mod.mountSwarmProtocol(parent, platform);
+      } else if (game!.id === "sky-stack") {
+        const mod = await import("@gamesweb/sky-stack");
+        stage = "mount";
+        instance = mod.mountSkyStack(parent, platform);
+      } else if (game!.id === "knockout-circuit") {
+        const mod = await import("@gamesweb/knockout-circuit");
+        stage = "mount";
+        instance = mod.mountKnockoutCircuit(parent, platform, playIndex);
+      } else if (game!.id === "pocket-striker") {
+        const mod = await import("@gamesweb/pocket-striker");
+        stage = "mount";
+        instance = mod.mountPocketStriker(parent, platform, playIndex);
+      } else if (game!.id === "territory-rush") {
+        const mod = await import("@gamesweb/territory-rush");
+        stage = "mount";
+        instance = mod.mountTerritoryRush(parent, platform);
+      } else {
+        const mod = await import("@gamesweb/crowd-control");
+        stage = "mount";
+        instance = mod.mountCrowdControl(parent, platform);
       }
       stage = "create";
       if (dead) {
@@ -144,7 +177,7 @@ export function GameView({ slug }: { slug: string }) {
     }
     if (player.history.length > historyLen.current) {
       const last = player.history[0];
-      if (last && last.gameId === game?.id) {
+      if (last && last.gameId === game?.id && last.result !== "attempt-death" && last.metadata?.hideResult !== true) {
         runEndedAt.current = Date.now();
         setResult({
           score: last.score,
@@ -220,13 +253,8 @@ export function GameView({ slug }: { slug: string }) {
   const gameId = game.id;
 
   const daily = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("daily") === "1";
-  const pbMode =
-    gameId === "velocity-run"
-      ? (["course-1", "course-2", "course-3"][loadPlayIndex("velocity-run")] ?? "course-1")
-      : gameId === "swarm-protocol"
-        ? "survival"
-        : neonBoardMode(loadPlayIndex("neon-drift"), daily);
-  const pb = store.personalBest(gameId, pbMode, gameId === "velocity-run");
+  const pbMode = boardModeFromPlayIndex(gameId, loadPlayIndex(gameId), daily);
+  const pb = store.personalBest(gameId, pbMode, lowerIsBetter(gameId));
   const friendsHere = player.friends.filter((f) => f.status === "accepted" && f.gameId === gameId);
 
   function resume() {
@@ -404,6 +432,10 @@ export function GameView({ slug }: { slug: string }) {
           durationMs={result.durationMs}
           metadata={result.metadata}
           onRetry={retry}
+          onContinueEndless={() => {
+            setResult(null);
+            phaser.current?.events.emit("continue-endless");
+          }}
           nextSlug={next?.slug}
           nextTitle={next?.title}
         />
@@ -420,6 +452,7 @@ function Results({
   durationMs,
   metadata,
   onRetry,
+  onContinueEndless,
   nextSlug,
   nextTitle,
 }: {
@@ -429,6 +462,7 @@ function Results({
   durationMs: number;
   metadata?: Record<string, number | string | boolean>;
   onRetry: () => void;
+  onContinueEndless?: () => void;
   nextSlug?: string;
   nextTitle?: string;
 }) {
@@ -437,12 +471,118 @@ function Results({
   const quests = dailyQuests(player.dayKey);
   const done = quests.filter((q) => player.questCompleted.includes(q.id)).length;
   const retries = player.history.filter((h) => h.gameId === gameId).length;
-  const primary =
-    done >= 1 && nextSlug
-      ? "challenge"
-      : retries >= 4
-        ? "other"
-        : "retry";
+  const params = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
+  const challengeCode = (params.get("c") ?? params.get("challenge") ?? "").toUpperCase();
+  const payload = params.get("p");
+  const daily = params.get("daily") === "1";
+  const partyCode = params.get("party");
+  const gpRound = params.get("gp");
+  const [copied, setCopied] = useState(false);
+  const [challengeOutcome, setChallengeOutcome] = useState<string | null>(null);
+  const applied = useRef(false);
+
+  const pbImproved =
+    typeof metadata?.pbDelta === "number" &&
+    (lowerIsBetter(gameId) ? metadata.pbDelta <= 0 : Number(metadata.pbDelta) > 0);
+
+  const friendsAhead = player.friends
+    .filter((f) => f.status === "accepted")
+    .slice(0, 2)
+    .map((f) => ({
+      name: f.displayName,
+      gameId,
+      deltaLabel: f.gameId === gameId ? "playing now" : "challenge them",
+      href: `/play/${gameId}`,
+    }));
+
+  const arcade = arcadeStore.view();
+  const day = utcDayKey();
+  const dailyEvents = dailyArcadeEvents(day);
+  const dailyDone = arcade.daily.day === day ? arcade.daily.completed.length : 0;
+  const openLocal = arcade.challenges.find((c) => c.status === "open" && c.challengerId !== player.id);
+
+  const action = nextBestAction({
+    recentRuns: player.history.slice(0, 8).map((h) => ({ gameId: h.gameId, score: h.score, result: h.result, at: h.at })),
+    retries,
+    pbImproved,
+    lastGameId: gameId,
+    gamesPlayed: [...new Set(player.history.map((h) => h.gameId))],
+    friendsAhead: friendsAhead.length ? friendsAhead : undefined,
+    openChallenge:
+      challengeCode && challengeCode !== "NEW"
+        ? { code: challengeCode, gameId, from: "challenger" }
+        : openLocal
+          ? { code: openLocal.publicCode, gameId: openLocal.gameId, from: openLocal.challengerName }
+          : undefined,
+    daily: daily ? { remaining: Math.max(0, dailyEvents.length - dailyDone) } : undefined,
+    party: partyCode ? { code: partyCode, nextRound: true } : undefined,
+  });
+  const continueEndless = metadata?.continueEndless === true;
+
+  useEffect(() => {
+    if (applied.current) return;
+    applied.current = true;
+    analytics.track("game_finished", { gameId, score });
+    arcadeStore.contributeCrew();
+    if (challengeCode && challengeCode !== "NEW") {
+      const r = arcadeStore.completeChallenge(
+        challengeCode,
+        {
+          id: crypto.randomUUID?.() ?? `att-${Date.now()}`,
+          playerId: player.id,
+          playerName: player.displayName || "Guest",
+          score,
+          runId: null,
+          trust: player.syncStatus === "saved" ? "verified" : "unverified",
+          createdAt: Date.now(),
+          metadata: { durationMs },
+        },
+        payload,
+      );
+      if (r.ok && r.outcome !== "pending") setChallengeOutcome(r.outcome);
+    }
+    if (daily) {
+      const event = dailyEvents.find((e) => e.gameId === gameId);
+      arcadeStore.dailyProgress(day, `${gameId}:${event?.mode ?? "daily"}`, normalizePerformance(gameId, score));
+    }
+    if (partyCode) {
+      arcadeStore.scorePartyRound(partyCode, [{ id: player.id, name: player.displayName || "You", score }], gameId);
+    }
+    if (gpRound) arcadeStore.gpScore(Math.max(0, Number(metadata?.gpRound ?? 0)), 10);
+  }, [
+    challengeCode,
+    daily,
+    day,
+    dailyEvents,
+    durationMs,
+    gameId,
+    gpRound,
+    metadata?.gpRound,
+    partyCode,
+    payload,
+    player.displayName,
+    player.id,
+    player.syncStatus,
+    score,
+  ]);
+
+  function makeChallenge() {
+    const game = getManifest(gameId);
+    const made = arcadeStore.createChallenge({
+      gameId,
+      mode: boardModeFromPlayIndex(gameId, loadPlayIndex(gameId), daily),
+      seed: params.get("seed") ?? `${gameId}:${Date.now()}`,
+      type: game ? defaultChallengeType(game) : "beat-score",
+      challengerId: player.id,
+      challengerName: player.displayName || "Player",
+      score,
+      trust: player.syncStatus === "saved" ? "verified" : "unverified",
+    });
+    void navigator.clipboard.writeText(`${window.location.origin}${made.url}`);
+    setCopied(true);
+    analytics.track("challenge_shared", { gameId, code: made.challenge.publicCode });
+    analytics.track("social_action_after_result", { gameId, type: "challenge" });
+  }
 
   const pbDelta = typeof metadata?.pbDelta === "number" ? metadata.pbDelta : null;
   const retryHint = typeof metadata?.retryHint === "string" ? metadata.retryHint : null;
@@ -473,10 +613,15 @@ function Results({
       <div className="w-[min(420px,92vw)] px-6 py-8">
         <p className="meta text-white/45">{result}</p>
         <p className="display mt-3 text-[64px]">{formatScore(gameId, score)}</p>
+        {challengeOutcome ? (
+          <p className="mt-2 text-[15px] text-emerald-300">
+            {challengeOutcome === "win" ? "You won" : challengeOutcome === "draw" ? "Draw" : "They still lead"}
+          </p>
+        ) : null}
         {pbDelta !== null ? (
           <p
             className={`mt-1 text-[14px] ${
-              gameId === "velocity-run"
+              lowerIsBetter(gameId)
                 ? pbDelta <= 0
                   ? "text-emerald-300"
                   : "text-rose-300"
@@ -485,9 +630,9 @@ function Results({
                   : "text-rose-300"
             }`}
           >
-            {gameId === "velocity-run"
+            {lowerIsBetter(gameId)
               ? pbDelta <= 0
-                ? `PB ${ (pbDelta / 1000).toFixed(3)}s`
+                ? `PB ${(pbDelta / 1000).toFixed(3)}s`
                 : `PB +${(pbDelta / 1000).toFixed(3)}s`
               : pbDelta >= 0
                 ? `PB +${Math.round(pbDelta).toLocaleString()}`
@@ -529,21 +674,52 @@ function Results({
                   : null}
         </p>
         <div className="mt-6 flex flex-col gap-2">
-          <button
-            type="button"
-            className={`rounded-full py-3 text-[14px] ${primary === "retry" ? "bg-[var(--accent)] text-[#140d12]" : "border border-white/15"}`}
-            onClick={onRetry}
-          >
-            Retry
-          </button>
-          {nextSlug ? (
+          {continueEndless ? (
+            <button
+              type="button"
+              className="rounded-full bg-[var(--accent)] py-3 text-[14px] text-[#140d12]"
+              onClick={() => onContinueEndless?.()}
+            >
+              Continue Endless
+            </button>
+          ) : action.href.startsWith("/play/") && (action.type === "retry_pb" || action.type === "challenge_friend" || action.type === "beat_friend") ? (
+            <button
+              type="button"
+              className="rounded-full bg-[var(--accent)] py-3 text-[14px] text-[#140d12]"
+              onClick={() => {
+                analytics.track("meaningful_action_after_result", { gameId, type: action.type });
+                if (action.type === "challenge_friend") makeChallenge();
+                else onRetry();
+              }}
+            >
+              {action.type === "challenge_friend" ? (copied ? "Link copied" : action.label) : action.label}
+            </button>
+          ) : (
+            <Link
+              href={action.href}
+              className="rounded-full bg-[var(--accent)] py-3 text-center text-[14px] text-[#140d12]"
+              onClick={() => analytics.track("meaningful_action_after_result", { gameId, type: action.type })}
+            >
+              {action.label}
+            </Link>
+          )}
+          {copied ? <p className="text-center text-[12px] text-white/50">Challenge link copied</p> : null}
+          {action.type !== "retry_pb" && !continueEndless ? (
+            <button type="button" className="rounded-full border border-white/15 py-3 text-[14px]" onClick={onRetry}>
+              Retry
+            </button>
+          ) : null}
+          {action.type !== "challenge_friend" ? (
+            <button type="button" className="rounded-full border border-white/15 py-3 text-[14px]" onClick={makeChallenge}>
+              Challenge a friend
+            </button>
+          ) : nextSlug ? (
             <Link
               href={`/play/${nextSlug}`}
               onClick={() => analytics.track("recommendation_clicked", { from: gameId, to: nextSlug })}
-              className={`rounded-full py-3 text-center text-[14px] ${primary !== "retry" ? "bg-[var(--accent)] text-[#140d12]" : "border border-white/15"}`}
+              className="rounded-full border border-white/15 py-3 text-center text-[14px]"
             >
-              {primary === "challenge" ? "Next challenge" : "Try another game"}
-              {nextTitle ? ` — ${nextTitle}` : ""}
+              Try another game{nextTitle ? ` — ${nextTitle}` : ""}
             </Link>
           ) : null}
         </div>

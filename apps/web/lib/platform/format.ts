@@ -1,6 +1,7 @@
 export function formatPlayScore(gameId: string, score: number) {
   if (!Number.isFinite(score) || score <= 0 || score >= 1e12) return null;
-  if (gameId === "velocity-run") return `${(score / 1000).toFixed(3)}s`;
+  if (gameId === "velocity-run" || gameId === "knockout-circuit") return `${(score / 1000).toFixed(3)}s`;
+  if (gameId === "pocket-striker") return `${Math.round(score)} strokes`;
   return Math.round(score).toLocaleString();
 }
 

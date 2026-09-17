@@ -6,6 +6,7 @@ import { analytics } from "@gamesweb/analytics";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { arcadeStore } from "@/lib/social/arcade-store";
 import { usePlayer } from "@/lib/player";
 import { SavePrompt } from "@/components/meta/SavePrompt";
 import { Toasts } from "@/components/meta/Toasts";
@@ -15,13 +16,15 @@ export const PLATFORM_ACCENT = "#d7c4a3";
 
 const DESKTOP_NAV = [
   { href: "/", label: "Games", match: (p: string) => p === "/" },
-  { href: "/arcade", label: "Arcade", match: (p: string) => p.startsWith("/arcade") || p.startsWith("/challenges") || p.startsWith("/achievements") },
+  { href: "/arcade", label: "Arcade", match: (p: string) => p.startsWith("/arcade") || p.startsWith("/challenges") || p.startsWith("/achievements") || p.startsWith("/daily") || p.startsWith("/grand-prix") },
+  { href: "/daily", label: "Daily", match: (p: string) => p.startsWith("/daily") },
+  { href: "/inbox", label: "Inbox", match: (p: string) => p.startsWith("/inbox") || p.startsWith("/c/") },
 ];
 
 const MOBILE_NAV = [
   { href: "/", label: "Games", match: (p: string) => p === "/", icon: HomeIcon },
   { href: "/arcade", label: "Arcade", match: (p: string) => p.startsWith("/arcade") || p.startsWith("/challenges") || p.startsWith("/achievements"), icon: ArcadeIcon },
-  { href: "/friends", label: "Friends", match: (p: string) => p.startsWith("/friends"), icon: FriendsIcon },
+  { href: "/friends", label: "Friends", match: (p: string) => p.startsWith("/friends") || p.startsWith("/inbox"), icon: FriendsIcon },
   { href: "/me", label: "Me", match: (p: string) => p.startsWith("/me") || p.startsWith("/profile") || p.startsWith("/settings"), icon: MeIcon },
 ];
 
@@ -30,6 +33,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const playing = path.startsWith("/play/") && path !== "/play";
   const player = usePlayer();
   const [query, setQuery] = useState(false);
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    const sync = () => setUnread(arcadeStore.unread());
+    sync();
+    return arcadeStore.subscribe(sync);
+  }, []);
 
   useEffect(() => {
     analytics.page(path);
@@ -84,6 +94,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className={item.match(path) ? "nav-active pb-0.5 text-white" : "hover:text-white"}
               >
                 {item.label}
+                {item.href === "/inbox" && unread > 0 ? (
+                  <span className="ml-1 rounded-full bg-[var(--accent)] px-1.5 text-[10px] text-[#140d12]">{unread}</span>
+                ) : null}
               </Link>
             ))}
           </nav>
