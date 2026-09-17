@@ -330,7 +330,7 @@ export class TerritoryScene extends Phaser.Scene {
         g.fillTriangle(bx, by - c * 0.46, bx + c * 0.46, by, bx, by + c * 0.46);
         g.fillTriangle(bx, by - c * 0.46, bx - c * 0.46, by, bx, by + c * 0.46);
       } else g.fillRoundedRect(bx - c * 0.4, by - c * 0.4, c * 0.8, c * 0.8, 3);
-      this.names[i]?.setPosition(bx, by - c * 0.7).setVisible(true);
+      this.names[i]?.setPosition(bx, by - c * 0.7).setVisible(this.hud.visible);
     });
     drawParticles(g, this.parts);
     fillVignette(g, this.scale.width, this.scale.height, 0.2);

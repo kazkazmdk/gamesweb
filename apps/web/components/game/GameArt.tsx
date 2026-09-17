@@ -2,14 +2,23 @@ const POSITION: Record<string, Record<string, string>> = {
   "neon-drift": { backdrop: "48% 52%", hero: "46% 58%", tile: "46% 58%" },
   "velocity-run": { backdrop: "22% 68%", hero: "18% 70%", tile: "20% 68%" },
   "swarm-protocol": { backdrop: "92% 42%", hero: "70% 50%", tile: "60% 48%" },
-  "sky-stack": { backdrop: "50% 20%", hero: "50% 30%", tile: "50% 35%" },
-  "knockout-circuit": { backdrop: "40% 60%", hero: "45% 55%", tile: "50% 50%" },
-  "pocket-striker": { backdrop: "50% 50%", hero: "50% 50%", tile: "50% 50%" },
-  "territory-rush": { backdrop: "50% 50%", hero: "50% 50%", tile: "50% 50%" },
-  "crowd-control": { backdrop: "50% 70%", hero: "50% 60%", tile: "50% 55%" },
+  "sky-stack": { backdrop: "50% 62%", hero: "48% 68%", tile: "50% 70%" },
+  "knockout-circuit": { backdrop: "28% 72%", hero: "22% 74%", tile: "30% 72%" },
+  "pocket-striker": { backdrop: "50% 48%", hero: "38% 42%", tile: "42% 45%" },
+  "territory-rush": { backdrop: "42% 58%", hero: "36% 62%", tile: "40% 58%" },
+  "crowd-control": { backdrop: "62% 78%", hero: "72% 80%", tile: "70% 78%" },
 };
 
-const JPG = new Set(["neon-drift", "velocity-run", "swarm-protocol"]);
+const JPG = new Set([
+  "neon-drift",
+  "velocity-run",
+  "swarm-protocol",
+  "sky-stack",
+  "knockout-circuit",
+  "pocket-striker",
+  "territory-rush",
+  "crowd-control",
+]);
 
 export function GameArt({
   slug,
