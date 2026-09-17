@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Apply 0001–0005 to a clean Postgres and run security / concurrency / dedupe tests.
+ * Apply 0001–0006 to a clean Postgres and run security / concurrency / dedupe tests.
  * Requires DATABASE_URL. Fails if the database is missing or a migration is invalid.
  */
 import { readdirSync, readFileSync } from "node:fs";
@@ -60,7 +60,7 @@ async function main() {
     const files = readdirSync(join(root, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql"))
       .sort();
-    if (files.join() !== "0001_init.sql,0002_hardening.sql,0003_quality_hardening.sql,0004_authoritative_progression.sql,0005_privacy_rewards_dedupe.sql") {
+    if (files.join() !== "0001_init.sql,0002_hardening.sql,0003_quality_hardening.sql,0004_authoritative_progression.sql,0005_privacy_rewards_dedupe.sql,0006_social_arcade.sql") {
       throw new Error(`unexpected migrations: ${files.join(", ")}`);
     }
     for (const file of files) {
