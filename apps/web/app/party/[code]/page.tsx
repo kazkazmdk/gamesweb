@@ -3,6 +3,7 @@
 import { getManifest, PARTY_REACTIONS } from "@gamesweb/game-sdk";
 import { arcadeStore } from "@/lib/social/arcade-store";
 import { usePlayer } from "@/lib/player";
+import { SSR_PLAYER } from "@/lib/player-store";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -19,6 +20,7 @@ export default function PartyPage() {
   const [party, setParty] = useState<PartyState | null | undefined>(undefined);
 
   useEffect(() => {
+    if (player.id === SSR_PLAYER.id) return;
     const target = created || code;
     const joined = arcadeStore.joinParty(target, player.id, player.displayName || "Player");
     if (joined.ok) setParty(joined.party);
