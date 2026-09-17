@@ -2,6 +2,22 @@ export type InputMethod = "keyboard" | "mouse" | "touch" | "gamepad";
 
 export type GameOrientation = "landscape" | "portrait" | "either";
 
+export type SocialMode = "solo" | "async-duel" | "ghost-race" | "party" | "daily" | "grand-prix";
+
+export type ChallengeType =
+  | "beat-score"
+  | "beat-time"
+  | "beat-ghost"
+  | "survive-longer"
+  | "same-seed"
+  | "beat-route"
+  | "beat-build"
+  | "survive-seed";
+
+export type ScoreDirection = "higher" | "lower";
+
+export type VerificationLevel = "practice" | "unverified" | "verified";
+
 export type AchievementDefinition = {
   key: string;
   name: string;
@@ -29,6 +45,7 @@ export type GameManifest = {
   description: string;
   genre: string;
   tags: string[];
+  skills: string[];
   accent: string;
   accentSoft: string;
   orientation: GameOrientation;
@@ -51,9 +68,19 @@ export type GameManifest = {
   minPlayers: number;
   maxPlayers: number;
   sessionHint: string;
+  sessionDuration: { minSec: number; maxSec: number };
   howToPlay: string[];
   controls: Array<{ input: string; action: string }>;
   faq: Array<{ q: string; a: string }>;
+  modes: string[];
+  scoreDirection: ScoreDirection;
+  socialModes: SocialMode[];
+  challengeTypes: ChallengeType[];
+  ghostSupport: boolean;
+  dailySupport: boolean;
+  partySupport: boolean;
+  leaderboards: string[];
+  assets?: Record<string, string>;
 };
 
 export type GameSession = {
@@ -98,6 +125,17 @@ export type AudioSettings = {
   muted: boolean;
 };
 
+export type RunContext = {
+  daily: boolean;
+  seed?: string;
+  challengeCode?: string;
+  partyCode?: string;
+  grandPrixId?: string;
+  endless?: boolean;
+  modeIndex?: number;
+  ghostKind?: "pb" | "friend" | "rival" | "challenge" | "daily";
+};
+
 export type PlatformSDK = {
   init: (opts: { gameId: string; version: string }) => void;
   session: {
@@ -134,5 +172,8 @@ export type PlatformSDK = {
   };
   pause: {
     request: () => void;
+  };
+  run?: {
+    context: () => RunContext;
   };
 };

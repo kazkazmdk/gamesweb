@@ -1,7 +1,7 @@
 import { levelFromXp, xpRewards } from "@gamesweb/config";
 import { dailyQuests } from "@gamesweb/game-sdk";
 import { achievementXp } from "./merge";
-import { medalForTime } from "./constants";
+import { lowerIsBetter as gameLowerIsBetter, medalForTime } from "./constants";
 import type { ProgressionDiff, VerifiedStatus } from "./types";
 
 export type RunContext = {
@@ -26,7 +26,7 @@ export type RunContext = {
 };
 
 export function isPersonalBest(gameId: string, score: number, pbBefore: number): boolean {
-  const lower = gameId === "velocity-run";
+  const lower = gameLowerIsBetter(gameId);
   const hasExisting = lower ? Number.isFinite(pbBefore) && pbBefore < 1e12 : Number.isFinite(pbBefore) && pbBefore > 0;
   if (!hasExisting) return score > 0;
   return lower ? score < pbBefore : score > pbBefore;

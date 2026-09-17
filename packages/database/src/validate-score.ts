@@ -38,6 +38,16 @@ export function validateScore(payload: ScorePayload): ScoreValidation {
     validateVelocity(payload, reasons);
   } else if (payload.gameId === "swarm-protocol") {
     validateSwarm(payload, durationSec, reasons);
+  } else if (payload.gameId === "sky-stack") {
+    validateSkyStack(payload, durationSec, reasons);
+  } else if (payload.gameId === "knockout-circuit") {
+    validateKnockout(payload, reasons);
+  } else if (payload.gameId === "pocket-striker") {
+    validatePocket(payload, durationSec, reasons);
+  } else if (payload.gameId === "territory-rush") {
+    validateTerritory(payload, durationSec, reasons);
+  } else if (payload.gameId === "crowd-control") {
+    validateCrowd(payload, durationSec, reasons);
   } else {
     reasons.push("unknown_game");
   }
@@ -109,4 +119,44 @@ function validateSwarm(payload: ScorePayload, durationSec: number, reasons: stri
   if (damage < 0 || damage > 5_000_000) reasons.push("damage_implausible");
   if (surviveMs > payload.durationMs + 5000) reasons.push("survive_desync");
   if (level > 6 && durationSec < 40) reasons.push("wave_too_fast");
+}
+
+function validateSkyStack(payload: ScorePayload, durationSec: number, reasons: string[]) {
+  if (!["climb", "daily"].includes(payload.mode)) reasons.push("invalid_mode");
+  if (payload.score < 0 || payload.score > 5_000_000) reasons.push("score_out_of_range");
+  const floors = num(payload.metadata, "floors");
+  if (floors < 0 || floors > 400) reasons.push("floors_implausible");
+  if (floors > durationSec * 8 + 4) reasons.push("score_exceeds_pace");
+  if (payload.score > 200_000 && durationSec < 8) reasons.push("high_score_fast_run");
+}
+
+function validateKnockout(payload: ScorePayload, reasons: string[]) {
+  if (!["map-a", "map-b", "map-c", "daily"].includes(payload.mode)) reasons.push("invalid_mode");
+  if (payload.score < 4_000 || payload.score > 240_000) reasons.push("time_out_of_range");
+  if (payload.durationMs + 1200 < payload.score) reasons.push("timer_desync");
+  if (payload.durationMs > payload.score + 20_000) reasons.push("timer_desync");
+}
+
+function validatePocket(payload: ScorePayload, durationSec: number, reasons: string[]) {
+  if (!["layout", "daily"].includes(payload.mode)) reasons.push("invalid_mode");
+  if (payload.score < 1 || payload.score > 40) reasons.push("score_out_of_range");
+  if (payload.score === 1 && durationSec < 0.4) reasons.push("duration_too_short");
+  const strokes = num(payload.metadata, "strokes") || payload.score;
+  if (strokes !== payload.score) reasons.push("stroke_mismatch");
+}
+
+function validateTerritory(payload: ScorePayload, durationSec: number, reasons: string[]) {
+  if (!["arena", "daily"].includes(payload.mode)) reasons.push("invalid_mode");
+  if (payload.score < 0 || payload.score > 500_000) reasons.push("score_out_of_range");
+  const pct = num(payload.metadata, "territoryPct");
+  if (pct < 0 || pct > 100) reasons.push("territory_implausible");
+  if (payload.score > 80_000 && durationSec < 12) reasons.push("high_score_fast_run");
+}
+
+function validateCrowd(payload: ScorePayload, durationSec: number, reasons: string[]) {
+  if (!["rush", "daily"].includes(payload.mode)) reasons.push("invalid_mode");
+  if (payload.score < 0 || payload.score > 2_000_000) reasons.push("score_out_of_range");
+  const pack = num(payload.metadata, "pack");
+  if (pack < 0 || pack > 4000) reasons.push("pack_implausible");
+  if (payload.score > 120_000 && durationSec < 12) reasons.push("high_score_fast_run");
 }

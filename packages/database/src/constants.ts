@@ -1,10 +1,24 @@
-export const GAME_IDS = ["neon-drift", "velocity-run", "swarm-protocol"] as const;
+export const GAME_IDS = [
+  "neon-drift",
+  "velocity-run",
+  "swarm-protocol",
+  "sky-stack",
+  "knockout-circuit",
+  "pocket-striker",
+  "territory-rush",
+  "crowd-control",
+] as const;
 export type GameId = (typeof GAME_IDS)[number];
 
 export const GAME_MODES: Record<GameId, readonly string[]> = {
   "neon-drift": ["foundation", "technical", "velocity", "daily", "circuit"],
   "velocity-run": ["course-1", "course-2", "course-3"],
-  "swarm-protocol": ["survival"],
+  "swarm-protocol": ["survival", "seed"],
+  "sky-stack": ["climb", "daily"],
+  "knockout-circuit": ["map-a", "map-b", "map-c", "daily"],
+  "pocket-striker": ["layout", "daily"],
+  "territory-rush": ["arena", "daily"],
+  "crowd-control": ["rush", "daily"],
 };
 
 export const VELOCITY_MEDALS: Record<
@@ -15,6 +29,8 @@ export const VELOCITY_MEDALS: Record<
   "course-2": { platinum: 48000, gold: 56000, silver: 68000, bronze: 84000 },
   "course-3": { platinum: 68000, gold: 80000, silver: 96000, bronze: 118000 },
 };
+
+export const LOWER_IS_BETTER_GAMES = ["velocity-run", "knockout-circuit", "pocket-striker"] as const;
 
 export const PRESENCE_STALE_MS = 2 * 60 * 1000;
 export const MAX_SAVE_BYTES = 48_000;
@@ -31,11 +47,16 @@ export function isGameId(value: string): value is GameId {
 export function defaultMode(gameId: string): string {
   if (gameId === "velocity-run") return "course-1";
   if (gameId === "swarm-protocol") return "survival";
+  if (gameId === "sky-stack") return "climb";
+  if (gameId === "knockout-circuit") return "map-a";
+  if (gameId === "pocket-striker") return "layout";
+  if (gameId === "territory-rush") return "arena";
+  if (gameId === "crowd-control") return "rush";
   return "foundation";
 }
 
 export function lowerIsBetter(gameId: string): boolean {
-  return gameId === "velocity-run";
+  return (LOWER_IS_BETTER_GAMES as readonly string[]).includes(gameId);
 }
 
 export function medalForTime(mode: string, timeMs: number): "platinum" | "gold" | "silver" | "bronze" | null {
