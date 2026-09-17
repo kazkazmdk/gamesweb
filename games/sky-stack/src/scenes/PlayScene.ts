@@ -335,6 +335,11 @@ export class SkyStackScene extends Phaser.Scene {
           this.fail();
         },
         killPlayer: () => this.fail(),
+        jump: () => {
+          const top = this.stack[this.stack.length - 1];
+          if (top) this.moving.x = top.x;
+          this.tryPlace();
+        },
         hideHud: () => this.hud.setVisible(false),
       },
     );

@@ -71,7 +71,9 @@ async function waitReady(page: Page, gameId: string) {
       return d?.ready && d.gameId === gameId ? d.gameId : null;
     }, { timeout: 20_000 })
     .toBe(gameId);
-  await page.locator("canvas").click({ position: { x: 200, y: 200 }, timeout: 5_000 });
+  await page.locator("canvas").evaluate((el) => {
+    if (el instanceof HTMLCanvasElement) el.focus({ preventScroll: true });
+  });
 }
 
 async function assertAlive(page: Page) {
@@ -216,9 +218,9 @@ test("swarm protocol moves, levels, and takes an upgrade", async ({ page }) => {
 test("sky stack places with space and retries", async ({ page }) => {
   const done = attachConsoleGuard(page);
   await waitReady(page, "sky-stack");
-  await page.locator("canvas").click({ position: { x: 180, y: 400 } });
-  await page.keyboard.press("Space");
+  await cmd(page, "jump");
   await expect.poll(async () => (await debugOf(page))?.score ?? 0, { timeout: 8_000 }).toBeGreaterThan(0);
+  await page.keyboard.press("Space");
   await assertAlive(page);
   done();
 });
