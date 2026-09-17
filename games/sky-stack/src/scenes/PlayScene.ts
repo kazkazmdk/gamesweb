@@ -16,6 +16,7 @@ import { placeSlab, slabScore, type Slab } from "../systems/stack";
 
 const START_W = 210;
 const SLAB_H = 28;
+const RETRY_GRACE_MS = 450;
 
 export class SkyStackScene extends Phaser.Scene {
   private platform!: PlatformSDK;
@@ -129,7 +130,7 @@ export class SkyStackScene extends Phaser.Scene {
   private tryPlace() {
     this.ensureAudio();
     if (this.ended) {
-      this.retry();
+      if (this.time.now - this.endedAt >= RETRY_GRACE_MS) this.retry();
       return;
     }
     if (this.placing) return;
@@ -241,8 +242,10 @@ export class SkyStackScene extends Phaser.Scene {
     }
     const native = this.nativeKeys?.read();
     if (native?.jumpPressed || native?.retryPressed) {
-      if (this.ended || native.retryPressed) this.retry();
-      else this.tryPlace();
+      if (this.ended || native.retryPressed) {
+        // The platform result screen owns the first moments after a fall.
+        if (!this.ended || this.time.now - this.endedAt >= RETRY_GRACE_MS) this.retry();
+      } else this.tryPlace();
     }
     if (!this.ended) {
       this.moving.x += this.dir * this.speed * dt * (this.fever ? 1.18 : 1);

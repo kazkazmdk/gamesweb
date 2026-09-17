@@ -24,6 +24,8 @@ import { arcadeStore } from "@/lib/social/arcade-store";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import type Phaser from "phaser";
 
+const RESULT_INPUT_GRACE_MS = 450;
+
 export function GameView({ slug }: { slug: string }) {
   const game = getManifest(slug);
   const store = useStore();
@@ -202,6 +204,7 @@ export function GameView({ slug }: { slug: string }) {
         });
       }
       if (e.key === "r" || e.key === "R") {
+        if (runEndedAt.current && Date.now() - runEndedAt.current < RESULT_INPUT_GRACE_MS) return;
         setPaused(false);
         setResult(null);
         phaser.current?.events.emit("platform-resume");
@@ -597,10 +600,15 @@ function Results({
   const buildHint = typeof metadata?.buildHint === "string" ? metadata.buildHint : null;
   const boss = metadata?.boss === true || metadata?.boss === "defeated";
 
+  const shownAt = useRef(0);
+  if (shownAt.current === 0 && typeof performance !== "undefined") shownAt.current = performance.now();
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "r" || e.key === "R" || e.key === " ") {
         e.preventDefault();
+        // A tap still in the play rhythm should not skip the recap.
+        if (performance.now() - shownAt.current < RESULT_INPUT_GRACE_MS) return;
         onRetry();
       }
     };

@@ -43,10 +43,10 @@ export const playerApi = {
     idempotencyKey?: string;
   }) {
     return parse<{
-      verification: { status: string; reasons: string[] };
+      verification?: { status: string; reasons: string[] };
       alreadyApplied: boolean;
-      progressionDiff: ProgressionDiff;
-      scoreId: string;
+      progressionDiff?: ProgressionDiff;
+      scoreId?: string;
     }>(
       await fetch("/api/score", {
         method: "POST",

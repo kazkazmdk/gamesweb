@@ -222,6 +222,9 @@ class PlayerStore {
   }
 
   private emit() {
+    // Most mutations above edit the snapshot in place; useSyncExternalStore only
+    // re-renders when the reference changes, so publish a fresh object each time.
+    this.snapshot = { ...this.snapshot };
     this.listeners.forEach((fn) => fn());
   }
 
@@ -433,12 +436,21 @@ class PlayerStore {
             localSessionId: sessionId,
             idempotencyKey: `score-offline:${sessionId}`,
           });
-          if (retry.ok) {
+          if (retry.ok && retry.data.verification) {
             row.verified = retry.data.verification.status as VerifiedStatus;
-            this.applyServerProgression(retry.data.progressionDiff);
+            if (retry.data.progressionDiff) this.applyServerProgression(retry.data.progressionDiff);
             this.snapshot.syncStatus = retry.data.verification.status === "unverified" ? "review" : "saved";
+          } else if (retry.ok) {
+            this.snapshot.syncStatus = "saved";
           }
         }
+        this.persist();
+        this.emit();
+        return;
+      }
+      if (!res.data.verification) {
+        // Replayed idempotent submission: the server already holds this run.
+        this.snapshot.syncStatus = "saved";
         this.persist();
         this.emit();
         return;
@@ -452,7 +464,7 @@ class PlayerStore {
       } else {
         this.snapshot.syncStatus = "saved";
       }
-      this.applyServerProgression(res.data.progressionDiff);
+      if (res.data.progressionDiff) this.applyServerProgression(res.data.progressionDiff);
       this.persist();
       this.emit();
     } catch {
@@ -928,7 +940,9 @@ class PlayerStore {
       payload,
       retryCount: 0,
       ts: Date.now(),
-      idempotencyKey: `${type}:${String(payload.sessionId ?? opId)}`,
+      // Namespaced so a queued op never claims the idempotency key of the
+      // authoritative /api/score submission for the same session.
+      idempotencyKey: `sync:${type}:${String(payload.sessionId ?? opId)}`,
     });
     this.persist();
     void this.flush();
