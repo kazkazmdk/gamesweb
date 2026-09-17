@@ -504,6 +504,9 @@ function Results({
   const dailyDone = arcade.daily.day === day ? arcade.daily.completed.length : 0;
   const openLocal = arcade.challenges.find((c) => c.status === "open" && c.challengerId !== player.id);
 
+  // Once the challenge is beaten, "Beat challenger" would loop back to the magic
+  // page; the meaningful next action is to send the rematch.
+  const wonChallenge = challengeOutcome === "win";
   const action = nextBestAction({
     recentRuns: player.history.slice(0, 8).map((h) => ({ gameId: h.gameId, score: h.score, result: h.result, at: h.at })),
     retries,
@@ -511,8 +514,9 @@ function Results({
     lastGameId: gameId,
     gamesPlayed: [...new Set(player.history.map((h) => h.gameId))],
     friendsAhead: friendsAhead.length ? friendsAhead : undefined,
-    openChallenge:
-      challengeCode && challengeCode !== "NEW"
+    openChallenge: wonChallenge
+      ? undefined
+      : challengeCode && challengeCode !== "NEW"
         ? { code: challengeCode, gameId, from: "challenger" }
         : openLocal
           ? { code: openLocal.publicCode, gameId: openLocal.gameId, from: openLocal.challengerName }
@@ -690,6 +694,17 @@ function Results({
             >
               Continue Endless
             </button>
+          ) : wonChallenge ? (
+            <button
+              type="button"
+              className="rounded-full bg-[var(--accent)] py-3 text-[14px] text-[#140d12]"
+              onClick={() => {
+                analytics.track("meaningful_action_after_result", { gameId, type: "rematch" });
+                makeChallenge();
+              }}
+            >
+              {copied ? "Rematch link copied" : "Send rematch"}
+            </button>
           ) : action.href.startsWith("/play/") && (action.type === "retry_pb" || action.type === "challenge_friend" || action.type === "beat_friend") ? (
             <button
               type="button"
@@ -717,7 +732,7 @@ function Results({
               Retry
             </button>
           ) : null}
-          {action.type !== "challenge_friend" ? (
+          {action.type !== "challenge_friend" && !wonChallenge ? (
             <button type="button" className="rounded-full border border-white/15 py-3 text-[14px]" onClick={makeChallenge}>
               Challenge a friend
             </button>
