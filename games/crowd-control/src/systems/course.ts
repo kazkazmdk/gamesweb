@@ -2,7 +2,7 @@ export type GateOp = { kind: "add" | "mul" | "sub" | "div"; n: number };
 
 export type Segment = {
   z: number;
-  type: "gate" | "split" | "enemy" | "finish" | "shortcut";
+  type: "gate" | "split" | "enemy" | "finish" | "shortcut" | "boss" | "break";
   left?: GateOp;
   right?: GateOp;
   lane?: "left" | "right" | "mid";

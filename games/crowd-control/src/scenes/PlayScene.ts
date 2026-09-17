@@ -9,12 +9,15 @@ import {
   clearGwDebug,
   createGameKeyboard,
   drawParticles,
+  drawMiniPerson,
+  drawGateArch,
   fillBackdrop,
   fillVignette,
   type GameKeyboard,
 } from "@gamesweb/game-core";
 import { crowdControlManifest, readRunContext, type PlatformSDK } from "@gamesweb/game-sdk";
 import { applyOp, buildCourse, opLabel, type Segment } from "../systems/course";
+import { LEVELS } from "../levels/levels";
 
 type Member = { ox: number; oy: number; vx: number; vy: number; phase: number };
 
@@ -57,7 +60,8 @@ export class CrowdScene extends Phaser.Scene {
     this.platform = this.game.registry.get("platform") as PlatformSDK;
     const ctx = readRunContext();
     this.seed = ctx.seed ?? ctx.challengeCode ?? "rush";
-    this.segs = buildCourse(this.seed);
+    const idx = Math.abs([...this.seed].reduce((h, c) => h + c.charCodeAt(0), 0)) % LEVELS.length;
+    this.segs = LEVELS[idx] ?? buildCourse(this.seed);
     this.z = 0;
     this.x = 0.5;
     this.pack = 12;
@@ -211,8 +215,24 @@ export class CrowdScene extends Phaser.Scene {
       this.shortcut = true;
       this.speed += 40;
       void this.platform.achievement.unlock("cut-in");
+    } else if (seg.type === "boss") {
+      this.pack = Math.max(1, this.pack - 14);
+      this.syncPack();
+      this.juice.flash(0.22);
+      this.synth.crash(0.7);
+      this.parts.burst(this.scale.width * 0.5, this.scale.height * 0.7, 22, 0xff4d6d, 140, 360);
+    } else if (seg.type === "break") {
+      this.speed += 20;
+      this.synth.impact(0.5);
     }
     if (this.pack <= 0) this.finish();
+  }
+
+  private qualityMembers() {
+    const cap = this.sys.game.device.input.touch ? 40 : 80;
+    if (this.members.length <= cap) return this.members;
+    const step = Math.ceil(this.members.length / cap);
+    return this.members.filter((_, i) => i % step === 0);
   }
 
   private finish() {
@@ -296,24 +316,28 @@ export class CrowdScene extends Phaser.Scene {
       const y = h * 0.75 - (s.z - this.z) * 0.7;
       if (y < -50 || y > h + 50) continue;
       if (s.type === "gate" || s.type === "finish") {
-        const leftC = s.type === "finish" ? 0x3d2a12 : 0x4a2c20;
-        const rightC = s.type === "finish" ? 0x2a3218 : 0x4a2c20;
-        g.fillStyle(leftC, 1);
-        g.fillRoundedRect(w * 0.2, y - 20, w * 0.26, 40, 10);
-        g.fillStyle(rightC, 1);
-        g.fillRoundedRect(w * 0.54, y - 20, w * 0.26, 40, 10);
-        g.lineStyle(2, 0xffe0d4, 0.35);
-        g.strokeRoundedRect(w * 0.2, y - 20, w * 0.26, 40, 10);
-        g.strokeRoundedRect(w * 0.54, y - 20, w * 0.26, 40, 10);
-        this.labelAt(labelN, w * 0.33, y, opLabel(s.left), "#ffe8d8");
+        const leftC = s.left?.kind === "mul" || s.left?.kind === "add" ? 0x2f6a3a : 0x6a2a28;
+        const rightC = s.right?.kind === "mul" || s.right?.kind === "add" ? 0x2f6a3a : 0x6a2a28;
+        drawGateArch(g, w * 0.2, y - 36, w * 0.26, 56, leftC);
+        drawGateArch(g, w * 0.54, y - 36, w * 0.26, 56, rightC);
+        if (s.type === "finish") {
+          g.fillStyle(0xffd166, 0.85);
+          g.fillRect(w * 0.42, y - 90, w * 0.16, 90);
+          g.fillRect(w * 0.4, y - 110, w * 0.2, 22);
+        }
+        this.labelAt(labelN, w * 0.33, y - 18, opLabel(s.left), "#fff4ea");
         labelN += 1;
-        this.labelAt(labelN, w * 0.67, y, opLabel(s.right), "#ffe8d8");
+        this.labelAt(labelN, w * 0.67, y - 18, opLabel(s.right), "#fff4ea");
         labelN += 1;
       } else if (s.type === "enemy") {
-        g.fillStyle(0xff4d6d, 0.95);
-        g.fillCircle(s.lane === "left" ? w * 0.33 : w * 0.67, y, 16);
-        g.fillStyle(0xffffff, 0.35);
-        g.fillCircle(s.lane === "left" ? w * 0.33 : w * 0.67, y - 3, 5);
+        for (let i = 0; i < 5; i += 1) {
+          drawMiniPerson(g, (s.lane === "left" ? w * 0.3 : w * 0.64) + i * 8, y + (i % 2) * 6, 0xff4d6d, this.time.now / 120 + i, 1.1);
+        }
+      } else if (s.type === "boss") {
+        g.fillStyle(0xff3d5a, 1);
+        g.fillRoundedRect(w * 0.38, y - 40, w * 0.24, 70, 10);
+        g.fillStyle(0xffe0d4, 0.8);
+        g.fillCircle(w * 0.5, y - 18, 16);
       } else if (s.type === "shortcut") {
         g.fillStyle(0xffd166, 0.7);
         g.fillRoundedRect(w * 0.18, y - 10, 22, 20, 4);
@@ -326,17 +350,15 @@ export class CrowdScene extends Phaser.Scene {
     }
     const cx = w * 0.2 + this.x * w * 0.6;
     const cy = h * 0.78;
-    for (const m of this.members) {
+    const shown = this.qualityMembers();
+    for (const m of shown) {
       const mx = Phaser.Math.Clamp(cx + m.ox * w * 0.6, w * 0.2, w * 0.8);
       const my = cy + m.oy * 0.35;
-      g.fillStyle(0xff8a62, 1);
-      g.fillCircle(mx, my, 7);
-      g.fillStyle(0xffe0d4, 0.35);
-      g.fillCircle(mx - 1.4, my - 1.6, 2.2);
+      drawMiniPerson(g, mx, my, 0xff8a62, this.time.now / 140 + m.phase, this.pack > 50 ? 0.85 : 1);
     }
     drawParticles(g, this.parts);
     fillVignette(g, w, h, 0.28);
-    this.hud.setText(`${this.pack}  pack`);
+    this.hud.setText(`${this.pack}`);
     this.overlay.clear();
     const fa = this.juice.flashAlpha(0.016);
     if (fa) {
