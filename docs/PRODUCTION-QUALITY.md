@@ -1,6 +1,8 @@
 # Production quality pass
 
-Branch `cursor/game-production-quality-c08e`. Art is original procedural / vector in-repo. No Poki or CrazyGames assets.
+Branch `cursor/game-production-quality-c08e`. Superseded for classification by `docs/PRODUCTION-CLOSEOUT.md` on `cursor/game-production-closeout-c08e`. Art is original procedural / vector in-repo. No Poki or CrazyGames assets.
+
+The READY / NEAR READY labels below are historical. Closeout uses SHIP CANDIDATE / POLISH REQUIRED / PROTOTYPE only.
 
 ## Method
 

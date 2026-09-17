@@ -282,7 +282,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.cameras.resize(w, h);
     this.cameras.main.setViewport(0, 0, w, h);
     this.cameras.main.setSize(w, h);
-    this.cameras.main.setZoom(Math.max(w / ARENA, h / ARENA) * 1.05);
+    this.cameras.main.setZoom(Math.max(1.05, Math.min(w / 780, h / 500)));
   }
 
   private ensureAudio() {
