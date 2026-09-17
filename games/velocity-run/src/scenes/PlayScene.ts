@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { clamp, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, type GameKeyboard } from "@gamesweb/game-core";
+import { clamp, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, fillBackdrop, mixColor, type GameKeyboard } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { velocityRunManifest } from "@gamesweb/game-sdk";
 import { COURSES, medalFor, nextMedalTarget, type Course, type Rect } from "../systems/courses";
@@ -101,7 +101,7 @@ export class VelocityPlayScene extends Phaser.Scene {
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hud = this.add
-      .text(24, 52, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "17px", color: "#e8fbff" })
+      .text(24, 68, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "17px", color: "#e8fbff" })
       .setScrollFactor(0)
       .setDepth(21);
     this.splitTxt = this.add
@@ -145,6 +145,7 @@ export class VelocityPlayScene extends Phaser.Scene {
     this.game.canvas.tabIndex = 0;
     this.game.canvas.focus({ preventScroll: true });
 
+    this.input.addPointer(3);
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
       this.ensureAudio();
       if (this.handleChromeTap(p.x, p.y)) return;
@@ -211,7 +212,10 @@ export class VelocityPlayScene extends Phaser.Scene {
       this.signaledReady = true;
       this.platform.events.emit({ name: "game_ready", props: { gameId: "velocity-run" } });
     }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.r)) {
+    // The platform keyboard captures and preventDefaults these keys, and Phaser
+    // ignores defaultPrevented events, so read them from the native layer too.
+    const chrome = this.nativeKeys?.peek();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.r) || chrome?.retryPressed) {
       if (!this.ended) this.retry();
       return;
     }
@@ -219,9 +223,9 @@ export class VelocityPlayScene extends Phaser.Scene {
       this.showGhost = !this.showGhost;
       setGhostEnabled(this.showGhost);
     }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.one)) this.switchCourse(0);
-    if (Phaser.Input.Keyboard.JustDown(this.keys.two)) this.switchCourse(1);
-    if (Phaser.Input.Keyboard.JustDown(this.keys.three)) this.switchCourse(2);
+    if (Phaser.Input.Keyboard.JustDown(this.keys.one) || chrome?.onePressed) this.switchCourse(0);
+    else if (Phaser.Input.Keyboard.JustDown(this.keys.two) || chrome?.twoPressed) this.switchCourse(1);
+    else if (Phaser.Input.Keyboard.JustDown(this.keys.three) || chrome?.threePressed) this.switchCourse(2);
     if (this.paused) {
       this.draw(dt);
       return;
@@ -359,7 +363,23 @@ export class VelocityPlayScene extends Phaser.Scene {
     this.juice.flash(0.22);
     this.parts.burst(this.runner.x + 8, this.runner.y + 12, 16, this.course.theme.accent, 240, 260);
     this.synth.impact(0.7);
-    this.platform.events.emit({ name: "death", props: { gameId: "velocity-run", deaths: this.deaths } });
+    this.platform.events.emit({ name: "death", props: { gameId: "velocity-run", deaths: this.deaths, sessionDeaths: this.sessionDeaths } });
+    if (this.running) {
+      void this.platform.session.end({
+        mode: this.course.id,
+        score: Math.floor(this.timeMs),
+        result: "attempt-death",
+        metadata: {
+          competitive: false,
+          hideResult: true,
+          attemptDeaths: this.deaths,
+          sessionDeaths: this.sessionDeaths,
+          attemptDurationMs: Math.floor(this.timeMs),
+          verificationLevel: "practice",
+          course: this.courseIndex,
+        },
+      });
+    }
   }
 
   private win() {
@@ -385,7 +405,7 @@ export class VelocityPlayScene extends Phaser.Scene {
     if (medal === "gold" || medal === "platinum") void this.platform.achievement.unlock("gold");
     if (medal === "platinum") void this.platform.achievement.unlock("platinum");
     if (this.courseIndex === 0 && this.timeMs < 40000) void this.platform.achievement.unlock("sub-40");
-    if (this.sessionDeaths === 0) void this.platform.achievement.unlock("no-death");
+    if (this.deaths === 0) void this.platform.achievement.unlock("no-death");
     this.markCourseCleared();
     if (pb && prev > 0) this.markSecondPb();
     void this.platform.quest.progress("velocity-run:gold", medal === "gold" || medal === "platinum" ? 1 : 0);
@@ -411,7 +431,10 @@ export class VelocityPlayScene extends Phaser.Scene {
       metadata: {
         medal: medal ?? "none",
         deaths: this.deaths,
+        attemptDeaths: this.deaths,
         sessionDeaths: this.sessionDeaths,
+        attemptDurationMs: Math.floor(this.timeMs),
+        verificationLevel: "verified",
         course: this.courseIndex,
         lowerIsBetter: true,
         pbDelta: prev > 0 ? this.timeMs - prev : 0,
@@ -453,8 +476,28 @@ export class VelocityPlayScene extends Phaser.Scene {
     const g = this.gfx;
     const th = this.course.theme;
     g.clear();
-    g.fillStyle(th.bg, 1);
-    g.fillRect(0, 0, this.course.width, this.course.height);
+    fillBackdrop(
+      g,
+      this.course.width,
+      this.course.height,
+      {
+        top: mixColor(th.sky, 0x02060a, 0.2),
+        mid: th.bg,
+        bottom: mixColor(th.bg, th.ground, 0.25),
+        grain: 0.035,
+        blobs: [{ color: th.accent, x: 0.7, y: 0.12, r: 180, alpha: 0.06, parallax: 0.03 }],
+      },
+      { x: this.camX, y: this.camY },
+    );
+    g.fillStyle(mixColor(th.sky, 0x000000, 0.35), 1);
+    for (let i = 0; i < 16; i += 1) {
+      const x = i * 280 + this.camX * 0.58;
+      const bh = 160 + (i % 4) * 50;
+      g.fillRect(x, this.course.height - bh - 40, 70 + (i % 3) * 18, bh);
+      g.fillStyle(th.accent, 0.06);
+      g.fillRect(x + 10, this.course.height - bh + 20, 8, 14);
+      g.fillStyle(mixColor(th.sky, 0x000000, 0.35), 1);
+    }
     g.fillStyle(th.accent, 0.04);
     for (let x = 0; x < this.course.width; x += 96) g.fillRect(x, 0, 2, this.course.height);
 
@@ -472,8 +515,11 @@ export class VelocityPlayScene extends Phaser.Scene {
         g.fillStyle(0x8ff3ff, 0.85);
         g.fillRect(s.x, s.y, s.w, s.h);
       } else if (s.kind === "checkpoint") {
-        g.fillStyle(th.accent, 0.35);
-        g.fillRect(s.x, s.y, 6, s.h);
+        const pulse = 0.45 + Math.sin(this.time.now / 180) * 0.25;
+        g.fillStyle(th.accent, pulse);
+        g.fillRect(s.x, s.y, 8, s.h);
+        g.fillStyle(0x8ff3ff, 0.8);
+        g.fillTriangle(s.x + 8, s.y + 8, s.x + 36, s.y + 18, s.x + 8, s.y + 30);
       }
     }
 
@@ -503,6 +549,12 @@ export class VelocityPlayScene extends Phaser.Scene {
     g.fillRoundedRect(-w / 2, -h / 2, w, h, 4);
     g.fillStyle(th.sky, 1);
     g.fillRect(r.facing > 0 ? 2 : -7, -6, 5, 5);
+    if (r.grounded && Math.abs(r.vx) > 24) {
+      const swing = Math.sin(this.timeMs / 70) * 7;
+      g.fillStyle(th.accent, 0.95);
+      g.fillRect(-5, h / 2 - 2, 4, 7 + swing);
+      g.fillRect(1, h / 2 - 2, 4, 7 - swing);
+    }
     g.restore();
 
     const t = (this.timeMs / 1000).toFixed(2);
@@ -630,7 +682,7 @@ export function mountVelocityRun(parent: HTMLElement, platform: PlatformSDK, cou
     disableContextMenu: true,
     banner: false,
     autoFocus: true,
-    input: { keyboard: { target: typeof window !== "undefined" ? window : undefined } },
+    input: { keyboard: { target: typeof window !== "undefined" ? window : undefined }, activePointers: 4 },
     fps: { target: 60 },
     render: { preserveDrawingBuffer: true },
   });

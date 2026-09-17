@@ -20,6 +20,8 @@ type GwDebug = {
   longFrames?: number;
   frozen?: boolean;
   fps?: number;
+  trackId?: string;
+  courseId?: string;
 };
 
 type GwCmd = {
@@ -28,6 +30,7 @@ type GwCmd = {
   killPlayer?: () => void;
   grantXp?: (n: number) => void;
   pickUpgrade?: (i: number) => void;
+  finishRun?: () => void;
 };
 
 const BENIGN = [/Download the React DevTools/i, /\[Phaser\]/i, /Failed to load resource/i];
@@ -71,7 +74,9 @@ async function waitReady(page: Page, gameId: string) {
       return d?.ready && d.gameId === gameId ? d.gameId : null;
     }, { timeout: 20_000 })
     .toBe(gameId);
-  await page.locator("canvas").click({ position: { x: 200, y: 200 }, timeout: 5_000 });
+  await page.locator("canvas").evaluate((el) => {
+    if (el instanceof HTMLCanvasElement) el.focus({ preventScroll: true });
+  });
 }
 
 async function assertAlive(page: Page) {
@@ -210,5 +215,68 @@ test("swarm protocol moves, levels, and takes an upgrade", async ({ page }) => {
   await expect.poll(async () => (await debugOf(page))?.runState).toBe("playing");
   const after = await debugOf(page);
   expect(after!.level ?? 1).toBeGreaterThanOrEqual(2);
+  done();
+});
+
+test("sky stack places with space and retries", async ({ page }) => {
+  const done = attachConsoleGuard(page);
+  await waitReady(page, "sky-stack");
+  await cmd(page, "jump");
+  await expect.poll(async () => (await debugOf(page))?.score ?? 0, { timeout: 8_000 }).toBeGreaterThan(0);
+  await page.keyboard.press("Space");
+  await assertAlive(page);
+  done();
+});
+
+test("number keys switch track and course from the keyboard", async ({ page }) => {
+  const done = attachConsoleGuard(page);
+  await waitReady(page, "neon-drift");
+  expect((await debugOf(page))?.trackId).toBe("foundation");
+  await page.keyboard.press("Digit2");
+  await expect.poll(async () => (await debugOf(page))?.trackId, { timeout: 6_000 }).toBe("technical");
+
+  await waitReady(page, "velocity-run");
+  const first = (await debugOf(page))?.courseId;
+  await page.keyboard.press("Digit3");
+  await expect.poll(async () => (await debugOf(page))?.courseId, { timeout: 6_000 }).toBe("course-3");
+  expect(first).not.toBe("course-3");
+  done();
+});
+
+test("a finished run opens the result screen and the score reaches the server", async ({ page }) => {
+  const done = attachConsoleGuard(page);
+  await waitReady(page, "territory-rush");
+  const scoreReq = page.waitForResponse((r) => r.url().includes("/api/score") && r.request().method() === "POST");
+  await cmd(page, "finishRun");
+  const res = await scoreReq;
+  const body = (await res.json()) as { verification?: { status: string }; alreadyApplied?: boolean };
+  expect(res.status()).toBe(200);
+  expect(body.alreadyApplied).toBe(false);
+  expect(body.verification?.status).toBeTruthy();
+
+  const overlay = page.getByText("R or Space retries");
+  await expect(overlay).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole("button", { name: "Challenge a friend" })).toBeVisible();
+  await expect(page.getByText(/^Saved$|Score under review/)).toBeVisible({ timeout: 5_000 });
+
+  // A tap still in the play rhythm must not dismiss the recap.
+  await page.keyboard.press("Space");
+  await expect(overlay).toBeVisible();
+  await page.waitForTimeout(600);
+  await page.keyboard.press("Space");
+  await expect(overlay).toBeHidden({ timeout: 3_000 });
+  await expect.poll(async () => (await debugOf(page))?.runState).toBe("playing");
+  done();
+});
+
+test("knockout circuit moves", async ({ page }) => {
+  const done = attachConsoleGuard(page);
+  await waitReady(page, "knockout-circuit");
+  const before = await debugOf(page);
+  await page.keyboard.down("KeyD");
+  await expect
+    .poll(async () => (await debugOf(page))?.playerX ?? 0)
+    .toBeGreaterThan(before!.playerX);
+  await page.keyboard.up("KeyD");
   done();
 });

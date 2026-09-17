@@ -407,6 +407,18 @@ describe("privacy rewards dedupe sql", () => {
   });
 });
 
+describe("social arcade sql", () => {
+  it("adds challenge tables and idempotent daily claim", () => {
+    const sql = readFileSync(new URL("../supabase/migrations/0006_social_arcade.sql", import.meta.url), "utf8");
+    expect(sql).toContain("create table if not exists public.challenges");
+    expect(sql).toContain("create table if not exists public.rivals");
+    expect(sql).toContain("claim_daily_reward");
+    expect(sql).toContain("on conflict (day, user_id, idx) do nothing");
+    expect(sql).toContain("sky-stack");
+    expect(sql).toContain("create table if not exists public.ghost_runs");
+  });
+});
+
 describe("ownership and identity", () => {
   it("forbids guest B from using guest A session", () => {
     expect(

@@ -20,6 +20,17 @@ export type Enemy = {
   patternT: number;
 };
 
+let rng = Math.random;
+export function setSimRng(next: () => number) {
+  rng = next;
+}
+export function resetSimRng() {
+  rng = Math.random;
+}
+export function simRand() {
+  return rng();
+}
+
 export const KIND: Record<
   EnemyKind,
   { hp: number; r: number; speed: number; damage: number; xp: number; color: number }
@@ -66,7 +77,7 @@ export function spawnEnemy(e: Enemy, kind: EnemyKind, x: number, y: number, scal
   e.hp = k.hp * scale;
   e.max = e.hp;
   e.r = k.r;
-  e.speed = k.speed * (0.94 + Math.random() * 0.12);
+  e.speed = k.speed * (0.94 + rng() * 0.12);
   e.damage = k.damage;
   e.xp = k.xp;
   e.flash = 0;
@@ -211,7 +222,7 @@ export function pickUpgrades(owned: UpgradeId[], n = 3): UpgradeDef[] {
   const pool = UPGRADES.filter((u) => ownedCount(owned, u.id) < u.max);
   const out: UpgradeDef[] = [];
   while (out.length < n && pool.length) {
-    const i = Math.floor(Math.random() * pool.length);
+    const i = Math.floor(rng() * pool.length);
     out.push(pool.splice(i, 1)[0]);
   }
   return out;
@@ -233,8 +244,8 @@ export function executionMul(build: Build, hp: number, max: number) {
 }
 
 export function critMul(build: Build) {
-  const chainBonus = build.chain > 0 && Math.random() < build.crit ? 0.15 : 0;
-  if (Math.random() < build.crit) return 2 + chainBonus;
+  const chainBonus = build.chain > 0 && rng() < build.crit ? 0.15 : 0;
+  if (rng() < build.crit) return 2 + chainBonus;
   return 1;
 }
 
@@ -279,7 +290,7 @@ export function desiredCount(elapsedSec: number): number {
 
 export function pickKind(elapsedSec: number, eliteOk: boolean): EnemyKind {
   const p = phaseFor(elapsedSec);
-  const roll = Math.random();
+  const roll = rng();
   if (p === "learn") return roll < 0.75 ? "chaser" : "dart";
   if (p === "build") {
     if (roll < 0.45) return "chaser";

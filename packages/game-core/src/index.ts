@@ -7,6 +7,9 @@ export type { Particle, FloatingText } from "./juice";
 export { Synth, createSynth } from "./audio";
 export type { MixerSettings } from "./audio";
 export { pulseHaptic } from "./haptic";
+export { hashSeed, mulberry32, seededRng } from "./rng";
+export { mixColor, fillBackdrop, fillVignette, drawParticles } from "./backdrop";
+export type { BackdropSpec, BackdropBand, BackdropBlob, GfxLike } from "./backdrop";
 
 export class Pool<T> {
   private free: T[] = [];

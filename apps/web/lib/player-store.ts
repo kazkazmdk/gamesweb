@@ -222,6 +222,9 @@ class PlayerStore {
   }
 
   private emit() {
+    // Most mutations above edit the snapshot in place; useSyncExternalStore only
+    // re-renders when the reference changes, so publish a fresh object each time.
+    this.snapshot = { ...this.snapshot };
     this.listeners.forEach((fn) => fn());
   }
 
@@ -433,12 +436,21 @@ class PlayerStore {
             localSessionId: sessionId,
             idempotencyKey: `score-offline:${sessionId}`,
           });
-          if (retry.ok) {
+          if (retry.ok && retry.data.verification) {
             row.verified = retry.data.verification.status as VerifiedStatus;
-            this.applyServerProgression(retry.data.progressionDiff);
+            if (retry.data.progressionDiff) this.applyServerProgression(retry.data.progressionDiff);
             this.snapshot.syncStatus = retry.data.verification.status === "unverified" ? "review" : "saved";
+          } else if (retry.ok) {
+            this.snapshot.syncStatus = "saved";
           }
         }
+        this.persist();
+        this.emit();
+        return;
+      }
+      if (!res.data.verification) {
+        // Replayed idempotent submission: the server already holds this run.
+        this.snapshot.syncStatus = "saved";
         this.persist();
         this.emit();
         return;
@@ -452,7 +464,7 @@ class PlayerStore {
       } else {
         this.snapshot.syncStatus = "saved";
       }
-      this.applyServerProgression(res.data.progressionDiff);
+      if (res.data.progressionDiff) this.applyServerProgression(res.data.progressionDiff);
       this.persist();
       this.emit();
     } catch {
@@ -542,7 +554,9 @@ class PlayerStore {
       );
       if (genres.size >= 2) void this.unlock("explorer");
     }
-    if (GAME_MANIFESTS.every((g) => this.playedIds().includes(g.id))) void this.unlock("three-worlds");
+    if (["neon-drift", "velocity-run", "swarm-protocol"].every((id) => this.playedIds().includes(id))) {
+      void this.unlock("three-worlds");
+    }
 
     this.progressQuest("platform:uniqueGamesToday", this.snapshot.uniqueGamesToday.length);
     if (opts.gameId === "neon-drift") {
@@ -553,6 +567,21 @@ class PlayerStore {
       this.progressQuest("swarm-protocol:surviveMs", Number(opts.payload.metadata.surviveMs ?? opts.durationMs));
       this.progressQuest("swarm-protocol:kills", Number(opts.payload.metadata.kills ?? 0));
     }
+    if (opts.gameId === "sky-stack") {
+      this.progressQuest("sky-stack:floors", Number(opts.payload.metadata.floors ?? 0));
+    }
+    if (opts.gameId === "knockout-circuit" && opts.result === "finish") {
+      this.progressQuest("knockout-circuit:finish", 1);
+    }
+    if (opts.gameId === "pocket-striker") {
+      this.progressQuest("pocket-striker:strokes-under", opts.score <= 4 ? 4 : 0);
+    }
+    if (opts.gameId === "territory-rush") {
+      this.progressQuest("territory-rush:pct", Number(opts.payload.metadata.territoryPct ?? 0));
+    }
+    if (opts.gameId === "crowd-control") {
+      this.progressQuest("crowd-control:pack", Number(opts.payload.metadata.pack ?? 0));
+    }
 
     const scale = Math.min(1, opts.durationMs / (xpRewards.minRunSecondsForFullXp * 1000));
     void this.addXp(Math.round(xpRewards.runComplete * scale + (opts.durationMs / 60000) * xpRewards.runCompletePerMinute), "run");
@@ -560,6 +589,10 @@ class PlayerStore {
     const tried = this.playedIds().length;
     if (tried === this.snapshot.sessionGames.length && this.snapshot.history.filter((h) => h.gameId === opts.gameId).length === 1) {
       void this.addXp(xpRewards.newGameTried, "new_game");
+    }
+    if (this.playedIds().length >= 5) void this.unlock("arcade-tourist");
+    if (GAME_MANIFESTS.length >= 8 && GAME_MANIFESTS.every((g) => this.playedIds().includes(g.id))) {
+      void this.unlock("world-tour");
     }
 
     if (this.snapshot.sessionGames.length >= 2 && this.snapshot.isGuest) {
@@ -590,21 +623,24 @@ class PlayerStore {
   createPlatform(gameId: string, hooks: { onPause: () => void; onHud?: (p: Record<string, number>) => void; onReady?: () => void }): PlatformSDK {
     let session = { id: uid(), gameId, startedAt: Date.now(), version: getManifest(gameId)?.version ?? "1.0.0" };
     let sessionReady: Promise<void> = Promise.resolve();
+    let sessionGen = 0;
     return {
       init: () => undefined,
       session: {
         start: () => {
+          const gen = ++sessionGen;
           session = { id: uid(), gameId, startedAt: Date.now(), version: getManifest(gameId)?.version ?? "1.0.0" };
           analytics.track("gameplay_started", { gameId, sessionId: session.id });
           void this.presencePlaying(gameId);
           sessionReady = playerApi
             .startSession({ gameId, gameVersion: session.version, device: deviceClass() })
             .then((res) => {
+              if (gen !== sessionGen) return;
               if (res.ok) {
                 session = {
                   id: res.data.sessionId,
                   gameId,
-                  startedAt: Date.parse(res.data.startedAt) || Date.now(),
+                  startedAt: Date.parse(res.data.startedAt) || session.startedAt,
                   version: res.data.gameVersion,
                 };
               } else if (res.status === 503) {
@@ -612,6 +648,7 @@ class PlayerStore {
               }
             })
             .catch(() => {
+              if (gen !== sessionGen) return;
               this.snapshot.backend = "local";
             });
           return session;
@@ -622,7 +659,21 @@ class PlayerStore {
           } catch {
             /* local session */
           }
-          const durationMs = Date.now() - session.startedAt;
+          const attemptMs =
+            typeof result.metadata.attemptDurationMs === "number" && Number.isFinite(result.metadata.attemptDurationMs)
+              ? Number(result.metadata.attemptDurationMs)
+              : Date.now() - session.startedAt;
+          const durationMs = Math.max(0, Math.round(attemptMs));
+          const competitive = result.metadata.competitive !== false && result.result !== "attempt-death";
+          if (!competitive) {
+            analytics.track("gameplay_ended", {
+              gameId,
+              durationMs,
+              score: result.score,
+              result: result.result,
+            });
+            return;
+          }
           this.onRunEnd({
             gameId,
             durationMs,
@@ -752,6 +803,7 @@ class PlayerStore {
         g.title.toLowerCase().includes(n) ||
         g.genre.toLowerCase().includes(n) ||
         g.tags.some((t) => t.includes(n)) ||
+        g.skills.some((t) => t.includes(n)) ||
         g.description.toLowerCase().includes(n),
     );
   }
@@ -888,7 +940,9 @@ class PlayerStore {
       payload,
       retryCount: 0,
       ts: Date.now(),
-      idempotencyKey: `${type}:${String(payload.sessionId ?? opId)}`,
+      // Namespaced so a queued op never claims the idempotency key of the
+      // authoritative /api/score submission for the same session.
+      idempotencyKey: `sync:${type}:${String(payload.sessionId ?? opId)}`,
     });
     this.persist();
     void this.flush();
@@ -1008,7 +1062,8 @@ export function deviceClass() {
 }
 
 export function formatScore(gameId: string, score: number) {
-  if (gameId === "velocity-run") return `${(score / 1000).toFixed(2)}s`;
+  if (gameId === "velocity-run" || gameId === "knockout-circuit") return `${(score / 1000).toFixed(2)}s`;
+  if (gameId === "pocket-striker") return `${Math.round(score)} ${Math.round(score) === 1 ? "stroke" : "strokes"}`;
   return Math.round(score).toLocaleString();
 }
 

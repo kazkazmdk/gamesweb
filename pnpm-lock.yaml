@@ -29,6 +29,9 @@ importers:
       '@gamesweb/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@gamesweb/crowd-control':
+        specifier: workspace:*
+        version: link:../../games/crowd-control
       '@gamesweb/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -38,12 +41,24 @@ importers:
       '@gamesweb/game-sdk':
         specifier: workspace:*
         version: link:../../packages/game-sdk
+      '@gamesweb/knockout-circuit':
+        specifier: workspace:*
+        version: link:../../games/knockout-circuit
       '@gamesweb/neon-drift':
         specifier: workspace:*
         version: link:../../games/neon-drift
+      '@gamesweb/pocket-striker':
+        specifier: workspace:*
+        version: link:../../games/pocket-striker
+      '@gamesweb/sky-stack':
+        specifier: workspace:*
+        version: link:../../games/sky-stack
       '@gamesweb/swarm-protocol':
         specifier: workspace:*
         version: link:../../games/swarm-protocol
+      '@gamesweb/territory-rush':
+        specifier: workspace:*
+        version: link:../../games/territory-rush
       '@gamesweb/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -100,6 +115,30 @@ importers:
         specifier: ^5.9.2
         version: 5.9.3
 
+  games/crowd-control:
+    dependencies:
+      '@gamesweb/game-core':
+        specifier: workspace:*
+        version: link:../../packages/game-core
+      '@gamesweb/game-sdk':
+        specifier: workspace:*
+        version: link:../../packages/game-sdk
+      phaser:
+        specifier: ^3.90.0
+        version: 3.90.0
+
+  games/knockout-circuit:
+    dependencies:
+      '@gamesweb/game-core':
+        specifier: workspace:*
+        version: link:../../packages/game-core
+      '@gamesweb/game-sdk':
+        specifier: workspace:*
+        version: link:../../packages/game-sdk
+      phaser:
+        specifier: ^3.90.0
+        version: 3.90.0
+
   games/neon-drift:
     dependencies:
       '@gamesweb/game-core':
@@ -112,7 +151,43 @@ importers:
         specifier: ^3.90.0
         version: 3.90.0
 
+  games/pocket-striker:
+    dependencies:
+      '@gamesweb/game-core':
+        specifier: workspace:*
+        version: link:../../packages/game-core
+      '@gamesweb/game-sdk':
+        specifier: workspace:*
+        version: link:../../packages/game-sdk
+      phaser:
+        specifier: ^3.90.0
+        version: 3.90.0
+
+  games/sky-stack:
+    dependencies:
+      '@gamesweb/game-core':
+        specifier: workspace:*
+        version: link:../../packages/game-core
+      '@gamesweb/game-sdk':
+        specifier: workspace:*
+        version: link:../../packages/game-sdk
+      phaser:
+        specifier: ^3.90.0
+        version: 3.90.0
+
   games/swarm-protocol:
+    dependencies:
+      '@gamesweb/game-core':
+        specifier: workspace:*
+        version: link:../../packages/game-core
+      '@gamesweb/game-sdk':
+        specifier: workspace:*
+        version: link:../../packages/game-sdk
+      phaser:
+        specifier: ^3.90.0
+        version: 3.90.0
+
+  games/territory-rush:
     dependencies:
       '@gamesweb/game-core':
         specifier: workspace:*

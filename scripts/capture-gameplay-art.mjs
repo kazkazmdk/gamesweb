@@ -18,7 +18,9 @@ async function ready(page, gameId) {
     gameId,
     { timeout: 25000 },
   );
-  await page.locator("canvas").click({ position: { x: 640, y: 360 } });
+  await page.locator("canvas").evaluate((el) => {
+    if (el instanceof HTMLCanvasElement) el.focus({ preventScroll: true });
+  });
 }
 
 async function hideChrome(page) {
@@ -69,10 +71,53 @@ await page.keyboard.up("Space");
 await page.keyboard.up("KeyD");
 
 await ready(page, "swarm-protocol");
-await page.waitForTimeout(24000);
+await page.waitForTimeout(4000);
 await snap(page, "swarm-protocol-backdrop.jpg");
-await page.waitForTimeout(5000);
+await page.waitForTimeout(2500);
 await snap(page, "swarm-protocol-hero.jpg");
+
+await ready(page, "sky-stack");
+await page.evaluate(() => window.__GW_DEBUG_CMD__?.jump?.());
+await page.waitForTimeout(220);
+await page.evaluate(() => window.__GW_DEBUG_CMD__?.jump?.());
+await page.waitForTimeout(220);
+await snap(page, "sky-stack-backdrop.jpg");
+await snap(page, "sky-stack-hero.jpg");
+
+await ready(page, "knockout-circuit");
+await page.keyboard.down("KeyD");
+await page.waitForTimeout(700);
+await page.keyboard.down("Space");
+await page.waitForTimeout(240);
+await snap(page, "knockout-circuit-backdrop.jpg");
+await snap(page, "knockout-circuit-hero.jpg");
+await page.keyboard.up("Space");
+await page.keyboard.up("KeyD");
+
+await ready(page, "pocket-striker");
+await page.locator("canvas").click({ position: { x: 480, y: 520 } });
+await page.waitForTimeout(80);
+await page.mouse.move(720, 280);
+await page.waitForTimeout(200);
+await snap(page, "pocket-striker-backdrop.jpg");
+await snap(page, "pocket-striker-hero.jpg");
+
+await ready(page, "territory-rush");
+await page.keyboard.down("KeyD");
+await page.waitForTimeout(900);
+await page.keyboard.down("ArrowDown");
+await page.waitForTimeout(500);
+await snap(page, "territory-rush-backdrop.jpg");
+await snap(page, "territory-rush-hero.jpg");
+await page.keyboard.up("ArrowDown");
+await page.keyboard.up("KeyD");
+
+await ready(page, "crowd-control");
+await page.keyboard.down("KeyD");
+await page.waitForTimeout(1100);
+await snap(page, "crowd-control-backdrop.jpg");
+await snap(page, "crowd-control-hero.jpg");
+await page.keyboard.up("KeyD");
 
 await browser.close();
 console.log("done", out);

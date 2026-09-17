@@ -49,6 +49,8 @@ export function reconstructAchievementsFromScores(scores: ScoreLike[]): string[]
   if (games.has("neon-drift") && games.has("velocity-run") && games.has("swarm-protocol")) {
     out.add("platform:three-worlds");
   }
+  if (games.size >= 5) out.add("platform:arcade-tourist");
+  if (games.size >= 8) out.add("platform:world-tour");
 
   for (const s of verified) {
     if (s.gameId === "neon-drift") {
@@ -77,6 +79,19 @@ export function reconstructAchievementsFromScores(scores: ScoreLike[]): string[]
       if (kills >= 200) out.add("swarm-protocol:kills-200");
       if (Number(s.metadata.elites ?? 0) >= 1) out.add("swarm-protocol:elite");
     }
+    if (s.gameId === "sky-stack") {
+      const floors = Number(s.metadata.floors ?? 0);
+      if (floors >= 1) out.add("sky-stack:first-place");
+      if (floors >= 30) out.add("sky-stack:floor-30");
+      if (floors >= 67) out.add("sky-stack:floor-67");
+    }
+    if (s.gameId === "knockout-circuit") out.add("knockout-circuit:first-gate");
+    if (s.gameId === "pocket-striker") {
+      out.add("pocket-striker:first-pocket");
+      if (s.score === 1) out.add("pocket-striker:perfect");
+    }
+    if (s.gameId === "territory-rush") out.add("territory-rush:first-claim");
+    if (s.gameId === "crowd-control") out.add("crowd-control:pack-gate");
   }
   return [...out];
 }

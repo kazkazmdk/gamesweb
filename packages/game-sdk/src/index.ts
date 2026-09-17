@@ -1,6 +1,7 @@
 export type {
   AchievementDefinition,
   AudioSettings,
+  ChallengeType,
   GameManifest,
   GameSave,
   GameSession,
@@ -9,16 +10,60 @@ export type {
   PlatformSDK,
   PlayerView,
   QuestDefinition,
+  RunContext,
+  ScoreDirection,
   ScorePayload,
+  SocialMode,
+  VerificationLevel,
 } from "./types";
 export {
   GAME_MANIFESTS,
   PLATFORM_ACHIEVEMENTS,
   allAchievements,
+  crowdControlManifest,
   getManifest,
+  knockoutCircuitManifest,
   neonDriftManifest,
+  pocketStrikerManifest,
+  skyStackManifest,
   swarmProtocolManifest,
+  territoryRushManifest,
   velocityRunManifest,
 } from "./manifests";
 export { dailyQuests, recommend, utcDayKey } from "./quests";
 export type { RecommendInput } from "./quests";
+export {
+  CREW_REACTIONS,
+  GRAND_PRIX_PLAYLIST,
+  LEAGUE_DIVISIONS,
+  PARTY_POINTS,
+  PARTY_REACTIONS,
+  QUICK_PARTY_PLAYLIST,
+  applyChallengeAttempt,
+  challengeCompatible,
+  challengeOutcome,
+  dailyArcadeEvents,
+  decodeChallengePayload,
+  defaultChallengeType,
+  downsampleGhost,
+  encodeChallengePayload,
+  ghostCompatible,
+  leagueForXp,
+  makePublicCode,
+  nextBestAction,
+  normalizePerformance,
+  rankScores,
+  readRunContext,
+  roundPoints,
+} from "./arcade";
+export type {
+  ChallengeAttempt,
+  ChallengeRecord,
+  ChallengeShare,
+  DailyEvent,
+  GhostKind,
+  GhostRun,
+  NextAction,
+  NextActionInput,
+} from "./arcade";
+
