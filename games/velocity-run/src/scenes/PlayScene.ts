@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { clamp, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, fillBackdrop, mixColor, type GameKeyboard } from "@gamesweb/game-core";
+import { clamp, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, drawRunner, fillBackdrop, mixColor, type GameKeyboard } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { velocityRunManifest } from "@gamesweb/game-sdk";
 import { COURSES, medalFor, nextMedalTarget, type Course, type Rect } from "../systems/courses";
@@ -111,7 +111,7 @@ export class VelocityPlayScene extends Phaser.Scene {
       .setDepth(21)
       .setAlpha(0);
     this.hint = this.add
-      .text(this.scale.width / 2, this.scale.height - 70, this.sys.game.device.input.touch ? "STEER  ·  JUMP" : "A/D MOVE  ·  SPACE JUMP  ·  R RETRY", {
+      .text(this.scale.width / 2, this.scale.height - 70, this.sys.game.device.input.touch ? "MOVE  ·  JUMP" : "MOVE  ·  JUMP", {
         fontFamily: "ui-sans-serif, system-ui",
         fontSize: "14px",
         color: "#e8fbff",
@@ -223,9 +223,9 @@ export class VelocityPlayScene extends Phaser.Scene {
       this.showGhost = !this.showGhost;
       setGhostEnabled(this.showGhost);
     }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.one) || chrome?.onePressed) this.switchCourse(0);
-    else if (Phaser.Input.Keyboard.JustDown(this.keys.two) || chrome?.twoPressed) this.switchCourse(1);
-    else if (Phaser.Input.Keyboard.JustDown(this.keys.three) || chrome?.threePressed) this.switchCourse(2);
+    if (Phaser.Input.Keyboard.JustDown(this.keys.one) || chrome?.onePressed) this.switchCourse(COURSES.findIndex((c) => c.id === "course-1"));
+    else if (Phaser.Input.Keyboard.JustDown(this.keys.two) || chrome?.twoPressed) this.switchCourse(COURSES.findIndex((c) => c.id === "course-2"));
+    else if (Phaser.Input.Keyboard.JustDown(this.keys.three) || chrome?.threePressed) this.switchCourse(COURSES.findIndex((c) => c.id === "course-3"));
     if (this.paused) {
       this.draw(dt);
       return;
@@ -307,23 +307,35 @@ export class VelocityPlayScene extends Phaser.Scene {
     this.draw(dt);
   }
 
+  private liveHazard(s: Rect) {
+    if (s.kind === "piston") {
+      const a = (Math.sin(this.time.now / 280 + (s.phase ?? 0)) + 1) / 2;
+      return { ...s, h: s.h * (0.45 + a * 0.7), y: s.y - s.h * a * 0.35 };
+    }
+    if (s.kind === "bar") {
+      return { ...s, x: s.x + Math.sin(this.time.now / 320 + (s.phase ?? 0)) * 18 };
+    }
+    return s;
+  }
+
   private collide() {
     const r = this.runner;
     for (const s of this.course.solids) {
       if (s.kind === "start" || s.kind === "finish" || s.kind === "checkpoint") continue;
-      if (!aabb(r.x, r.y, r.w, r.h, s.x, s.y, s.w, s.h)) continue;
-      if (s.kind === "spike" || s.kind === "hazard") {
+      const live = this.liveHazard(s);
+      if (!aabb(r.x, r.y, r.w, r.h, live.x, live.y, live.w, live.h)) continue;
+      if (s.kind === "spike" || s.kind === "hazard" || s.kind === "laser" || s.kind === "bar" || s.kind === "piston") {
         this.die();
         return;
       }
       const cx = r.x + r.w / 2;
       const cy = r.y + r.h / 2;
-      const sx = s.x + s.w / 2;
-      const sy = s.y + s.h / 2;
+      const sx = live.x + live.w / 2;
+      const sy = live.y + live.h / 2;
       const dx = cx - sx;
       const dy = cy - sy;
-      const px = r.w / 2 + s.w / 2 - Math.abs(dx);
-      const py = r.h / 2 + s.h / 2 - Math.abs(dy);
+      const px = r.w / 2 + live.w / 2 - Math.abs(dx);
+      const py = r.h / 2 + live.h / 2 - Math.abs(dy);
       if (px < py) {
         r.x += dx > 0 ? px : -px;
         r.vx = 0;
@@ -331,7 +343,7 @@ export class VelocityPlayScene extends Phaser.Scene {
         r.y += py;
         r.bonk();
       } else if (r.vy >= 0) {
-        r.land(s.y - r.h);
+        r.land(live.y - r.h);
       }
     }
   }
@@ -345,10 +357,10 @@ export class VelocityPlayScene extends Phaser.Scene {
     const pb = this.tape?.splits[this.splitIndex];
     const d = pb !== undefined ? this.timeMs - pb : 0;
     const sign = d >= 0 ? "+" : "";
-    this.splitTxt.setText(`CHECKPOINT ${this.splitIndex + 1}  ${pb === undefined ? "—" : `${sign}${(d / 1000).toFixed(2)}`}`);
-    this.splitTxt.setColor(d <= 0 ? "#8dffc1" : "#ff8aa0");
+    this.splitTxt.setText(pb === undefined ? "SPLIT" : `${sign}${(d / 1000).toFixed(2)}`);
+    this.splitTxt.setColor(d <= 0 ? "#3dff8a" : "#ff4d6d");
     this.splitTxt.setAlpha(1);
-    this.tweens.add({ targets: this.splitTxt, alpha: 0, delay: 1100, duration: 280 });
+    this.tweens.add({ targets: this.splitTxt, alpha: 0, delay: 360, duration: 140 });
     this.synth.gateChime();
     this.splitIndex += 1;
   }
@@ -357,7 +369,7 @@ export class VelocityPlayScene extends Phaser.Scene {
     if (this.ended || this.dying > 0) return;
     this.deaths += 1;
     this.sessionDeaths += 1;
-    this.dying = 90;
+    this.dying = 220;
     this.juice.hitStop(40);
     this.juice.screenShake(7, 90);
     this.juice.flash(0.22);
@@ -501,19 +513,50 @@ export class VelocityPlayScene extends Phaser.Scene {
     g.fillStyle(th.accent, 0.04);
     for (let x = 0; x < this.course.width; x += 96) g.fillRect(x, 0, 2, this.course.height);
 
+    if (this.course.world === "training") {
+      g.fillStyle(mixColor(th.sky, 0x000000, 0.28), 1);
+      for (let i = 0; i < 14; i += 1) {
+        const x = i * 260 + this.camX * 0.5;
+        g.fillRect(x, this.course.height - 220 - (i % 4) * 40, 46, 180);
+      }
+    } else if (this.course.world === "transit") {
+      g.fillStyle(th.danger, 0.08 + Math.sin(this.time.now / 180) * 0.04);
+      for (let x = 0; x < this.course.width; x += 220) g.fillRect(x, 40, 8, this.course.height);
+    } else {
+      g.fillStyle(0xffffff, 0.04);
+      for (let i = 0; i < 8; i += 1) g.fillTriangle(i * 520, this.course.height, i * 520 + 180, this.course.height - 260, i * 520 + 380, this.course.height);
+    }
     for (const s of this.course.solids) {
+      const live = this.liveHazard(s);
       if (s.kind === "solid") {
         const col = s.route === "expert" ? 0x2a5060 : s.route === "fast" ? 0x1e4454 : th.ground;
         g.fillStyle(col, 1);
-        g.fillRect(s.x, s.y, s.w, s.h);
+        g.fillRect(live.x, live.y, live.w, live.h);
         g.fillStyle(th.accent, s.route === "expert" ? 0.7 : 0.38);
-        g.fillRect(s.x, s.y, s.w, 3);
+        g.fillRect(live.x, live.y, live.w, 3);
       } else if (s.kind === "spike") {
         g.fillStyle(th.danger, 1);
-        g.fillTriangle(s.x, s.y + s.h, s.x + s.w / 2, s.y, s.x + s.w, s.y + s.h);
+        g.fillTriangle(live.x, live.y + live.h, live.x + live.w / 2, live.y, live.x + live.w, live.y + live.h);
+        g.fillStyle(0xffffff, 0.35);
+        g.fillTriangle(live.x + live.w * 0.3, live.y + live.h * 0.7, live.x + live.w / 2, live.y + 4, live.x + live.w * 0.7, live.y + live.h * 0.7);
+      } else if (s.kind === "laser") {
+        const pulse = 0.45 + Math.sin(this.time.now / 90) * 0.35;
+        g.fillStyle(th.danger, pulse);
+        g.fillRect(live.x, live.y, live.w, live.h);
+        g.fillStyle(0xffffff, 0.7);
+        g.fillRect(live.x, live.y + live.h / 2 - 1, live.w, 2);
+      } else if (s.kind === "bar" || s.kind === "piston") {
+        g.fillStyle(th.danger, 0.95);
+        g.fillRoundedRect(live.x, live.y, live.w, live.h, 3);
+        g.fillStyle(0xffffff, 0.25);
+        g.fillRect(live.x + 2, live.y + 2, live.w - 4, 3);
       } else if (s.kind === "finish") {
-        g.fillStyle(0x8ff3ff, 0.85);
-        g.fillRect(s.x, s.y, s.w, s.h);
+        g.fillStyle(0x8ff3ff, 0.2);
+        g.fillRect(s.x - 10, s.y, s.w + 20, s.h);
+        g.fillStyle(0x8ff3ff, 0.95);
+        g.fillRect(s.x, s.y, 8, s.h);
+        g.fillRect(s.x + s.w - 8, s.y, 8, s.h);
+        g.fillRect(s.x, s.y, s.w, 10);
       } else if (s.kind === "checkpoint") {
         const pulse = 0.45 + Math.sin(this.time.now / 180) * 0.25;
         g.fillStyle(th.accent, pulse);
@@ -538,24 +581,18 @@ export class VelocityPlayScene extends Phaser.Scene {
     }
 
     const r = this.runner;
-    const w = r.w * r.stretch;
-    const h = r.h * r.squash;
-    const ox = r.x + (r.w - w) / 2;
-    const oy = r.y + r.h - h;
-    g.save();
-    g.translateCanvas(ox + w / 2, oy + h / 2);
-    g.rotateCanvas(r.lean);
-    g.fillStyle(this.dying > 0 ? 0xffffff : th.accent, 1);
-    g.fillRoundedRect(-w / 2, -h / 2, w, h, 4);
-    g.fillStyle(th.sky, 1);
-    g.fillRect(r.facing > 0 ? 2 : -7, -6, 5, 5);
-    if (r.grounded && Math.abs(r.vx) > 24) {
-      const swing = Math.sin(this.timeMs / 70) * 7;
-      g.fillStyle(th.accent, 0.95);
-      g.fillRect(-5, h / 2 - 2, 4, 7 + swing);
-      g.fillRect(1, h / 2 - 2, 4, 7 - swing);
-    }
-    g.restore();
+    drawRunner(g, r.x, r.y, r.w, r.h, {
+      facing: r.facing,
+      grounded: r.grounded,
+      vx: r.vx,
+      vy: r.vy,
+      t: this.timeMs,
+      color: th.accent,
+      dying: this.dying > 0,
+      lean: r.lean,
+      squash: r.squash,
+      stretch: r.stretch,
+    });
 
     const t = (this.timeMs / 1000).toFixed(2);
     const medal = medalFor(this.course, this.timeMs);
@@ -578,8 +615,9 @@ export class VelocityPlayScene extends Phaser.Scene {
       this.overlay.fillRoundedRect(this.scale.width / 2 - 54, this.scale.height - 92, 108, 64, 16);
       this.overlay.fillStyle(this.showGhost ? th.accent : 0xffffff, this.showGhost ? 0.28 : 0.08);
       this.overlay.fillRoundedRect(this.scale.width - 86, 48, 70, 28, 8);
+      const worlds = ["course-1", "course-2", "course-3"];
       for (let i = 0; i < 3; i += 1) {
-        const active = i === this.courseIndex;
+        const active = this.course.id.startsWith(worlds[i].slice(0, 8));
         this.overlay.fillStyle(active ? th.accent : 0xffffff, active ? 0.28 : 0.08);
         this.overlay.fillRoundedRect(16 + i * 54, 48, 48, 28, 8);
       }
@@ -595,10 +633,11 @@ export class VelocityPlayScene extends Phaser.Scene {
       setGhostEnabled(this.showGhost);
       return true;
     }
+    const worldIds = ["course-1", "course-2", "course-3"];
     for (let i = 0; i < 3; i += 1) {
       const left = 16 + i * 54;
       if (y >= 48 && y <= 76 && x >= left && x <= left + 48) {
-        this.switchCourse(i);
+        this.switchCourse(COURSES.findIndex((c) => c.id === worldIds[i]));
         return true;
       }
     }
