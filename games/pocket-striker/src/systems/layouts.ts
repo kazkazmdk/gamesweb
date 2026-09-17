@@ -43,7 +43,7 @@ const MORE: Layout[] = Array.from({ length: 18 }, (_, i) => {
 });
 
 export const LAYOUTS: Layout[] = [
-  { id: "l1", name: "Open Green", par: 2, theme: "garden", w: W, h: H, ball: { x: 90, y: 240 }, hole: { x: 620, y: 240, r: 18 }, walls: frame() },
+  { id: "l1", name: "Open Green", par: 2, theme: "garden", w: W, h: H, ball: { x: 90, y: 240 }, hole: { x: 620, y: 240, r: 18 }, walls: [...frame(), box(300, 80, 28, 140), box(300, 280, 28, 140)], bumpers: [{ x: 360, y: 240, r: 22 }] },
   { id: "l2", name: "Center Post", par: 2, theme: "workshop", w: W, h: H, ball: { x: 80, y: 240 }, hole: { x: 630, y: 240, r: 18 }, walls: [...frame(), box(330, 160, 50, 160)], bumpers: [{ x: 360, y: 240, r: 20 }] },
   { id: "l3", name: "Two Lanes", par: 3, theme: "arcade", w: W, h: H, ball: { x: 80, y: 80 }, hole: { x: 640, y: 400, r: 18 }, walls: [...frame(), box(200, 0, 24, 300), box(480, 180, 24, 300)] },
   { id: "l4", name: "Bank Left", par: 2, theme: "workshop", w: W, h: H, ball: { x: 90, y: 400 }, hole: { x: 90, y: 80, r: 18 }, walls: [...frame(), box(180, 140, 360, 24)] },
