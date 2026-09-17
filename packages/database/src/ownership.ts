@@ -91,7 +91,7 @@ export function reconstructAchievementsFromScores(scores: ScoreLike[]): string[]
       if (s.score === 1) out.add("pocket-striker:perfect");
     }
     if (s.gameId === "territory-rush") out.add("territory-rush:first-claim");
-    if (s.gameId === "crowd-control") out.add("crowd-control:first-gate");
+    if (s.gameId === "crowd-control") out.add("crowd-control:pack-gate");
   }
   return [...out];
 }

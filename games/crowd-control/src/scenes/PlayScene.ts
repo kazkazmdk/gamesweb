@@ -115,7 +115,7 @@ export class CrowdScene extends Phaser.Scene {
       const op = side === "left" ? seg.left : seg.right;
       this.pack = applyOp(this.pack, op);
       this.synth.tone(seg.type === "finish" ? 520 : 300 + this.pack, 0.06, "square", 0.04, 0.12);
-      void this.platform.achievement.unlock("first-gate");
+      void this.platform.achievement.unlock("pack-gate");
       if (op?.kind === "mul" && op.n >= 4) void this.platform.achievement.unlock("x4");
       pulseHaptic(7);
       if (seg.type === "finish") this.finish();
@@ -128,7 +128,7 @@ export class CrowdScene extends Phaser.Scene {
     } else if (seg.type === "shortcut" && side === "left") {
       this.shortcut = true;
       this.speed += 40;
-      void this.platform.achievement.unlock("shortcut");
+      void this.platform.achievement.unlock("cut-in");
     }
     if (this.pack <= 0) this.finish();
   }

@@ -525,9 +525,9 @@ export const crowdControlManifest: GameManifest = {
     { q: "Is it auto-run?", a: "Forward motion is automatic. Everything that matters — lane, gate, fight, dash — is on you." },
   ],
   achievements: [
-    { key: "first-gate", name: "Through the gate", description: "Take your first gate.", xp: 10 },
+    { key: "pack-gate", name: "Through the gate", description: "Take your first gate.", xp: 10 },
     { key: "x4", name: "Crowd Surge", description: "Hit a x4 multiplier.", xp: 25 },
-    { key: "shortcut", name: "Cut In", description: "Take a hidden shortcut.", xp: 20 },
+    { key: "cut-in", name: "Cut In", description: "Take a hidden shortcut.", xp: 20 },
     { key: "finish-80", name: "Parade", description: "Finish with 80 or more in the pack.", xp: 35 },
   ],
 };
