@@ -370,16 +370,16 @@ export class SwarmPlayScene extends Phaser.Scene {
 
   private spawnWave(dt: number) {
     const elapsed = (this.time.now - this.started) / 1000;
-    const live = this.enemies.reduce((n, e) => n + (e.active && e.kind !== "boss" ? 1 : 0), 0);
+    const live = this.enemies.reduce((n, e) => n + (e.active && e.kind !== "boss" && e.kind !== "warden" ? 1 : 0), 0);
     const want = desiredCount(elapsed);
-    if (!this.endless && !this.bossSpawned && elapsed >= BOSS_AT) {
+    if (!this.bossSpawned && elapsed >= BOSS_AT) {
       const slot = this.enemies.find((e) => !e.active);
       if (slot) {
-        spawnEnemy(slot, "boss", ARENA / 2, 120, 1);
+        spawnEnemy(slot, this.endless ? "warden" : "boss", ARENA / 2, 120, 1);
         this.bossSpawned = true;
         this.synth.levelUp();
         this.juice.flash(0.2);
-        this.floaters.spawn(this.px, this.py - 40, "PROTOCOL CORE", "#ffd4a8");
+        this.floaters.spawn(this.px, this.py - 40, this.endless ? "WARDEN" : "PROTOCOL CORE", "#ffd4a8");
       }
     }
     if (live >= want) return;
@@ -412,24 +412,45 @@ export class SwarmPlayScene extends Phaser.Scene {
     for (let i = 0; i < n; i += 1) {
       const b = this.bullets.find((x) => !x.active);
       if (!b) break;
-      const spread = (i - (n - 1) / 2) * 0.14;
+      const spread = (i - (n - 1) / 2) * (0.14 + this.build.spread * 0.04);
       const a = base + spread;
       b.active = true;
       b.hostile = false;
       b.x = this.px;
       b.y = this.py;
-      b.vx = Math.cos(a) * (over ? 580 : 530);
-      b.vy = Math.sin(a) * (over ? 580 : 530);
-      b.life = 760;
+      const spd = (over ? 580 : 530) + this.build.rail * 80;
+      b.vx = Math.cos(a) * spd;
+      b.vy = Math.sin(a) * spd;
+      b.life = 760 + this.build.rail * 120;
       b.damage = this.build.damage * critMul(this.build) * (over ? 1.8 + this.build.overcharge * 0.2 : 1);
-      b.r = over ? 8 : 4;
+      b.r = over ? 8 : this.build.rail > 0 ? 3 : 4;
       b.chain = this.build.chain;
       b.pierce = this.build.pierce;
       b.split = this.build.split;
       b.over = over;
     }
-    const pitch = 400 + this.build.projectiles * 18 + (over ? 80 : 0);
-    this.synth.tone(pitch, 0.035, "square", over ? 0.04 : 0.022, 0.12);
+    if (this.build.twin > 0) {
+      for (const side of [-1, 1]) {
+        const b = this.bullets.find((x) => !x.active);
+        if (!b) break;
+        const a = base + side * 0.55;
+        b.active = true;
+        b.hostile = false;
+        b.x = this.px;
+        b.y = this.py;
+        b.vx = Math.cos(a) * 480;
+        b.vy = Math.sin(a) * 480;
+        b.life = 520;
+        b.damage = this.build.damage * 0.55 * this.build.twin;
+        b.r = 3;
+        b.chain = 0;
+        b.pierce = 0;
+        b.split = 0;
+        b.over = false;
+      }
+    }
+    const pitch = 400 + this.build.projectiles * 18 + (over ? 80 : 0) + this.build.rail * 40;
+    this.synth.tone(pitch, 0.035, this.build.rail ? "sawtooth" : "square", over ? 0.04 : 0.022, 0.12);
   }
 
   private nearest(x: number, y: number, ignore?: Enemy) {
@@ -450,7 +471,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     for (const e of this.enemies) {
       if (!e.active) continue;
       e.flash = Math.max(0, e.flash - dt);
-      if (e.kind === "boss") this.stepBoss(e, dt);
+      if (e.kind === "boss" || e.kind === "warden") this.stepBoss(e, dt);
       else if (e.kind === "spitter") this.stepSpitter(e, dt);
       else if (e.kind === "elite") this.stepElite(e, dt);
       else if (e.kind === "tank") {
@@ -717,7 +738,8 @@ export class SwarmPlayScene extends Phaser.Scene {
       this.elites += 1;
       void this.platform.achievement.unlock("elite");
     }
-    if (e.kind === "boss") {
+    if (this.build.lifesteal > 0) this.hp = Math.min(this.maxHp, this.hp + 2 * this.build.lifesteal);
+    if (e.kind === "boss" || e.kind === "warden") {
       this.bossDown = true;
       pulseHaptic([20, 40, 30]);
       this.platform.events.emit({ name: "boss_defeated", props: { gameId: "swarm-protocol" } });
@@ -771,6 +793,10 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.owned.push(u.id);
     if (u.id === "orbital") void this.platform.achievement.unlock("shield");
     if (u.id === "chain") void this.platform.achievement.unlock("chain");
+    if (u.id === "shield-wall") {
+      this.maxHp += 22;
+      this.hp += 22;
+    }
     this.platform.events.emit({ name: "upgrade_selected", props: { gameId: "swarm-protocol", upgrade: u.id, level: this.level } });
     this.choosing = null;
   }
@@ -858,23 +884,44 @@ export class SwarmPlayScene extends Phaser.Scene {
   private draw(dt: number) {
     const g = this.gfx;
     g.clear();
+    const fracture = this.endless || this.bossDown;
     fillBackdrop(
       g,
       ARENA,
       ARENA,
-      {
-        top: 0x1c1014,
-        mid: 0x140c10,
-        bottom: 0x0c080a,
-        grain: 0.035,
-        blobs: [
-          { color: 0xf07a3a, x: 0.28, y: 0.22, r: 220, alpha: 0.1, parallax: 0.02 },
-          { color: 0x6a2a48, x: 0.74, y: 0.68, r: 260, alpha: 0.09, parallax: 0.03 },
-          { color: 0xffc58a, x: 0.56, y: 0.18, r: 140, alpha: 0.05, parallax: 0.04 },
-        ],
-      },
+      fracture
+        ? {
+            top: 0x24140c,
+            mid: 0x180c08,
+            bottom: 0x0c0604,
+            grain: 0.05,
+            blobs: [
+              { color: 0xff6a3a, x: 0.3, y: 0.2, r: 260, alpha: 0.12, parallax: 0.03 },
+              { color: 0x6a2010, x: 0.8, y: 0.7, r: 300, alpha: 0.1, parallax: 0.04 },
+            ],
+          }
+        : {
+            top: 0x1c1014,
+            mid: 0x140c10,
+            bottom: 0x0c080a,
+            grain: 0.035,
+            blobs: [
+              { color: 0xf07a3a, x: 0.28, y: 0.22, r: 220, alpha: 0.1, parallax: 0.02 },
+              { color: 0x6a2a48, x: 0.74, y: 0.68, r: 260, alpha: 0.09, parallax: 0.03 },
+              { color: 0xffc58a, x: 0.56, y: 0.18, r: 140, alpha: 0.05, parallax: 0.04 },
+            ],
+          },
       { x: this.camX, y: this.camY },
     );
+    if (fracture) {
+      g.fillStyle(0x3a1810, 0.55);
+      g.fillTriangle(80, 200, 240, 80, 300, 340);
+      g.fillTriangle(980, 1100, 1200, 860, 1320, 1280);
+    } else {
+      g.fillStyle(0x2a1620, 0.45);
+      g.fillRect(60, 60, 80, ARENA - 120);
+      g.fillRect(ARENA - 140, 60, 80, ARENA - 120);
+    }
     g.lineStyle(2, 0xf07a3a, 0.18);
     g.strokeRect(20, 20, ARENA - 40, ARENA - 40);
     g.lineStyle(1, 0xffffff, 0.025);
@@ -904,12 +951,31 @@ export class SwarmPlayScene extends Phaser.Scene {
         g.lineStyle(2, 0xff8a6a, 0.35 + e.telegraph * 0.4);
         g.strokeCircle(e.x, e.y, e.r + 10 + e.telegraph * 18);
       }
-      g.fillStyle(e.flash > 0 ? 0xffffff : KIND[e.kind].color, 1);
-      if (e.kind === "tank" || e.kind === "elite" || e.kind === "boss") g.fillCircle(e.x, e.y, e.r);
-      else if (e.kind === "dart") g.fillTriangle(e.x, e.y - e.r, e.x + e.r, e.y + e.r * 0.7, e.x - e.r, e.y + e.r * 0.7);
-      else if (e.kind === "spitter") g.fillRoundedRect(e.x - e.r, e.y - e.r * 0.7, e.r * 2, e.r * 1.4, 4);
-      else g.fillCircle(e.x, e.y, e.r);
-      if (e.kind === "boss" || e.kind === "elite") {
+      const col = e.flash > 0 ? 0xffffff : KIND[e.kind].color;
+      g.fillStyle(col, 1);
+      if (e.kind === "dart") g.fillTriangle(e.x + e.r, e.y, e.x - e.r * 0.7, e.y - e.r * 0.6, e.x - e.r * 0.7, e.y + e.r * 0.6);
+      else if (e.kind === "tank") {
+        g.fillRoundedRect(e.x - e.r, e.y - e.r * 0.7, e.r * 2, e.r * 1.4, 4);
+        g.fillStyle(0x120c10, 0.4);
+        g.fillRect(e.x - e.r + 4, e.y - 4, e.r * 2 - 8, 8);
+      } else if (e.kind === "spitter") {
+        g.fillCircle(e.x, e.y, e.r);
+        g.fillStyle(0xff8a4a, 0.8);
+        g.fillCircle(e.x, e.y - e.r * 0.2, e.r * 0.35);
+      } else if (e.kind === "splitter") {
+        g.fillTriangle(e.x, e.y - e.r, e.x + e.r, e.y + e.r * 0.6, e.x - e.r, e.y + e.r * 0.6);
+        g.fillCircle(e.x, e.y, e.r * 0.35);
+      } else if (e.kind === "swarmling") g.fillCircle(e.x, e.y, e.r);
+      else if (e.kind === "chaser") {
+        g.fillCircle(e.x, e.y, e.r);
+        g.fillStyle(0x120c10, 0.5);
+        g.fillCircle(e.x + 3, e.y - 2, 3);
+      } else if (e.kind === "warden") {
+        g.fillRoundedRect(e.x - e.r, e.y - e.r, e.r * 2, e.r * 2, 8);
+        g.fillStyle(0xffe0c0, 0.7);
+        g.fillRect(e.x - 6, e.y - e.r - 8, 12, 10);
+      } else g.fillCircle(e.x, e.y, e.r);
+      if (e.kind === "boss" || e.kind === "elite" || e.kind === "warden") {
         g.fillStyle(0x120c10, 0.8);
         g.fillRect(e.x - e.r, e.y - e.r - 8, e.r * 2, 4);
         g.fillStyle(0xf07a3a, 1);
@@ -931,10 +997,23 @@ export class SwarmPlayScene extends Phaser.Scene {
       g.fillCircle(this.px + Math.cos(sa) * 48, this.py + Math.sin(sa) * 48, 2.4);
     }
 
+    const heading = Math.atan2(this.vy, this.vx);
+    g.save();
+    g.translateCanvas(this.px, this.py);
+    g.rotateCanvas(Math.hypot(this.vx, this.vy) > 8 ? heading : 0);
     g.fillStyle(this.iFrames > 0 ? 0xffffff : 0xf07a3a, 1);
-    g.fillCircle(this.px, this.py, 12);
-    g.fillStyle(0x140e0c, 1);
-    g.fillCircle(this.px, this.py, 5);
+    g.fillTriangle(16, 0, -10, -9, -10, 9);
+    g.fillStyle(0xffe8d4, this.hp / this.maxHp > 0.35 ? 0.9 : 0.35);
+    g.fillCircle(0, 0, 5);
+    if (this.dashing > 0) {
+      g.fillStyle(0xffffff, 0.35);
+      g.fillTriangle(-16, 0, -28, -6, -28, 6);
+    }
+    g.restore();
+    if (this.build.nova + this.build.shieldWall > 0) {
+      g.lineStyle(2, 0xffc58a, 0.35);
+      g.strokeCircle(this.px, this.py, 20 + this.build.shieldWall * 4);
+    }
 
     const survive = (this.time.now - this.started) / 1000;
     const need = xpToLevel(this.level);
@@ -985,8 +1064,9 @@ export class SwarmPlayScene extends Phaser.Scene {
         this.overlay.lineStyle(2, 0xf07a3a, 0.75);
         this.overlay.strokeRoundedRect(x, y, cardW, cardH, 14);
         const owned = this.owned.filter((id) => id === u.id).length;
+        const syn = recommendBuild([...this.owned, u.id]);
         this.cards[i]
-          .setText(`${i + 1}  ${u.name}\n${u.desc}\nlv ${owned + 1}`)
+          .setText(`${u.name}\n${u.desc}\nlv ${owned + 1}${syn ? `\n${syn}` : ""}`)
           .setPosition(x + 16, y + 18)
           .setWordWrapWidth(cardW - 28)
           .setAlpha(1);
