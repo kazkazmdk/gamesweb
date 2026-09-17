@@ -1,5 +1,6 @@
 {
   "framework": "nextjs",
   "installCommand": "cd ../.. && corepack enable && pnpm install --frozen-lockfile",
-  "buildCommand": "cd ../.. && pnpm --filter @gamesweb/web build"
+  "buildCommand": "cd ../.. && pnpm --filter @gamesweb/web build",
+  "ignoreCommand": "node ../../scripts/vercel-should-build.mjs"
 }
