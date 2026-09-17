@@ -12,9 +12,34 @@ test("velocity run boots", async ({ page }) => {
   await expect(page.locator("canvas")).toBeVisible({ timeout: 20_000 });
 });
 
-test("swarm protocol boots", async ({ page }) => {
-  await page.goto("/play/swarm-protocol");
+test("crowd control boots", async ({ page }) => {
+  await page.goto("/play/crowd-control");
   await expect(page.locator("canvas")).toBeVisible({ timeout: 20_000 });
+});
+
+test("sky stack boots", async ({ page }) => {
+  await page.goto("/play/sky-stack");
+  await expect(page.locator("canvas")).toBeVisible({ timeout: 20_000 });
+});
+
+test("knockout circuit boots", async ({ page }) => {
+  await page.goto("/play/knockout-circuit");
+  await expect(page.locator("canvas")).toBeVisible({ timeout: 20_000 });
+});
+
+test("pocket striker boots", async ({ page }) => {
+  await page.goto("/play/pocket-striker");
+  await expect(page.locator("canvas")).toBeVisible({ timeout: 20_000 });
+});
+
+test("territory rush boots", async ({ page }) => {
+  await page.goto("/play/territory-rush");
+  await expect(page.locator("canvas")).toBeVisible({ timeout: 20_000 });
+});
+
+test("guest magic challenge page renders without signup", async ({ page }) => {
+  await page.goto("/c/7FQ2K?p=e30");
+  await expect(page.getByText(/expired|challenged|Challenge/i).first()).toBeVisible();
 });
 
 test("guest progression persists after refresh", async ({ page }) => {
@@ -43,6 +68,17 @@ test("private surfaces are noindex", async ({ page }) => {
     const robots = await page.locator('meta[name="robots"]').getAttribute("content");
     expect(robots ?? "", path).toMatch(/noindex/i);
   }
+});
+
+test("daily arcade and party pages render", async ({ page }) => {
+  await page.goto("/daily");
+  await expect(page.getByTestId("daily-arcade")).toBeVisible();
+  await page.goto("/party");
+  await expect(page.getByTestId("party-create")).toBeVisible();
+  await page.goto("/inbox");
+  await expect(page.getByTestId("inbox")).toBeVisible();
+  await page.goto("/grand-prix");
+  await expect(page.getByTestId("grand-prix")).toBeVisible();
 });
 
 test("invalid score is rejected", async ({ request }) => {

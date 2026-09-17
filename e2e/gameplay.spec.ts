@@ -212,3 +212,25 @@ test("swarm protocol moves, levels, and takes an upgrade", async ({ page }) => {
   expect(after!.level ?? 1).toBeGreaterThanOrEqual(2);
   done();
 });
+
+test("sky stack places with space and retries", async ({ page }) => {
+  const done = attachConsoleGuard(page);
+  await waitReady(page, "sky-stack");
+  await page.locator("canvas").click({ position: { x: 180, y: 400 } });
+  await page.keyboard.press("Space");
+  await expect.poll(async () => (await debugOf(page))?.score ?? 0, { timeout: 8_000 }).toBeGreaterThan(0);
+  await assertAlive(page);
+  done();
+});
+
+test("knockout circuit moves", async ({ page }) => {
+  const done = attachConsoleGuard(page);
+  await waitReady(page, "knockout-circuit");
+  const before = await debugOf(page);
+  await page.keyboard.down("KeyD");
+  await expect
+    .poll(async () => (await debugOf(page))?.playerX ?? 0)
+    .toBeGreaterThan(before!.playerX);
+  await page.keyboard.up("KeyD");
+  done();
+});
