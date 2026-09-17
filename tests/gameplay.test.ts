@@ -159,7 +159,7 @@ describe("velocity medals", () => {
 
 describe("swarm upgrades", () => {
   it("ships 15 behavioral upgrades", () => {
-    expect(UPGRADES).toHaveLength(15);
+    expect(UPGRADES).toHaveLength(26);
   });
 
   it("changes combat behavior instead of only adding flat stats", () => {
