@@ -19,7 +19,7 @@ export default function PartyCreatePage() {
         type="button"
         className="mt-8 w-full rounded-full bg-[var(--accent)] py-3 text-[#140d12]"
         onClick={() => {
-          const party = arcadeStore.createParty(player.displayName || "Host");
+          const party = arcadeStore.createParty(player.id, player.displayName || "Host");
           router.push(`/party/${party.code}`);
         }}
       >

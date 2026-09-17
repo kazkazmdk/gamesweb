@@ -3,7 +3,7 @@
 import { InviteWidget, FriendPresence, SectionHeader } from "@/components/platform";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
-import { arcadeStore } from "@/lib/social/arcade-store";
+import { useArcade } from "@/lib/social/use-arcade";
 import Link from "next/link";
 
 export default function FriendsPage() {
@@ -15,8 +15,9 @@ export default function FriendsPage() {
   const online = accepted.filter((f) => f.presence === "online");
   const offline = accepted.filter((f) => f.presence === "offline");
   const requests = player.friends.filter((f) => f.status === "pending-in" || f.status === "pending-out");
-  const recent = arcadeStore.view().recentPlayers;
-  const rivals = arcadeStore.view().rivals;
+  const arcade = useArcade();
+  const recent = arcade.recentPlayers;
+  const rivals = arcade.rivals;
 
   return (
     <div className="px-5 py-8 md:px-10">

@@ -1,13 +1,11 @@
 "use client";
 
 import { arcadeStore } from "@/lib/social/arcade-store";
+import { useArcade } from "@/lib/social/use-arcade";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
 export default function InboxPage() {
-  const [, bump] = useState(0);
-  useEffect(() => arcadeStore.subscribe(() => bump((n) => n + 1)), []);
-  const items = arcadeStore.view().inbox;
+  const items = useArcade().inbox;
 
   return (
     <div className="mx-auto max-w-2xl px-5 py-10" data-testid="inbox">

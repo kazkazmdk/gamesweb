@@ -6,7 +6,7 @@ import { analytics } from "@gamesweb/analytics";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { arcadeStore } from "@/lib/social/arcade-store";
+import { useArcade } from "@/lib/social/use-arcade";
 import { usePlayer } from "@/lib/player";
 import { SavePrompt } from "@/components/meta/SavePrompt";
 import { Toasts } from "@/components/meta/Toasts";
@@ -33,13 +33,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const playing = path.startsWith("/play/") && path !== "/play";
   const player = usePlayer();
   const [query, setQuery] = useState(false);
-  const [unread, setUnread] = useState(0);
-
-  useEffect(() => {
-    const sync = () => setUnread(arcadeStore.unread());
-    sync();
-    return arcadeStore.subscribe(sync);
-  }, []);
+  const unread = useArcade().inbox.filter((i) => !i.read).length;
 
   useEffect(() => {
     analytics.page(path);

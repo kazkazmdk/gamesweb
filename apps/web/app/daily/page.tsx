@@ -1,13 +1,14 @@
 "use client";
 
 import { dailyArcadeEvents, getManifest, utcDayKey } from "@gamesweb/game-sdk";
-import { arcadeStore } from "@/lib/social/arcade-store";
+import { useArcade } from "@/lib/social/use-arcade";
 import Link from "next/link";
 
 export default function DailyArcadePage() {
   const day = utcDayKey();
   const events = dailyArcadeEvents(day);
-  const progress = arcadeStore.view().daily.day === day ? arcadeStore.view().daily : { completed: [], score: 0, day };
+  const arcade = useArcade();
+  const progress = arcade.daily.day === day ? arcade.daily : { completed: [], score: 0, day };
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-10" data-testid="daily-arcade">

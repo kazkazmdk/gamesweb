@@ -115,6 +115,9 @@ class ArcadeStore {
     };
   }
   private emit() {
+    // Mutations edit nested records in place; publish a new root so
+    // useSyncExternalStore consumers re-render.
+    this.snap = { ...this.snap };
     this.persist();
     for (const fn of this.listeners) fn();
   }
@@ -291,11 +294,11 @@ class ArcadeStore {
     this.emit();
   }
 
-  createParty(host: string): PartyState {
+  createParty(hostId: string, hostName: string): PartyState {
     const party: PartyState = {
       code: makePublicCode(),
-      host,
-      members: [{ id: host, name: host, ready: true, score: 0 }],
+      host: hostId,
+      members: [{ id: hostId, name: hostName, ready: true, score: 0 }],
       playlist: QUICK_PARTY_PLAYLIST.map((r) => ({ ...r })),
       round: 0,
       state: "lobby",
@@ -388,4 +391,6 @@ class ArcadeStore {
 }
 
 export const arcadeStore = new ArcadeStore();
+export type { ArcadeSnap };
+export const SSR_ARCADE: ArcadeSnap = empty();
 export { dailyArcadeEvents, encodeChallengePayload, GRAND_PRIX_PLAYLIST, QUICK_PARTY_PLAYLIST, roundPoints };

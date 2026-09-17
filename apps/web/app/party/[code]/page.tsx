@@ -5,7 +5,9 @@ import { arcadeStore } from "@/lib/social/arcade-store";
 import { usePlayer } from "@/lib/player";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+
+type PartyState = ReturnType<typeof arcadeStore.createParty>;
 
 export default function PartyPage() {
   const params = useParams<{ code: string }>();
@@ -13,11 +15,23 @@ export default function PartyPage() {
   const code = (params.code ?? "").toUpperCase();
   const [reaction, setReaction] = useState("");
   const [created, setCreated] = useState(code);
-  const party = useMemo(() => {
-    const joined = arcadeStore.joinParty(created || code, player.id, player.displayName);
-    if (joined.ok) return joined.party;
-    return arcadeStore.view().parties.find((p) => p.code === (created || code)) ?? null;
+  // Parties live in localStorage, so resolve them after hydration only.
+  const [party, setParty] = useState<PartyState | null | undefined>(undefined);
+
+  useEffect(() => {
+    const target = created || code;
+    const joined = arcadeStore.joinParty(target, player.id, player.displayName || "Player");
+    if (joined.ok) setParty(joined.party);
+    else setParty(arcadeStore.view().parties.find((p) => p.code === target) ?? null);
   }, [code, created, player.displayName, player.id]);
+
+  if (party === undefined) {
+    return (
+      <div className="grid min-h-dvh place-items-center px-6">
+        <p className="meta text-white/45">Party {code}</p>
+      </div>
+    );
+  }
 
   if (!party) {
     return (
@@ -28,7 +42,7 @@ export default function PartyPage() {
           <button
             type="button"
             className="mt-6 rounded-full bg-[var(--accent)] px-5 py-3 text-[#140d12]"
-            onClick={() => setCreated(arcadeStore.createParty(player.displayName).code)}
+            onClick={() => setCreated(arcadeStore.createParty(player.id, player.displayName || "Host").code)}
           >
             Create party
           </button>

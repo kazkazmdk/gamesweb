@@ -2,13 +2,24 @@
 
 import { CREW_REACTIONS } from "@gamesweb/game-sdk";
 import { arcadeStore } from "@/lib/social/arcade-store";
+import { useArcade } from "@/lib/social/use-arcade";
 import { usePlayer } from "@/lib/player";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function CrewPage() {
   const player = usePlayer();
-  const crew = arcadeStore.ensureCrew(player.displayName);
+  const crew = useArcade().crew;
   const [react, setReact] = useState("");
+  useEffect(() => {
+    if (!crew) arcadeStore.ensureCrew(player.displayName || "Player");
+  }, [crew, player.displayName]);
+  if (!crew) {
+    return (
+      <div className="mx-auto max-w-2xl px-5 py-10" data-testid="crew">
+        <p className="meta text-white/45">Crew</p>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto max-w-2xl px-5 py-10" data-testid="crew">
       <p className="meta text-white/45">{crew.tag}</p>

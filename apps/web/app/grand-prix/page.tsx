@@ -1,11 +1,11 @@
 "use client";
 
 import { getManifest, GRAND_PRIX_PLAYLIST } from "@gamesweb/game-sdk";
-import { arcadeStore } from "@/lib/social/arcade-store";
+import { useArcade } from "@/lib/social/use-arcade";
 import Link from "next/link";
 
 export default function GrandPrixPage() {
-  const gp = arcadeStore.view().grandPrix;
+  const gp = useArcade().grandPrix;
   return (
     <div className="mx-auto max-w-2xl px-5 py-10" data-testid="grand-prix">
       <p className="meta text-white/45">Arcade Grand Prix</p>

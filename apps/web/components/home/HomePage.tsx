@@ -1,7 +1,7 @@
 "use client";
 
 import { GAME_MANIFESTS, nextBestAction, utcDayKey, dailyArcadeEvents } from "@gamesweb/game-sdk";
-import { arcadeStore } from "@/lib/social/arcade-store";
+import { useArcade } from "@/lib/social/use-arcade";
 import { levelFromXp } from "@gamesweb/config";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -72,7 +72,7 @@ export default function HomePage() {
   const modes = playModeOptions(game.id);
   const fade = reduced ? "" : "duration-[320ms] ease-[var(--ease-out)]";
   const line = ctx.pbLabel ? `${ctx.modeLabel} · Personal best ${ctx.pbLabel}` : ctx.modeLabel;
-  const snap = arcadeStore.view();
+  const snap = useArcade();
   const day = utcDayKey();
   const openCh = snap.challenges.find((c) => c.status === "open");
   const nba = nextBestAction({
