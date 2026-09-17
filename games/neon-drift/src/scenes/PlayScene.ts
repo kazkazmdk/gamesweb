@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, type GameKeyboard } from "@gamesweb/game-core";
+import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, qualityFromFps, type GameKeyboard, type QualityTier } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { neonDriftManifest } from "@gamesweb/game-sdk";
 import { CAMERA, NEON, VEHICLE } from "../config";
@@ -26,7 +26,7 @@ import {
   type TrackSample,
 } from "../systems/track";
 import { Car } from "../systems/vehicle";
-import { drawCar, drawGhost, drawHudChrome, drawMarks, drawWorld, type Mark } from "./render";
+import { drawCar, drawCountdown, drawGhost, drawHudChrome, drawMarks, drawWorld, type Mark } from "./render";
 
 type ResultKind = "crash" | "finish" | "time";
 
@@ -44,6 +44,7 @@ export class DriftPlayScene extends Phaser.Scene {
   private overlay!: Phaser.GameObjects.Graphics;
   private hud!: Phaser.GameObjects.Text;
   private hint!: Phaser.GameObjects.Text;
+  private countTxt!: Phaser.GameObjects.Text;
   private deltaTxt!: Phaser.GameObjects.Text;
   private floaterGfx: Phaser.GameObjects.Text[] = [];
   private paused = false;
@@ -70,7 +71,10 @@ export class DriftPlayScene extends Phaser.Scene {
   private fpsAcc = 0;
   private frames = 0;
   private ticks = 0;
-  private quality: "high" | "low" = "high";
+  private quality: QualityTier = "high";
+  private countdown = 0;
+  private smash = 0;
+  private finishPunch = 0;
   private debug = false;
   private sectorHits = 0;
   private lastBoost = false;
@@ -115,7 +119,11 @@ export class DriftPlayScene extends Phaser.Scene {
     this.debug = this.game.registry.get("debug") === true && process.env.NODE_ENV !== "production";
     const mobile = this.sys.game.device.input.touch;
     this.parts = new ParticlePool(mobile ? 140 : 260);
-    this.quality = mobile ? "low" : "high";
+    this.quality = mobile ? "mid" : "high";
+    const debugOn = typeof window !== "undefined" && Boolean((window as Window & { __GW_ALLOW_DEBUG__?: boolean }).__GW_ALLOW_DEBUG__);
+    this.countdown = debugOn ? 0 : 3.2;
+    this.smash = 0;
+    this.finishPunch = 0;
     this.synth = (this.game.registry.get("synth") as Synth | undefined) ?? new Synth();
     this.game.registry.set("synth", this.synth);
     const settings = this.platform.audio.getSettings();
@@ -137,6 +145,16 @@ export class DriftPlayScene extends Phaser.Scene {
       .setOrigin(0.5, 0)
       .setScrollFactor(0)
       .setDepth(21)
+      .setAlpha(0);
+    this.countTxt = this.add
+      .text(this.scale.width / 2, this.scale.height / 2, "", {
+        fontFamily: "ui-sans-serif, system-ui, sans-serif",
+        fontSize: "72px",
+        color: "#f3f1ec",
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(24)
       .setAlpha(0);
     this.hint = this.add
       .text(this.scale.width / 2, this.scale.height - 78, this.hintCopy(), {
@@ -200,6 +218,7 @@ export class DriftPlayScene extends Phaser.Scene {
       this.fitCam(gs.width, gs.height);
       this.hint.setPosition(this.scale.width / 2, this.scale.height - 78);
       this.deltaTxt.setPosition(this.scale.width / 2, 86);
+      this.countTxt.setPosition(this.scale.width / 2, this.scale.height / 2);
     });
     this.game.events.on("platform-pause", this.onPause, this);
     this.game.events.on("platform-resume", this.onResume, this);
@@ -207,7 +226,7 @@ export class DriftPlayScene extends Phaser.Scene {
 
   private hintCopy() {
     const touch = this.sys.game.device.input.touch;
-    return touch ? "STEER  ·  HOLD BRAKE TO SLIDE  ·  R RESTART" : "STEER  ·  SPACE TO DRIFT  ·  R RESTART";
+    return touch ? "STEER  ·  DRIFT" : "STEER  ·  DRIFT";
   }
 
   private shouldTutorial() {
@@ -248,8 +267,7 @@ export class DriftPlayScene extends Phaser.Scene {
     this.fpsAcc += delta;
     if (this.fpsAcc > 1000) {
       const fps = this.frames / (this.fpsAcc / 1000);
-      if (fps < 46) this.quality = "low";
-      else if (fps > 56) this.quality = this.sys.game.device.input.touch ? "low" : "high";
+      this.quality = qualityFromFps(fps, this.sys.game.device.input.touch, this.quality);
       this.fpsAcc = 0;
       this.frames = 0;
     }
@@ -272,6 +290,24 @@ export class DriftPlayScene extends Phaser.Scene {
       if (Phaser.Input.Keyboard.JustDown(this.keys.one) || native?.onePressed) this.switchTrack(0);
       else if (Phaser.Input.Keyboard.JustDown(this.keys.two) || native?.twoPressed) this.switchTrack(1);
       else if (Phaser.Input.Keyboard.JustDown(this.keys.three) || native?.threePressed) this.switchTrack(2);
+    }
+    if (this.countdown > 0 && !this.paused && !this.ended) {
+      this.countdown -= dt;
+      this.car.brakeLight = 1;
+      this.car.throttle = 0;
+      this.ensureAudio();
+      this.synth.engineRpm(0.35 + (3.2 - this.countdown) * 0.12, 0.4);
+      this.cam.zoom += (CAMERA.zoomSlow * 1.08 - this.cam.zoom) * (1 - Math.exp(-dt * 3));
+      this.cameras.main.setZoom(this.cam.zoom);
+      this.cameras.main.centerOn(this.car.x, this.car.y);
+      if (this.countdown <= 0) {
+        this.synth.gateChime();
+        this.juice.cameraPunch(1.1);
+        this.juice.flash(0.12);
+      }
+      this.draw(dt);
+      this.publishDebug(delta);
+      return;
     }
     if (this.paused || this.ended) {
       this.draw(0);
@@ -322,8 +358,11 @@ export class DriftPlayScene extends Phaser.Scene {
       this.juice.screenShake(5 + impactN * 6, 90);
       this.juice.hitStop(28);
       this.synth.impact(impactN);
-      this.parts.burst(this.car.x, this.car.y, this.quality === "high" ? 12 : 8, 0xf3f1ec, 160, 240);
+      this.smash = 1;
+      this.parts.burst(this.car.x, this.car.y, this.quality === "high" ? 16 : 8, 0xffd59a, 180, 240);
+      this.parts.burst(this.car.x, this.car.y, this.quality === "low" ? 4 : 10, 0xff8a4a, 220, 180);
       if (this.car.speed > 390) {
+        this.car.yawVel += 2.4;
         this.finish("crash");
         return;
       }
@@ -467,7 +506,7 @@ export class DriftPlayScene extends Phaser.Scene {
 
   private draw(dt: number) {
     this.gfx.clear();
-    drawWorld(this.gfx, this.def, this.samples, this.quality);
+    drawWorld(this.gfx, this.def, this.samples, this.quality, this.time.now);
     drawMarks(this.gfx, this.marks, dt);
     if (this.showGhost && this.tape) {
       drawGhost(this.gfx, ghostPose(this.tape.samples, this.time.now - this.runStart), this.def.theme.accent);
@@ -477,7 +516,8 @@ export class DriftPlayScene extends Phaser.Scene {
       this.gfx.fillStyle(p.color, p.life / p.max);
       this.gfx.fillCircle(p.x, p.y, p.size);
     }
-    drawCar(this.gfx, this.car, this.def.theme.accent);
+    this.smash *= Math.exp(-dt * 8);
+    drawCar(this.gfx, this.car, this.def.theme.accent, this.smash);
 
     this.floaterGfx.forEach((label, i) => {
       const t = this.floaters.items[i];
@@ -506,6 +546,14 @@ export class DriftPlayScene extends Phaser.Scene {
       this.sys.game.device.input.touch,
       this.juice.flashAlpha(dt),
     );
+    if (this.countdown > 0) {
+      drawCountdown(this.overlay, this.scale.width, this.scale.height, this.countdown);
+      const step = this.countdown > 3 ? 3 : this.countdown > 2 ? 2 : this.countdown > 1 ? 1 : 0;
+      this.countTxt.setText(step === 0 ? "GO" : String(step)).setAlpha(1);
+      this.countTxt.setColor(step === 0 ? "#8dffc1" : "#f3f1ec");
+    } else {
+      this.countTxt.setAlpha(0);
+    }
     this.drawMobileChrome();
   }
 
@@ -595,6 +643,7 @@ export class DriftPlayScene extends Phaser.Scene {
           this.overlay.setVisible(false);
           this.hint.setVisible(false);
           this.deltaTxt.setVisible(false);
+          this.countTxt.setVisible(false);
           this.floaterGfx.forEach((t) => t.setVisible(false));
         },
       },
@@ -605,7 +654,13 @@ export class DriftPlayScene extends Phaser.Scene {
     if (this.ended) return;
     this.ended = true;
     this.endedAt = this.time.now;
+    this.finishPunch = kind === "finish" ? 1 : 0;
     this.synth.setSkid(0);
+    if (kind === "finish") {
+      this.juice.slowMo(0.35, 420);
+      this.juice.cameraPunch(1.4);
+      this.juice.flash(0.18);
+    }
     this.score.bestDrift = Math.max(this.score.bestDrift, this.score.currentDrift);
     const score = Math.floor(this.score.total);
     const prev = this.tape?.score ?? 0;
