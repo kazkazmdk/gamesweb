@@ -212,7 +212,10 @@ export class VelocityPlayScene extends Phaser.Scene {
       this.signaledReady = true;
       this.platform.events.emit({ name: "game_ready", props: { gameId: "velocity-run" } });
     }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.r)) {
+    // The platform keyboard captures and preventDefaults these keys, and Phaser
+    // ignores defaultPrevented events, so read them from the native layer too.
+    const chrome = this.nativeKeys?.peek();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.r) || chrome?.retryPressed) {
       if (!this.ended) this.retry();
       return;
     }
@@ -220,9 +223,9 @@ export class VelocityPlayScene extends Phaser.Scene {
       this.showGhost = !this.showGhost;
       setGhostEnabled(this.showGhost);
     }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.one)) this.switchCourse(0);
-    if (Phaser.Input.Keyboard.JustDown(this.keys.two)) this.switchCourse(1);
-    if (Phaser.Input.Keyboard.JustDown(this.keys.three)) this.switchCourse(2);
+    if (Phaser.Input.Keyboard.JustDown(this.keys.one) || chrome?.onePressed) this.switchCourse(0);
+    else if (Phaser.Input.Keyboard.JustDown(this.keys.two) || chrome?.twoPressed) this.switchCourse(1);
+    else if (Phaser.Input.Keyboard.JustDown(this.keys.three) || chrome?.threePressed) this.switchCourse(2);
     if (this.paused) {
       this.draw(dt);
       return;

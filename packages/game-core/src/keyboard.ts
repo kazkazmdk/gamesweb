@@ -109,17 +109,23 @@ export function createGameKeyboard() {
   window.addEventListener("keyup", onUp, true);
   window.addEventListener("blur", onBlur);
 
+  const snapshot = (): GameKeyState => ({
+    ...held,
+    jumpPressed,
+    retryPressed,
+    dashPressed,
+    onePressed,
+    twoPressed,
+    threePressed,
+  });
+
   return {
+    /** Same as read() but keeps the one-frame pulses for a later read() in the same frame. */
+    peek(): GameKeyState {
+      return snapshot();
+    },
     read(): GameKeyState {
-      const state: GameKeyState = {
-        ...held,
-        jumpPressed,
-        retryPressed,
-        dashPressed,
-        onePressed,
-        twoPressed,
-        threePressed,
-      };
+      const state = snapshot();
       jumpPressed = false;
       retryPressed = false;
       dashPressed = false;

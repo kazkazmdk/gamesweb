@@ -20,6 +20,8 @@ type GwDebug = {
   longFrames?: number;
   frozen?: boolean;
   fps?: number;
+  trackId?: string;
+  courseId?: string;
 };
 
 type GwCmd = {
@@ -223,6 +225,21 @@ test("sky stack places with space and retries", async ({ page }) => {
   await expect.poll(async () => (await debugOf(page))?.score ?? 0, { timeout: 8_000 }).toBeGreaterThan(0);
   await page.keyboard.press("Space");
   await assertAlive(page);
+  done();
+});
+
+test("number keys switch track and course from the keyboard", async ({ page }) => {
+  const done = attachConsoleGuard(page);
+  await waitReady(page, "neon-drift");
+  expect((await debugOf(page))?.trackId).toBe("foundation");
+  await page.keyboard.press("Digit2");
+  await expect.poll(async () => (await debugOf(page))?.trackId, { timeout: 6_000 }).toBe("technical");
+
+  await waitReady(page, "velocity-run");
+  const first = (await debugOf(page))?.courseId;
+  await page.keyboard.press("Digit3");
+  await expect.poll(async () => (await debugOf(page))?.courseId, { timeout: 6_000 }).toBe("course-3");
+  expect(first).not.toBe("course-3");
   done();
 });
 
