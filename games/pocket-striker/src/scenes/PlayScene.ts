@@ -8,6 +8,8 @@ import {
   countLongFrame,
   clearGwDebug,
   createGameKeyboard,
+  drawParticles,
+  fillBackdrop,
   type GameKeyboard,
 } from "@gamesweb/game-core";
 import { pocketStrikerManifest, readRunContext, type PlatformSDK } from "@gamesweb/game-sdk";
@@ -41,6 +43,7 @@ export class PocketScene extends Phaser.Scene {
   private started = 0;
   private scaleX = 1;
   private scaleY = 1;
+  private trail: Array<{ x: number; y: number }> = [];
 
   constructor() {
     super("pocket-play");
@@ -63,7 +66,8 @@ export class PocketScene extends Phaser.Scene {
     this.synth.setSettings(this.platform.audio.getSettings());
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
-    this.hud = this.add.text(16, 48, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#d9f5d4" }).setScrollFactor(0).setDepth(21);
+    this.hud = this.add.text(16, 64, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#d9f5d4" }).setScrollFactor(0).setDepth(21);
+    this.trail = [];
     this.native?.destroy();
     this.native = createGameKeyboard();
     this.game.canvas.tabIndex = 0;
@@ -127,9 +131,14 @@ export class PocketScene extends Phaser.Scene {
       this.vx *= Math.pow(0.985, dt * 60);
       this.vy *= Math.pow(0.985, dt * 60);
       this.bounce();
+      if (Math.hypot(this.vx, this.vy) > 20 && this.ticks % 2 === 0) {
+        this.trail.push({ x: this.bx, y: this.by });
+        if (this.trail.length > 18) this.trail.shift();
+      }
       if (Math.hypot(this.vx, this.vy) < 8) {
         this.vx = 0;
         this.vy = 0;
+        this.trail = [];
       }
       const hole = this.layout.hole;
       const dist = Math.hypot(this.bx - hole.x, this.by - hole.y);
@@ -158,7 +167,37 @@ export class PocketScene extends Phaser.Scene {
         this.by += Math.sign(dy) * 3;
       }
       this.synth.tone(520, 0.03, "square", 0.02, 0.08);
+      this.parts.burst(this.bx, this.by, 5, 0xc4f1c2, 50, 180);
     }
+  }
+
+  private predict() {
+    const pts: Array<{ x: number; y: number }> = [];
+    let x = this.bx;
+    let y = this.by;
+    const dx = this.bx - this.ax;
+    const dy = this.by - this.ay;
+    const len = Math.hypot(dx, dy);
+    if (len < 8) return pts;
+    const power = Math.min(1, len / 160);
+    let vx = (dx / len) * power * 620;
+    let vy = (dy / len) * power * 620;
+    const step = 0.028;
+    for (let i = 0; i < 14; i += 1) {
+      x += vx * step;
+      y += vy * step;
+      vx *= Math.pow(0.985, step * 60);
+      vy *= Math.pow(0.985, step * 60);
+      for (const w of this.layout.walls) {
+        const nx = Math.max(w.x, Math.min(x, w.x + w.w));
+        const ny = Math.max(w.y, Math.min(y, w.y + w.h));
+        if ((x - nx) ** 2 + (y - ny) ** 2 > 12 * 12) continue;
+        if (Math.abs(x - nx) > Math.abs(y - ny)) vx *= -0.72;
+        else vy *= -0.72;
+      }
+      pts.push({ x, y });
+    }
+    return pts;
   }
 
   private sink(ok = true) {
@@ -194,22 +233,62 @@ export class PocketScene extends Phaser.Scene {
   private draw() {
     const g = this.gfx;
     g.clear();
+    fillBackdrop(g, this.scale.width, this.scale.height, {
+      top: 0x102418,
+      mid: 0x173322,
+      bottom: 0x0c1a12,
+      grain: 0.04,
+    });
     g.save();
     g.scaleCanvas(this.scaleX, this.scaleY);
-    g.fillStyle(0x173322, 1);
-    g.fillRect(0, 0, this.layout.w, this.layout.h);
+    g.fillStyle(0x5a3a22, 1);
+    g.fillRoundedRect(6, 6, this.layout.w - 12, this.layout.h - 12, 18);
     g.fillStyle(0x1f4a32, 1);
-    g.fillRect(18, 18, this.layout.w - 36, this.layout.h - 36);
+    g.fillRoundedRect(22, 22, this.layout.w - 44, this.layout.h - 44, 12);
+    g.fillStyle(0x7a5230, 1);
+    g.fillRect(10, 10, this.layout.w - 20, 12);
+    g.fillRect(10, this.layout.h - 22, this.layout.w - 20, 12);
+    g.fillRect(10, 10, 12, this.layout.h - 20);
+    g.fillRect(this.layout.w - 22, 10, 12, this.layout.h - 20);
     g.fillStyle(0x0f2418, 1);
-    for (const w of this.layout.walls) g.fillRect(w.x, w.y, w.w, w.h);
+    for (const w of this.layout.walls) {
+      g.fillRoundedRect(w.x, w.y, w.w, w.h, 3);
+      g.fillStyle(0x2a5a3c, 0.35);
+      g.fillRect(w.x, w.y, w.w, 3);
+      g.fillStyle(0x0f2418, 1);
+    }
+    const hole = this.layout.hole;
+    g.fillStyle(0x3a6a48, 0.9);
+    g.fillCircle(hole.x, hole.y, hole.r + 6);
     g.fillStyle(0x08140c, 1);
-    g.fillCircle(this.layout.hole.x, this.layout.hole.y, this.layout.hole.r);
+    g.fillCircle(hole.x, hole.y, hole.r);
+    g.fillStyle(0xffffff, 0.12);
+    g.fillCircle(hole.x - 3, hole.y - 3, hole.r * 0.35);
+    for (let i = 0; i < this.trail.length; i += 1) {
+      const p = this.trail[i];
+      g.fillStyle(0xc4f1c2, 0.08 + (i / this.trail.length) * 0.28);
+      g.fillCircle(p.x, p.y, 4 + (i / this.trail.length) * 4);
+    }
+    if (this.aiming) {
+      const dx = this.bx - this.ax;
+      const dy = this.by - this.ay;
+      const len = Math.hypot(dx, dy);
+      const power = Math.min(1, len / 160);
+      g.lineStyle(3, 0xffffff, 0.35 + power * 0.45);
+      g.lineBetween(this.bx, this.by, this.bx + dx, this.by + dy);
+      g.fillStyle(0xffe08a, 0.85);
+      g.fillCircle(this.bx + dx, this.by + dy, 4 + power * 5);
+      const pts = this.predict();
+      for (let i = 0; i < pts.length; i += 1) {
+        g.fillStyle(0xffffff, 0.18 + (1 - i / pts.length) * 0.35);
+        g.fillCircle(pts[i].x, pts[i].y, 2.4);
+      }
+    }
     g.fillStyle(0xc4f1c2, 1);
     g.fillCircle(this.bx, this.by, 11);
-    if (this.aiming) {
-      g.lineStyle(2, 0xffffff, 0.7);
-      g.lineBetween(this.bx, this.by, this.bx + (this.bx - this.ax), this.by + (this.by - this.ay));
-    }
+    g.fillStyle(0xffffff, 0.4);
+    g.fillCircle(this.bx - 3, this.by - 3, 3);
+    drawParticles(g, this.parts);
     g.restore();
     this.hud.setText(`${this.layout.name}\n${this.strokes} / par ${this.layout.par}`);
     this.overlay.clear();

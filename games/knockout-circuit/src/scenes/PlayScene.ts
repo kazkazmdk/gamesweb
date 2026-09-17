@@ -9,6 +9,10 @@ import {
   countLongFrame,
   clearGwDebug,
   createGameKeyboard,
+  drawParticles,
+  fillBackdrop,
+  fillVignette,
+  mixColor,
   type GameKeyboard,
 } from "@gamesweb/game-core";
 import { knockoutCircuitManifest, readRunContext, type PlatformSDK } from "@gamesweb/game-sdk";
@@ -56,6 +60,7 @@ export class KnockoutScene extends Phaser.Scene {
   private ghosts: Array<{ name: string; color: number; samples: Array<{ t: number; x: number; y: number }> }> = [];
   private usedExpert = false;
   private spawn = { x: 80, y: 600 };
+  private rag = { x: 0, y: 0, vx: 0, vy: 0, rot: 0, av: 0 };
 
   constructor() {
     super("knockout-play");
@@ -85,7 +90,7 @@ export class KnockoutScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(this.map.theme.sky);
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
-    this.hud = this.add.text(20, 50, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#ffe8b0" }).setScrollFactor(0).setDepth(21);
+    this.hud = this.add.text(20, 64, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#ffe8b0" }).setScrollFactor(0).setDepth(21);
     this.nativeKeys?.destroy();
     this.nativeKeys = createGameKeyboard();
     this.game.canvas.tabIndex = 0;
@@ -144,6 +149,11 @@ export class KnockoutScene extends Phaser.Scene {
     if (native?.threePressed) this.switchMap(2);
     if (this.dying > 0) {
       this.dying -= dt * 1000;
+      this.rag.vy += 1680 * dt;
+      this.rag.x += this.rag.vx * dt;
+      this.rag.y += this.rag.vy * dt;
+      this.rag.rot += this.rag.av * dt;
+      this.parts.update(dt);
       this.draw();
       if (this.dying <= 0) {
         this.x = this.spawn.x;
@@ -236,7 +246,9 @@ export class KnockoutScene extends Phaser.Scene {
   private die() {
     if (this.ended || this.dying > 0) return;
     this.hits += 1;
-    this.dying = 90;
+    this.dying = 520;
+    this.rag = { x: this.x, y: this.y, vx: this.vx * 0.35 + (Math.random() - 0.5) * 140, vy: -340, rot: 0, av: 9 + Math.random() * 6 };
+    this.parts.burst(this.x + 11, this.y + 12, 16, this.map.theme.danger, 140, 380);
     this.synth.impact(0.6);
     this.juice.flash(0.2);
     if (this.running) {
@@ -289,17 +301,68 @@ export class KnockoutScene extends Phaser.Scene {
   private draw() {
     const g = this.gfx;
     const th = this.map.theme;
-    g.clear();
-    g.fillStyle(th.sky, 1);
-    g.fillRect(0, 0, this.map.width, this.map.height);
     const t = this.time.now / 1000;
+    g.clear();
+    fillBackdrop(
+      g,
+      this.map.width,
+      this.map.height,
+      {
+        top: mixColor(th.sky, 0x000000, 0.15),
+        mid: th.sky,
+        bottom: mixColor(th.sky, th.ground, 0.35),
+        grain: 0.04,
+        blobs: [
+          { color: th.accent, x: 0.2, y: 0.18, r: 160, alpha: 0.07, parallax: 0.04 },
+          { color: th.danger, x: 0.78, y: 0.12, r: 120, alpha: 0.05, parallax: 0.05 },
+        ],
+      },
+      { x: this.camX, y: this.camY },
+    );
+    g.fillStyle(mixColor(th.sky, 0x000000, 0.35), 1);
+    for (let i = 0; i < 10; i += 1) {
+      const x = i * 420 + this.camX * 0.62;
+      g.fillTriangle(x, this.map.height, x + 160, this.map.height - 210 - (i % 3) * 40, x + 340, this.map.height);
+    }
     for (const s of this.map.solids) {
       const live = this.liveRect(s, t);
-      if (s.kind === "finish") g.fillStyle(0xffe08a, 0.9);
-      else if (s.kind === "spinner" || s.kind === "spike" || s.kind === "beam") g.fillStyle(th.danger, 1);
-      else if (s.kind === "gate") g.fillStyle(0xffffff, 0.35);
-      else g.fillStyle(s.route === "expert" ? 0x5a3a18 : th.ground, 1);
-      if (s.kind !== "spawn") g.fillRect(live.x, live.y, live.w, live.h);
+      if (s.kind === "spawn") continue;
+      if (s.kind === "spinner") {
+        const a = t * 2.8 + (s.phase ?? 0);
+        const cx = live.x + live.w / 2;
+        const cy = live.y + live.h / 2;
+        g.save();
+        g.translateCanvas(cx, cy);
+        g.rotateCanvas(a);
+        g.fillStyle(th.danger, 0.95);
+        g.fillRect(-40, -5, 80, 10);
+        g.fillRect(-5, -40, 10, 80);
+        g.fillStyle(0xffffff, 0.85);
+        g.fillCircle(0, 0, 7);
+        g.restore();
+        continue;
+      }
+      if (s.kind === "beam") {
+        const pulse = 0.45 + Math.sin(t * 9 + (s.phase ?? 0)) * 0.3;
+        g.fillStyle(th.danger, pulse);
+        g.fillRect(live.x, live.y, live.w, live.h);
+        g.fillStyle(0xffffff, 0.55);
+        g.fillRect(live.x, live.y + live.h / 2 - 2, live.w, 4);
+        continue;
+      }
+      if (s.kind === "spike") {
+        g.fillStyle(th.danger, 1);
+        g.fillTriangle(live.x, live.y + live.h, live.x + live.w / 2, live.y, live.x + live.w, live.y + live.h);
+        continue;
+      }
+      if (s.kind === "finish") g.fillStyle(0xffe08a, 0.95);
+      else if (s.kind === "gate") g.fillStyle(0xffffff, 0.28 + Math.sin(t * 3) * 0.08);
+      else g.fillStyle(s.route === "expert" ? 0x8a4a18 : th.ground, 1);
+      g.fillRect(live.x, live.y, live.w, live.h);
+      if (s.kind === "solid" || s.kind === "mover" || s.kind === "fall") {
+        g.fillStyle(0xffe8b0, 0.35);
+        g.fillRect(live.x, live.y, live.w, 4);
+      }
     }
     for (const ghost of this.ghosts) {
       const pose = ghost.samples.find((s) => s.t >= this.timeMs) ?? ghost.samples[ghost.samples.length - 1];
@@ -307,10 +370,29 @@ export class KnockoutScene extends Phaser.Scene {
       g.fillStyle(ghost.color, 0.35);
       g.fillRoundedRect(pose.x, pose.y, 22, 32, 4);
     }
+    drawParticles(g, this.parts);
+    const bodyX = this.dying > 0 ? this.rag.x : this.x;
+    const bodyY = this.dying > 0 ? this.rag.y : this.y;
+    const lean = this.dying > 0 ? this.rag.rot : this.vx * 0.0009;
+    g.save();
+    g.translateCanvas(bodyX + 11, bodyY + 16);
+    g.rotateCanvas(lean);
     g.fillStyle(this.dying > 0 ? 0xffffff : th.accent, 1);
-    g.fillRoundedRect(this.x, this.y, 22, 32, 5);
+    g.fillRoundedRect(-11, -16, 22, 32, 5);
+    g.fillStyle(0x1b1408, 1);
+    g.fillCircle(this.vx >= 0 ? 4 : -4, -8, 3.2);
+    g.fillStyle(th.accent, 0.85);
+    g.fillRect(-7, 10, 5, this.grounded ? 8 : 5);
+    g.fillRect(2, 10, 5, this.grounded ? 8 : 5);
+    g.restore();
+    fillVignette(g, this.map.width, this.map.height, 0.18);
     this.hud.setText(`${this.map.name}\n${(this.timeMs / 1000).toFixed(2)}s`);
     this.overlay.clear();
+    const fa = this.juice.flashAlpha(0.016);
+    if (fa) {
+      this.overlay.fillStyle(0xffffff, fa);
+      this.overlay.fillRect(0, 0, this.scale.width, this.scale.height);
+    }
     if (this.sys.game.device.input.touch) {
       this.overlay.fillStyle(0xffffff, 0.06);
       this.overlay.fillRoundedRect(12, this.scale.height * 0.3, this.scale.width * 0.24, this.scale.height * 0.45, 16);

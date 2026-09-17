@@ -29,7 +29,7 @@ export const MAPS: MapDef[] = [
     name: "Starter Gates",
     width: 2800,
     height: 720,
-    theme: { sky: 0x1b1408, ground: 0x3a2a12, accent: 0xffb703, danger: 0xff5d4a },
+    theme: { sky: 0x0b0906, ground: 0x7a5628, accent: 0xffd166, danger: 0xff3b4e },
     solids: [
       { x: 40, y: 580, w: 40, h: 40, kind: "spawn" },
       plat(20, 620, 280),
@@ -53,7 +53,7 @@ export const MAPS: MapDef[] = [
     name: "Liftwell",
     width: 1600,
     height: 2200,
-    theme: { sky: 0x14181e, ground: 0x243040, accent: 0xffb703, danger: 0xff6b4a },
+    theme: { sky: 0x07090e, ground: 0x3d5368, accent: 0xffd166, danger: 0xff4d62 },
     solids: [
       { x: 80, y: 2040, w: 40, h: 40, kind: "spawn" },
       plat(40, 2080, 320),
@@ -80,7 +80,7 @@ export const MAPS: MapDef[] = [
     name: "Risk Line",
     width: 3200,
     height: 800,
-    theme: { sky: 0x1a0f12, ground: 0x3a2218, accent: 0xffb703, danger: 0xff4d6d },
+    theme: { sky: 0x0c0708, ground: 0x6a3a28, accent: 0xffd166, danger: 0xff3d6a },
     solids: [
       { x: 50, y: 620, w: 40, h: 40, kind: "spawn" },
       plat(20, 660, 260),

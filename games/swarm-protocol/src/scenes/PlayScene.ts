@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, seededRng, type GameKeyboard } from "@gamesweb/game-core";
+import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, seededRng, fillBackdrop, fillVignette, type GameKeyboard } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { readRunContext, swarmProtocolManifest, utcDayKey } from "@gamesweb/game-sdk";
 import {
@@ -115,7 +115,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hud = this.add
-      .text(22, 52, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#f7ebe3" })
+      .text(22, 74, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#f7ebe3" })
       .setScrollFactor(0)
       .setDepth(21);
     this.cards = [0, 1, 2].map((i) =>
@@ -463,14 +463,13 @@ export class SwarmPlayScene extends Phaser.Scene {
         e.y += Math.sin(a) * e.speed * dt;
       }
 
-      if (this.build.orbital > 0) {
-        for (let i = 0; i < this.build.orbital; i += 1) {
-          const sa = this.shieldA + (i * Math.PI * 2) / this.build.orbital;
-          const sx = this.px + Math.cos(sa) * 48;
-          const sy = this.py + Math.sin(sa) * 48;
-          if ((e.x - sx) ** 2 + (e.y - sy) ** 2 < (e.r + 12) ** 2) {
-            this.hurtEnemy(e, this.build.damage * 0.4, false);
-          }
+      const drones = Math.max(3, this.build.orbital);
+      for (let i = 0; i < drones; i += 1) {
+        const sa = this.shieldA + (i * Math.PI * 2) / drones;
+        const sx = this.px + Math.cos(sa) * 48;
+        const sy = this.py + Math.sin(sa) * 48;
+        if ((e.x - sx) ** 2 + (e.y - sy) ** 2 < (e.r + 12) ** 2) {
+          this.hurtEnemy(e, this.build.damage * 0.4, false);
         }
       }
 
@@ -859,8 +858,23 @@ export class SwarmPlayScene extends Phaser.Scene {
   private draw(dt: number) {
     const g = this.gfx;
     g.clear();
-    g.fillStyle(0x161014, 1);
-    g.fillRect(0, 0, ARENA, ARENA);
+    fillBackdrop(
+      g,
+      ARENA,
+      ARENA,
+      {
+        top: 0x1c1014,
+        mid: 0x140c10,
+        bottom: 0x0c080a,
+        grain: 0.035,
+        blobs: [
+          { color: 0xf07a3a, x: 0.28, y: 0.22, r: 220, alpha: 0.1, parallax: 0.02 },
+          { color: 0x6a2a48, x: 0.74, y: 0.68, r: 260, alpha: 0.09, parallax: 0.03 },
+          { color: 0xffc58a, x: 0.56, y: 0.18, r: 140, alpha: 0.05, parallax: 0.04 },
+        ],
+      },
+      { x: this.camX, y: this.camY },
+    );
     g.lineStyle(2, 0xf07a3a, 0.18);
     g.strokeRect(20, 20, ARENA - 40, ARENA - 40);
     g.lineStyle(1, 0xffffff, 0.025);
@@ -908,12 +922,13 @@ export class SwarmPlayScene extends Phaser.Scene {
       g.fillCircle(p.x, p.y, p.size);
     }
 
-    if (this.build.orbital) {
-      for (let i = 0; i < this.build.orbital; i += 1) {
-        const sa = this.shieldA + (i * Math.PI * 2) / this.build.orbital;
-        g.fillStyle(0xf7ebe3, 0.9);
-        g.fillCircle(this.px + Math.cos(sa) * 48, this.py + Math.sin(sa) * 48, 6);
-      }
+    const drones = Math.max(3, this.build.orbital);
+    for (let i = 0; i < drones; i += 1) {
+      const sa = this.shieldA + (i * Math.PI * 2) / drones;
+      g.fillStyle(0xf7ebe3, 0.92);
+      g.fillCircle(this.px + Math.cos(sa) * 48, this.py + Math.sin(sa) * 48, 6);
+      g.fillStyle(0xf07a3a, 0.55);
+      g.fillCircle(this.px + Math.cos(sa) * 48, this.py + Math.sin(sa) * 48, 2.4);
     }
 
     g.fillStyle(this.iFrames > 0 ? 0xffffff : 0xf07a3a, 1);
@@ -929,6 +944,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     );
     void need;
 
+    fillVignette(g, ARENA, ARENA, 0.32);
     this.overlay.clear();
     const fa = this.juice.flashAlpha(dt);
     if (fa) {
@@ -936,7 +952,7 @@ export class SwarmPlayScene extends Phaser.Scene {
       this.overlay.fillRect(0, 0, this.scale.width, this.scale.height);
     }
     this.overlay.fillStyle(0xc45c3a, 0.85);
-    this.overlay.fillRect(22, 96, Math.max(0, (this.hp / this.maxHp) * 120), 6);
+    this.overlay.fillRect(22, 118, Math.max(0, (this.hp / this.maxHp) * 120), 6);
 
     if (this.sys.game.device.input.touch) {
       this.overlay.fillStyle(0xffffff, 0.06);

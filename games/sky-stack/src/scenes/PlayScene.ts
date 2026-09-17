@@ -9,6 +9,10 @@ import {
   clearGwDebug,
   createGameKeyboard,
   seededRng,
+  drawParticles,
+  fillBackdrop,
+  fillVignette,
+  mixColor,
   type GameKeyboard,
 } from "@gamesweb/game-core";
 import { readRunContext, skyStackManifest, type PlatformSDK } from "@gamesweb/game-sdk";
@@ -55,6 +59,9 @@ export class SkyStackScene extends Phaser.Scene {
   private started = 0;
   private endedAt = 0;
   private pitch = 220;
+  private scraps: Array<{ x: number; y: number; w: number; vx: number; vy: number; rot: number; vr: number; color: number }> = [];
+  private clouds: Array<{ x: number; y: number; r: number; a: number; s: number }> = [];
+  private halo = 0;
 
   constructor() {
     super("sky-stack-play");
@@ -73,7 +80,7 @@ export class SkyStackScene extends Phaser.Scene {
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hud = this.add
-      .text(18, 48, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "18px", color: "#eaf6ff" })
+      .text(18, 64, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "18px", color: "#eaf6ff" })
       .setScrollFactor(0)
       .setDepth(21);
     this.banner = this.add
@@ -124,6 +131,15 @@ export class SkyStackScene extends Phaser.Scene {
     this.camY = 0;
     this.hue = 198;
     this.pitch = 220;
+    this.halo = 0;
+    this.scraps = [];
+    this.clouds = Array.from({ length: 8 }, () => ({
+      x: this.rng() * (this.scale.width || 390),
+      y: this.rng() * (this.scale.height || 844) * 0.7,
+      r: 28 + this.rng() * 42,
+      a: 0.08 + this.rng() * 0.1,
+      s: 8 + this.rng() * 14,
+    }));
     this.banner.setAlpha(0.85);
   }
 
@@ -145,10 +161,25 @@ export class SkyStackScene extends Phaser.Scene {
     this.stack.push(result.next);
     this.floors += 1;
     if (this.floors === 1) void this.platform.achievement.unlock("first-place");
+    if (result.leftover > 6) {
+      const overlapR = Math.min(this.moving.x + this.moving.w, top.x + top.w);
+      const leftScrap = this.moving.x < top.x;
+      this.scraps.push({
+        x: leftScrap ? this.moving.x : overlapR,
+        y: this.moving.y,
+        w: result.leftover,
+        vx: leftScrap ? -90 : 90,
+        vy: 40,
+        rot: 0,
+        vr: leftScrap ? -2.4 : 2.4,
+        color: this.colorFor(this.stack.length),
+      });
+    }
     if (result.kind === "perfect") {
       this.streak += 1;
       this.perfects += 1;
       this.combo += 1;
+      this.halo = 1;
       this.pitch = Math.min(880, this.pitch + 28);
       this.synth.tone(this.pitch, 0.07, "sine", 0.05, 0.18);
       pulseHaptic(8);
@@ -166,7 +197,8 @@ export class SkyStackScene extends Phaser.Scene {
       this.combo = result.kind === "near" ? this.combo + 1 : Math.max(0, this.combo - 1);
       this.pitch = Math.max(220, this.pitch - 40);
       this.synth.tone(this.pitch, 0.05, "triangle", 0.03, 0.12);
-      this.shake = result.kind === "near" ? 4 : 7;
+      this.shake = result.kind === "near" ? 8 : 12;
+      this.juice.screenShake(this.shake, 140);
     }
     this.score += slabScore(result.kind, this.combo, this.fever);
     if (this.floors >= 30) void this.platform.achievement.unlock("floor-30");
@@ -261,6 +293,19 @@ export class SkyStackScene extends Phaser.Scene {
     const targetCam = Math.max(0, (this.stack[0].y - (this.stack[this.stack.length - 1]?.y ?? 0)) - this.scale.height * 0.18);
     this.camY += (targetCam - this.camY) * (1 - Math.exp(-dt * 3.2));
     this.shake = Math.max(0, this.shake - dt * 28);
+    this.halo = Math.max(0, this.halo - dt * 1.6);
+    for (const c of this.clouds) {
+      c.x += c.s * dt;
+      if (c.x - c.r > this.scale.width) c.x = -c.r;
+    }
+    for (const s of this.scraps) {
+      s.vy += 980 * dt;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.rot += s.vr * dt;
+    }
+    this.scraps = this.scraps.filter((s) => s.y < this.scale.height + 80);
+    this.parts.update(dt);
     this.draw(dt);
     this.publishDebug();
   }
@@ -277,23 +322,56 @@ export class SkyStackScene extends Phaser.Scene {
     g.clear();
     const w = this.scale.width;
     const h = this.scale.height;
-    g.fillStyle(0x101826, 1);
-    g.fillRect(0, 0, w, h);
-    g.fillStyle(0x7ec8ff, 0.08);
-    g.fillCircle(w * 0.7, 90 - this.camY * 0.08, 70);
-    g.fillStyle(0xffc38a, 0.1);
-    g.fillCircle(w * 0.18, h * 0.2, 46);
-    const ox = (this.rng() * 0 + this.shake) * (Math.random() - 0.5);
+    const dusk = Math.min(1, this.floors / 40);
+    fillBackdrop(
+      g,
+      w,
+      h,
+      {
+        top: mixColor(0x6aa8d8, 0x0a1020, dusk),
+        mid: mixColor(0x1a2a44, 0x070b14, dusk),
+        bottom: mixColor(0x101826, 0x04060c, dusk),
+        grain: 0.045,
+        blobs: [
+          { color: 0xffc38a, x: 0.16, y: 0.18, r: 52, alpha: 0.12 * (1 - dusk * 0.5), parallax: 0.04 },
+          { color: 0x7ec8ff, x: 0.72, y: 0.12, r: 80, alpha: 0.1 * (1 - dusk), parallax: 0.06 },
+        ],
+      },
+      { y: this.camY },
+    );
+    for (const c of this.clouds) {
+      g.fillStyle(0xffffff, c.a * (1 - dusk * 0.4));
+      g.fillCircle(c.x, c.y + this.camY * 0.12, c.r);
+      g.fillCircle(c.x + c.r * 0.55, c.y + 8 + this.camY * 0.12, c.r * 0.7);
+    }
+    const ox = this.shake * (Math.random() - 0.5);
     for (let i = 0; i < this.stack.length; i += 1) {
       const s = this.stack[i];
       const y = s.y + this.camY + ox;
       g.fillStyle(this.colorFor(i), 1);
       g.fillRoundedRect(s.x, y, s.w, SLAB_H - 4, 6);
+      g.fillStyle(0xffffff, 0.12);
+      g.fillRoundedRect(s.x + 4, y + 3, Math.max(8, s.w - 16), 5, 3);
+    }
+    const top = this.stack[this.stack.length - 1];
+    if (this.halo > 0.02 && top) {
+      g.lineStyle(3, 0xffffff, this.halo * 0.85);
+      g.strokeRoundedRect(top.x - 6, top.y + this.camY + ox - 6, top.w + 12, SLAB_H + 4, 10);
+    }
+    for (const s of this.scraps) {
+      g.save();
+      g.translateCanvas(s.x + s.w / 2, s.y + this.camY + SLAB_H / 2);
+      g.rotateCanvas(s.rot);
+      g.fillStyle(s.color, 0.9);
+      g.fillRoundedRect(-s.w / 2, -(SLAB_H - 4) / 2, s.w, SLAB_H - 4, 5);
+      g.restore();
     }
     if (!this.ended) {
       g.fillStyle(0xeaf6ff, 0.95);
       g.fillRoundedRect(this.moving.x, this.moving.y + this.camY, this.moving.w, SLAB_H - 4, 6);
     }
+    drawParticles(g, this.parts, 0, this.camY);
+    fillVignette(g, w, h, 0.22 + dusk * 0.12);
     const mark = (floors: number, color: number, label: string) => {
       if (!floors) return;
       const y = this.stack[0].y - floors * (SLAB_H + 6) + this.camY;

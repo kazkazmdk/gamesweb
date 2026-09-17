@@ -9,6 +9,8 @@ import {
   clearGwDebug,
   createGameKeyboard,
   seededRng,
+  drawParticles,
+  fillVignette,
   type GameKeyboard,
 } from "@gamesweb/game-core";
 import { readRunContext, territoryRushManifest, type PlatformSDK } from "@gamesweb/game-sdk";
@@ -44,6 +46,8 @@ export class TerritoryScene extends Phaser.Scene {
   private cell = 16;
   private rng = Math.random;
   private stick = { x: 0, y: 0 };
+  private flashes: Array<{ cells: number[]; t: number; id: Owner }> = [];
+  private names: Phaser.GameObjects.Text[] = [];
 
   constructor() {
     super("territory-play");
@@ -73,7 +77,15 @@ export class TerritoryScene extends Phaser.Scene {
     this.game.registry.set("synth", this.synth);
     this.synth.setSettings(this.platform.audio.getSettings());
     this.gfx = this.add.graphics();
-    this.hud = this.add.text(16, 48, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#ffe0e6" }).setScrollFactor(0).setDepth(21);
+    this.hud = this.add.text(16, 64, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#ffe0e6" }).setScrollFactor(0).setDepth(21);
+    this.flashes = [];
+    this.names.forEach((t) => t.destroy());
+    this.names = this.bots.map((b) =>
+      this.add
+        .text(0, 0, b.name, { fontFamily: "ui-sans-serif, system-ui", fontSize: "11px", color: "#fff4f6" })
+        .setOrigin(0.5, 1)
+        .setDepth(18),
+    );
     this.native?.destroy();
     this.native = createGameKeyboard();
     this.game.canvas.tabIndex = 0;
@@ -135,6 +147,8 @@ export class TerritoryScene extends Phaser.Scene {
       if (this.t >= TIME) this.finish();
     }
     this.parts.update(dt);
+    for (const f of this.flashes) f.t -= dt * 1.8;
+    this.flashes = this.flashes.filter((f) => f.t > 0);
     this.draw();
     this.publishDebug();
   }
@@ -169,8 +183,12 @@ export class TerritoryScene extends Phaser.Scene {
     }
     if (this.get(nx, ny) === id) {
       if (trail.length) {
+        const before = this.grid.slice();
         const n = this.fill(id, trail);
         if (n > 0) {
+          const cells: number[] = [];
+          for (let i = 0; i < this.grid.length; i += 1) if (before[i] !== this.grid[i]) cells.push(i);
+          this.flashes.push({ cells, t: 1, id });
           this.claims += 1;
           this.largest = Math.max(this.largest, n);
           this.combo += 1;
@@ -266,21 +284,57 @@ export class TerritoryScene extends Phaser.Scene {
     const g = this.gfx;
     g.clear();
     const colors = [0x1a1014, 0xff4d6d, 0x4dabff, 0xffd166, 0x7d5fff];
+    const outlines = [0x000000, 0xffc1cc, 0xb8ddff, 0xffe9a8, 0xcbb8ff];
+    const c = this.cell;
     for (let y = 0; y < ROWS; y += 1) {
       for (let x = 0; x < COLS; x += 1) {
-        g.fillStyle(colors[this.get(x, y)], 1);
-        g.fillRect(x * this.cell, y * this.cell, this.cell - 1, this.cell - 1);
+        const owner = this.get(x, y);
+        g.fillStyle(colors[owner], 1);
+        g.fillRect(x * c, y * c, c, c);
       }
     }
-    g.fillStyle(0xffffff, 0.7);
-    for (const c of this.trail) g.fillRect(c.x * this.cell, c.y * this.cell, this.cell - 1, this.cell - 1);
-    g.fillStyle(0xffffff, 1);
-    g.fillRect(this.px * this.cell, this.py * this.cell, this.cell, this.cell);
-    for (const b of this.bots) {
-      g.fillStyle(colors[b.id], 1);
-      g.fillRect(b.x * this.cell, b.y * this.cell, this.cell, this.cell);
+    g.lineStyle(2.4, 0xffffff, 0.85);
+    for (let y = 0; y < ROWS; y += 1) {
+      for (let x = 0; x < COLS; x += 1) {
+        const owner = this.get(x, y);
+        if (!owner) continue;
+        g.lineStyle(2.4, outlines[owner], 0.9);
+        if (this.get(x, y - 1) !== owner) g.lineBetween(x * c, y * c, (x + 1) * c, y * c);
+        if (this.get(x, y + 1) !== owner) g.lineBetween(x * c, (y + 1) * c, (x + 1) * c, (y + 1) * c);
+        if (this.get(x - 1, y) !== owner) g.lineBetween(x * c, y * c, x * c, (y + 1) * c);
+        if (this.get(x + 1, y) !== owner) g.lineBetween((x + 1) * c, y * c, (x + 1) * c, (y + 1) * c);
+      }
     }
-    this.hud.setText(`${Math.max(0, (TIME - this.t) / 1000).toFixed(0)}s   ${this.pct(1).toFixed(0)}%\nBOTS: BRICK · NEEDLE · SWEEP`);
+    for (const f of this.flashes) {
+      g.fillStyle(0xffffff, f.t * 0.45);
+      for (const i of f.cells) {
+        const x = i % COLS;
+        const y = (i / COLS) | 0;
+        g.fillRect(x * c, y * c, c, c);
+      }
+    }
+    g.fillStyle(0xffffff, 0.75);
+    for (const t of this.trail) g.fillRect(t.x * c + 2, t.y * c + 2, c - 4, c - 4);
+    const px = this.px * c + c / 2;
+    const py = this.py * c + c / 2;
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(px, py, c * 0.42);
+    g.fillStyle(colors[1], 1);
+    g.fillCircle(px, py, c * 0.26);
+    this.bots.forEach((b, i) => {
+      const bx = b.x * c + c / 2;
+      const by = b.y * c + c / 2;
+      g.fillStyle(colors[b.id], 1);
+      if (b.name === "NEEDLE") g.fillTriangle(bx, by - c * 0.48, bx + c * 0.42, by + c * 0.38, bx - c * 0.42, by + c * 0.38);
+      else if (b.name === "SWEEP") {
+        g.fillTriangle(bx, by - c * 0.46, bx + c * 0.46, by, bx, by + c * 0.46);
+        g.fillTriangle(bx, by - c * 0.46, bx - c * 0.46, by, bx, by + c * 0.46);
+      } else g.fillRoundedRect(bx - c * 0.4, by - c * 0.4, c * 0.8, c * 0.8, 3);
+      this.names[i]?.setPosition(bx, by - c * 0.7).setVisible(true);
+    });
+    drawParticles(g, this.parts);
+    fillVignette(g, this.scale.width, this.scale.height, 0.2);
+    this.hud.setText(`${Math.max(0, (TIME - this.t) / 1000).toFixed(0)}s   ${this.pct(1).toFixed(0)}%`);
   }
 
   private publishDebug() {
@@ -300,13 +354,18 @@ export class TerritoryScene extends Phaser.Scene {
       },
       {
         finishRun: () => this.finish(),
-        hideHud: () => this.hud.setVisible(false),
+        hideHud: () => {
+          this.hud.setVisible(false);
+          this.names.forEach((t) => t.setVisible(false));
+        },
       },
     );
   }
 
   shutdown() {
     this.native?.destroy();
+    this.names.forEach((t) => t.destroy());
+    this.names = [];
     clearGwDebug();
   }
 }
