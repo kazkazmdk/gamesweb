@@ -40,9 +40,8 @@ export default function HomePage() {
     void store.ensureBoard(game.id, ctx.boardMode);
   }, [store, game.id, ctx.boardMode]);
 
-  const setFocusSafe = useCallback((index: number) => {
-    const next = (index + GAME_MANIFESTS.length) % GAME_MANIFESTS.length;
-    setFocus(next);
+  const setFocusSafe = useCallback((delta: number) => {
+    setFocus((current) => (current + delta + GAME_MANIFESTS.length) % GAME_MANIFESTS.length);
   }, []);
 
   useEffect(() => {
@@ -54,11 +53,11 @@ export default function HomePage() {
       if (el.closest('[role="tablist"]')) return;
       if (e.key === "ArrowRight") {
         e.preventDefault();
-        setFocusSafe(focus + 1);
+        setFocusSafe(1);
       }
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        setFocusSafe(focus - 1);
+        setFocusSafe(-1);
       }
       if (e.key === "Enter") {
         if (el.closest("a,button")) return;
@@ -68,7 +67,7 @@ export default function HomePage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [focus, game.slug, router, setFocusSafe]);
+  }, [game.slug, router, setFocusSafe]);
 
   const modes = playModeOptions(game.id);
   const fade = reduced ? "" : "duration-[320ms] ease-[var(--ease-out)]";

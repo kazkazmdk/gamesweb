@@ -6,7 +6,7 @@ const POSITION: Record<string, Record<string, string>> = {
   "knockout-circuit": { backdrop: "28% 72%", hero: "22% 74%", tile: "30% 72%" },
   "pocket-striker": { backdrop: "50% 48%", hero: "38% 42%", tile: "42% 45%" },
   "territory-rush": { backdrop: "42% 58%", hero: "36% 62%", tile: "40% 58%" },
-  "crowd-control": { backdrop: "62% 78%", hero: "72% 80%", tile: "70% 78%" },
+  "crowd-control": { backdrop: "50% 58%", hero: "55% 62%", tile: "50% 55%" },
 };
 
 const JPG = new Set([
