@@ -1,0 +1,12 @@
+{
+  "name": "@gamesweb/territory-rush",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@gamesweb/game-core": "workspace:*",
+    "@gamesweb/game-sdk": "workspace:*",
+    "phaser": "^3.90.0"
+  }
+}
