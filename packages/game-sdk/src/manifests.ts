@@ -397,7 +397,7 @@ export const pocketStrikerManifest: GameManifest = {
   howToPlay: [
     "Drag back from the striker to aim. Release to shoot.",
     "Fewer strokes win. Banks and perfects add bragging rights.",
-    "12 layouts. Challenges lock the same table.",
+    "18 authored tables across Workshop, Garden, and Arcade Lab.",
   ],
   controls: [
     { input: "Drag / pointer", action: "Aim and power" },

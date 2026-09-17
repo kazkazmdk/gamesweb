@@ -15,6 +15,7 @@ import {
 } from "@gamesweb/game-core";
 import { pocketStrikerManifest, readRunContext, type PlatformSDK } from "@gamesweb/game-sdk";
 import { LAYOUTS, type Layout } from "../systems/layouts";
+import { stepBall, type BallState } from "../systems/physics";
 
 export class PocketScene extends Phaser.Scene {
   private platform!: PlatformSDK;
@@ -45,6 +46,8 @@ export class PocketScene extends Phaser.Scene {
   private scaleX = 1;
   private scaleY = 1;
   private trail: Array<{ x: number; y: number }> = [];
+  private portalCd = 0;
+  private lastPortal = false;
 
   constructor() {
     super("pocket-play");
@@ -127,11 +130,21 @@ export class PocketScene extends Phaser.Scene {
     const native = this.native?.read();
     if (native?.retryPressed) this.scene.restart();
     if (!this.ended) {
-      this.bx += this.vx * dt;
-      this.by += this.vy * dt;
-      this.vx *= Math.pow(0.985, dt * 60);
-      this.vy *= Math.pow(0.985, dt * 60);
-      this.bounce();
+      const next = stepBall({ x: this.bx, y: this.by, vx: this.vx, vy: this.vy, portalCd: this.portalCd }, this.layout, dt);
+      if (next.portalCd > this.portalCd) {
+        this.synth.tone(720, 0.05, "sine", 0.04, 0.08);
+        this.parts.burst(this.bx, this.by, 8, 0x7dffc3, 70, 220);
+        this.lastPortal = true;
+      }
+      if ((next.broke ?? 0) > 0) {
+        this.synth.impact(0.45);
+        this.parts.burst(next.x, next.y, 10, 0xffc18a, 80, 240);
+      }
+      this.bx = next.x;
+      this.by = next.y;
+      this.vx = next.vx;
+      this.vy = next.vy;
+      this.portalCd = next.portalCd;
       if (Math.hypot(this.vx, this.vy) > 20 && this.ticks % 2 === 0) {
         this.trail.push({ x: this.bx, y: this.by });
         if (this.trail.length > 18) this.trail.shift();
@@ -150,6 +163,31 @@ export class PocketScene extends Phaser.Scene {
     this.parts.update(dt);
     this.draw();
     this.publishDebug();
+  }
+
+  private drawFurniture(g: Phaser.GameObjects.Graphics, theme: Layout["theme"]) {
+    if (theme === "workshop") {
+      g.fillStyle(0x4a3420, 0.55);
+      g.fillRect(40, 40, 50, 16);
+      g.fillRect(630, 40, 50, 16);
+      g.fillStyle(0x8a6a40, 0.4);
+      for (let i = 40; i < 680; i += 70) g.fillRect(i, 36, 10, 4);
+    } else if (theme === "garden") {
+      g.fillStyle(0x2a5a34, 0.45);
+      g.fillCircle(70, 70, 22);
+      g.fillCircle(650, 70, 18);
+      g.fillCircle(70, 410, 16);
+      g.fillCircle(650, 410, 20);
+      g.fillStyle(0x6a8a40, 0.3);
+      g.fillTriangle(80, 50, 60, 90, 100, 90);
+    } else {
+      g.fillStyle(0xff6ad5, 0.12);
+      g.fillRect(40, 40, 80, 8);
+      g.fillRect(600, 40, 80, 8);
+      g.fillStyle(0x6ad4ff, 0.12);
+      g.fillRect(40, 430, 80, 8);
+      g.fillRect(600, 430, 80, 8);
+    }
   }
 
   private bounce() {
@@ -270,12 +308,25 @@ export class PocketScene extends Phaser.Scene {
     g.fillRect(10, this.layout.h - 22, this.layout.w - 20, 12);
     g.fillRect(10, 10, 12, this.layout.h - 20);
     g.fillRect(this.layout.w - 22, 10, 12, this.layout.h - 20);
-    g.fillStyle(0x0f2418, 1);
+    this.drawFurniture(g, theme);
+    g.fillStyle(theme === "workshop" ? 0x2a1c12 : theme === "arcade" ? 0x1a1028 : 0x0f2418, 1);
     for (const w of this.layout.walls) {
-      g.fillRoundedRect(w.x, w.y, w.w, w.h, 3);
-      g.fillStyle(0x2a5a3c, 0.35);
-      g.fillRect(w.x, w.y, w.w, 3);
-      g.fillStyle(0x0f2418, 1);
+      if (w.x === 0 || w.y === 0 || w.w >= this.layout.w - 2 || w.h >= this.layout.h - 2) continue;
+      g.fillRoundedRect(w.x, w.y, w.w, w.h, theme === "garden" ? 8 : 3);
+      if (theme === "workshop") {
+        g.fillStyle(0x8a6a40, 0.7);
+        g.fillCircle(w.x + 6, w.y + 6, 2);
+        g.fillCircle(w.x + w.w - 6, w.y + 6, 2);
+        g.fillStyle(0x2a1c12, 1);
+      } else if (theme === "garden") {
+        g.fillStyle(0x2a6a3c, 0.55);
+        g.fillRect(w.x, w.y, w.w, 5);
+        g.fillStyle(0x0f2418, 1);
+      } else {
+        g.fillStyle(0xff6ad5, 0.35);
+        g.fillRect(w.x, w.y, w.w, 3);
+        g.fillStyle(0x1a1028, 1);
+      }
     }
     const hole = this.layout.hole;
     g.fillStyle(0x3a6a48, 0.9);
@@ -305,10 +356,58 @@ export class PocketScene extends Phaser.Scene {
       }
     }
     for (const b of this.layout.bumpers ?? []) {
-      g.fillStyle(theme === "arcade" ? 0xff6ad5 : 0xe8a050, 1);
+      g.fillStyle(theme === "arcade" ? 0xff6ad5 : theme === "workshop" ? 0xc47a28 : 0x7ab86a, 1);
       g.fillCircle(b.x, b.y, b.r);
       g.fillStyle(0xffffff, 0.25);
       g.fillCircle(b.x - 4, b.y - 4, 5);
+    }
+    for (const m of this.layout.movingBlockers ?? []) {
+      g.fillStyle(theme === "arcade" ? 0x6ad4ff : 0x8a6a40, 1);
+      g.fillRoundedRect(m.x, m.y, m.w, m.h, 4);
+      g.fillStyle(0xffffff, 0.2);
+      g.fillRect(m.x + 3, m.y + 3, m.w - 6, 3);
+    }
+    for (const r of this.layout.rotators ?? []) {
+      g.save();
+      g.translateCanvas(r.x, r.y);
+      g.rotateCanvas(r.a);
+      g.fillStyle(0xc4c4c8, 1);
+      g.fillRect(0, -5, r.len, 10);
+      g.fillStyle(0x3a3a40, 1);
+      g.fillCircle(0, 0, 8);
+      g.restore();
+    }
+    for (const p of this.layout.portals ?? []) {
+      g.lineStyle(3, 0x7dffc3, 0.9);
+      g.strokeCircle(p.x, p.y, p.r + 4);
+      g.fillStyle(0x1a3a34, 0.85);
+      g.fillCircle(p.x, p.y, p.r);
+      g.fillStyle(0x7dffc3, 0.35 + Math.sin(this.time.now / 120) * 0.15);
+      g.fillCircle(p.x, p.y, p.r * 0.55);
+    }
+    for (const p of this.layout.forcePads ?? []) {
+      g.fillStyle(0xffe08a, 0.55);
+      g.fillRoundedRect(p.x, p.y, p.w, p.h, 4);
+      g.fillStyle(0xffffff, 0.7);
+      const cx = p.x + p.w / 2;
+      const cy = p.y + p.h / 2;
+      g.fillTriangle(cx + Math.sign(p.ax) * 10, cy + Math.sign(p.ay) * 10, cx - 6, cy - 6, cx - 6, cy + 6);
+    }
+    for (const b of this.layout.breakables ?? []) {
+      if (b.hp <= 0) continue;
+      g.fillStyle(0xc4a070, 0.95);
+      g.fillRoundedRect(b.x, b.y, b.w, b.h, 3);
+      g.fillStyle(0x000000, 0.2);
+      g.fillRect(b.x + 4, b.y + 4, b.w - 8, 3);
+    }
+    for (const gate of this.layout.gates ?? []) {
+      if (gate.open) {
+        g.fillStyle(0x7dffc3, 0.18);
+        g.fillRect(gate.x, gate.y, gate.w, gate.h);
+      } else {
+        g.fillStyle(0xff6a6a, 0.9);
+        g.fillRect(gate.x, gate.y, gate.w, gate.h);
+      }
     }
     drawShinyBall(g, this.bx, this.by, 11, theme === "arcade" ? 0xffd0f0 : 0xe8f6e6, this.time.now / 80);
     drawParticles(g, this.parts);

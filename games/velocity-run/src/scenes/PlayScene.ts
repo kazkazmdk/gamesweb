@@ -518,22 +518,35 @@ export class VelocityPlayScene extends Phaser.Scene {
       for (let i = 0; i < 14; i += 1) {
         const x = i * 260 + this.camX * 0.5;
         g.fillRect(x, this.course.height - 220 - (i % 4) * 40, 46, 180);
+        g.fillStyle(th.accent, 0.1);
+        g.fillRect(x + 8, this.course.height - 200, 18, 6);
+        g.fillStyle(mixColor(th.sky, 0x000000, 0.28), 1);
       }
     } else if (this.course.world === "transit") {
       g.fillStyle(th.danger, 0.08 + Math.sin(this.time.now / 180) * 0.04);
       for (let x = 0; x < this.course.width; x += 220) g.fillRect(x, 40, 8, this.course.height);
+      g.fillStyle(0x1a2430, 0.45);
+      for (let i = 0; i < 10; i += 1) g.fillCircle(180 + i * 240, 80, 22);
     } else {
       g.fillStyle(0xffffff, 0.04);
       for (let i = 0; i < 8; i += 1) g.fillTriangle(i * 520, this.course.height, i * 520 + 180, this.course.height - 260, i * 520 + 380, this.course.height);
+      g.fillStyle(th.accent, 0.12);
+      for (let i = 0; i < 6; i += 1) g.fillRect(i * 420 + 80, 30, 6, 90);
     }
     for (const s of this.course.solids) {
       const live = this.liveHazard(s);
       if (s.kind === "solid") {
         const col = s.route === "expert" ? 0x2a5060 : s.route === "fast" ? 0x1e4454 : th.ground;
+        g.fillStyle(0x0a1218, 0.55);
+        g.fillRect(live.x + 8, live.y + live.h, live.w - 16, 10);
         g.fillStyle(col, 1);
         g.fillRect(live.x, live.y, live.w, live.h);
+        g.fillStyle(0x000000, 0.22);
+        g.fillRect(live.x, live.y + live.h - 5, live.w, 5);
         g.fillStyle(th.accent, s.route === "expert" ? 0.7 : 0.38);
         g.fillRect(live.x, live.y, live.w, 3);
+        g.fillStyle(0xffffff, 0.12);
+        for (let i = 8; i < live.w; i += 18) g.fillCircle(live.x + i, live.y + 8, 1.4);
       } else if (s.kind === "spike") {
         g.fillStyle(th.danger, 1);
         g.fillTriangle(live.x, live.y + live.h, live.x + live.w / 2, live.y, live.x + live.w, live.y + live.h);
@@ -541,11 +554,21 @@ export class VelocityPlayScene extends Phaser.Scene {
         g.fillTriangle(live.x + live.w * 0.3, live.y + live.h * 0.7, live.x + live.w / 2, live.y + 4, live.x + live.w * 0.7, live.y + live.h * 0.7);
       } else if (s.kind === "laser") {
         const pulse = 0.45 + Math.sin(this.time.now / 90) * 0.35;
+        g.fillStyle(0x2a2a30, 1);
+        g.fillRect(live.x - 8, live.y - 6, 12, live.h + 12);
+        g.fillRect(live.x + live.w - 4, live.y - 6, 12, live.h + 12);
         g.fillStyle(th.danger, pulse);
         g.fillRect(live.x, live.y, live.w, live.h);
         g.fillStyle(0xffffff, 0.7);
         g.fillRect(live.x, live.y + live.h / 2 - 1, live.w, 2);
-      } else if (s.kind === "bar" || s.kind === "piston") {
+      } else if (s.kind === "bar") {
+        g.fillStyle(0x2a2a30, 1);
+        g.fillCircle(live.x, live.y + live.h / 2, 8);
+        g.fillStyle(th.danger, 0.95);
+        g.fillRoundedRect(live.x, live.y, live.w, live.h, 3);
+      } else if (s.kind === "piston") {
+        g.fillStyle(0x3a3a44, 1);
+        g.fillRect(live.x + live.w / 2 - 6, live.y, 12, live.h + 24);
         g.fillStyle(th.danger, 0.95);
         g.fillRoundedRect(live.x, live.y, live.w, live.h, 3);
         g.fillStyle(0xffffff, 0.25);
@@ -569,8 +592,16 @@ export class VelocityPlayScene extends Phaser.Scene {
     if (this.showGhost && this.tape && this.running) {
       const pose = ghostPose(this.tape.samples, this.timeMs);
       if (pose) {
-        g.fillStyle(th.accent, 0.28);
-        g.fillRoundedRect(pose.x, pose.y, 16, 28, 4);
+        drawRunner(g, pose.x, pose.y, 16, 28, {
+          facing: 1,
+          grounded: true,
+          vx: 120,
+          vy: 0,
+          t: this.timeMs,
+          color: th.accent,
+        });
+        g.fillStyle(th.accent, 0.12);
+        g.fillCircle(pose.x + 8, pose.y + 24, 12);
       }
     }
 

@@ -158,8 +158,9 @@ describe("velocity medals", () => {
 });
 
 describe("swarm upgrades", () => {
-  it("ships 15 behavioral upgrades", () => {
+  it("ships a closed upgrade pool with no leftover placeholders", () => {
     expect(UPGRADES).toHaveLength(26);
+    expect(new Set(UPGRADES.map((u) => u.id)).size).toBe(26);
   });
 
   it("changes combat behavior instead of only adding flat stats", () => {

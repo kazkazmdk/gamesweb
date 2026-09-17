@@ -22,6 +22,7 @@ import {
   setSimRng,
   resetSimRng,
   simRand,
+  emptyBullet,
   type Build,
   type Bullet,
   type Enemy,
@@ -30,6 +31,31 @@ import {
   type UpgradeDef,
   type UpgradeId,
 } from "../systems/sim";
+import {
+  aoeHits,
+  arenaIdFor,
+  arenaSolids,
+  bladeHitsEnemy,
+  bladePose,
+  droneCount,
+  emptyDrone,
+  emptyMissile,
+  missileCooldown,
+  missileSpeed,
+  missileVolleyCount,
+  novaRadius,
+  plasmaBurns,
+  plasmaPulseRadius,
+  resolveCircleVsSolids,
+  stepDrone,
+  stepMissile,
+  stepProtocolCore,
+  stepWarden,
+  wardenZoneHits,
+  type ArenaSolid,
+  type Drone,
+  type Missile,
+} from "../systems/combat";
 
 const ARENA = 1400;
 const BOSS_AT = 390;
@@ -94,6 +120,16 @@ export class SwarmPlayScene extends Phaser.Scene {
   private quality: "high" | "low" = "high";
   private fpsAcc = 0;
   private frames = 0;
+  private missiles: Missile[] = [];
+  private drones: Drone[] = [];
+  private missileCd = 0;
+  private droneClock = 0;
+  private plasmaTicks: Array<{ x: number; y: number; t: number; r: number; hits: number }> = [];
+  private banners: Array<{ text: string; t: number; color: string }> = [];
+  private solids: ArenaSolid[] = [];
+  private arenaName: "core-chamber" | "fracture-zone" = "core-chamber";
+  private hazardCd = 0;
+  private deathFx = 0;
 
   constructor() {
     super("swarm-play");
@@ -111,6 +147,8 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.seed = ctx.seed ?? ctx.challengeCode ?? (ctx.daily ? utcDayKey() : "");
     if (this.seed) setSimRng(seededRng(this.seed));
     else resetSimRng();
+    this.arenaName = arenaIdFor(this.endless, this.bossDown);
+    this.solids = arenaSolids(this.arenaName);
     this.cameras.main.setBackgroundColor("#120c10");
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
@@ -150,23 +188,9 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.game.canvas.focus({ preventScroll: true });
     if (!this.enemies.length) {
       for (let i = 0; i < 110; i += 1) this.enemies.push(emptyEnemy());
-      for (let i = 0; i < 140; i += 1) {
-        this.bullets.push({
-          active: false,
-          x: 0,
-          y: 0,
-          vx: 0,
-          vy: 0,
-          life: 0,
-          damage: 0,
-          r: 4,
-          chain: 0,
-          pierce: 0,
-          split: 0,
-          over: false,
-          hostile: false,
-        });
-      }
+      for (let i = 0; i < 180; i += 1) this.bullets.push(emptyBullet());
+      for (let i = 0; i < 16; i += 1) this.missiles.push(emptyMissile());
+      for (let i = 0; i < 6; i += 1) this.drones.push(emptyDrone());
       for (let i = 0; i < 140; i += 1) this.orbs.push({ active: false, x: 0, y: 0, vx: 0, vy: 0, value: 1 });
     }
 
@@ -239,9 +263,19 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.bossDown = this.endless;
     this.shotN = 0;
     this.trails = [];
+    this.missileCd = 0.8;
+    this.droneClock = 0;
+    this.plasmaTicks = [];
+    this.banners = [];
+    this.deathFx = 0;
+    this.hazardCd = 0;
+    this.arenaName = arenaIdFor(this.endless, this.bossDown);
+    this.solids = arenaSolids(this.arenaName);
     for (const e of this.enemies) e.active = false;
     for (const b of this.bullets) b.active = false;
     for (const o of this.orbs) o.active = false;
+    for (const m of this.missiles) m.active = false;
+    for (const d of this.drones) d.active = false;
   }
 
   private fitCam(w: number, h: number) {
@@ -324,13 +358,28 @@ export class SwarmPlayScene extends Phaser.Scene {
     }
     this.px = clamp(this.px + this.vx * dt, 40, ARENA - 40);
     this.py = clamp(this.py + this.vy * dt, 40, ARENA - 40);
+    this.arenaName = arenaIdFor(this.endless, this.bossDown);
+    this.solids = arenaSolids(this.arenaName);
+    const resolved = resolveCircleVsSolids(this.px, this.py, 16, this.solids);
+    this.px = clamp(resolved.x, 40, ARENA - 40);
+    this.py = clamp(resolved.y, 40, ARENA - 40);
+    this.hazardCd = Math.max(0, this.hazardCd - dt);
+    if (resolved.hazard > 0 && this.hazardCd <= 0 && this.iFrames <= 0) {
+      this.hurtPlayer(resolved.hazard);
+      this.hazardCd = 0.55;
+    }
 
     if (Phaser.Input.Keyboard.JustDown(this.keys.dash) || native?.dashPressed) this.tryDash();
     this.dashCd = Math.max(0, this.dashCd - dt * 1000);
     this.dashing = Math.max(0, this.dashing - dt * 1000);
     this.iFrames = Math.max(0, this.iFrames - dt * 1000);
-    this.shieldA += dt * (1.6 + this.build.orbital);
+    this.shieldA += dt * (1.6 + this.build.orbital + this.build.blade);
     this.pulseT += dt;
+    this.droneClock += dt;
+    this.missileCd = Math.max(0, this.missileCd - dt);
+    this.deathFx = Math.max(0, this.deathFx - dt);
+    for (const b of this.banners) b.t -= dt;
+    this.banners = this.banners.filter((b) => b.t > 0);
 
     if (this.build.dashBurn && this.dashing > 0) {
       this.trails.push({ x: this.px, y: this.py, life: 0.45 + this.build.dashBurn * 0.1, r: 16 });
@@ -340,10 +389,14 @@ export class SwarmPlayScene extends Phaser.Scene {
 
     this.spawnWave(dt);
     this.fire(dt);
+    this.stepMissiles(dt);
+    this.syncDrones();
+    this.stepDrones(dt);
     this.stepEnemies(dt);
     this.stepBullets(dt);
     this.stepOrbs(dt);
     this.stepPulse(dt);
+    this.stepPlasma(dt);
     this.stepTrails(dt);
 
     this.camX += (this.px - this.camX) * (1 - Math.exp(-dt * 8));
@@ -428,6 +481,9 @@ export class SwarmPlayScene extends Phaser.Scene {
       b.pierce = this.build.pierce;
       b.split = this.build.split;
       b.over = over;
+      b.kind = this.build.rail > 0 ? "rail" : "gun";
+      b.aoe = 0;
+      b.turn = 0;
     }
     if (this.build.twin > 0) {
       for (const side of [-1, 1]) {
@@ -447,10 +503,117 @@ export class SwarmPlayScene extends Phaser.Scene {
         b.pierce = 0;
         b.split = 0;
         b.over = false;
+        b.kind = "gun";
+        b.aoe = 0;
+        b.turn = 0;
       }
     }
     const pitch = 400 + this.build.projectiles * 18 + (over ? 80 : 0) + this.build.rail * 40;
     this.synth.tone(pitch, 0.035, this.build.rail ? "sawtooth" : "square", over ? 0.04 : 0.022, 0.12);
+    if (this.build.missile > 0 && this.missileCd <= 0) this.launchMissiles();
+  }
+
+  private launchMissiles() {
+    const n = missileVolleyCount(this.build.missile);
+    this.missileCd = missileCooldown(this.build.missile);
+    const used = new Set<Enemy>();
+    for (let i = 0; i < n; i += 1) {
+      const slot = this.missiles.find((m) => !m.active);
+      if (!slot) break;
+      const target = this.enemies
+        .filter((e) => e.active && !used.has(e))
+        .sort((a, b) => (a.x - this.px) ** 2 + (a.y - this.py) ** 2 - ((b.x - this.px) ** 2 + (b.y - this.py) ** 2))[0];
+      if (target) used.add(target);
+      const a = target ? Math.atan2(target.y - this.py, target.x - this.px) : i * 0.7;
+      const spd = missileSpeed();
+      slot.active = true;
+      slot.x = this.px;
+      slot.y = this.py;
+      slot.vx = Math.cos(a + (i - (n - 1) / 2) * 0.18) * spd;
+      slot.vy = Math.sin(a + (i - (n - 1) / 2) * 0.18) * spd;
+      slot.life = 2.4;
+      slot.damage = this.build.damage * (1.15 + this.build.missile * 0.35);
+      slot.r = 6;
+      slot.turn = 2.15;
+      slot.aoe = 34 + this.build.missile * 10;
+    }
+    this.synth.tone(180, 0.08, "sawtooth", 0.05, 0.04);
+    this.synth.noiseBurst(0.07, 0.03, 240);
+  }
+
+  private stepMissiles(dt: number) {
+    for (const m of this.missiles) {
+      if (!m.active) continue;
+      const target = this.nearest(m.x, m.y);
+      stepMissile(m, dt, target);
+      if (!m.active) continue;
+      for (const e of this.enemies) {
+        if (!e.active) continue;
+        if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 < (e.r + m.r) ** 2) {
+          this.explodeMissile(m);
+          break;
+        }
+      }
+    }
+  }
+
+  private explodeMissile(m: Missile) {
+    m.active = false;
+    this.synth.noiseBurst(0.1, 0.055, 140);
+    this.juice.hitStop(22);
+    if (this.quality === "high") this.parts.burst(m.x, m.y, 14, 0xff6a3a, 140, 320);
+    this.plasmaTicks.push({ x: m.x, y: m.y, t: 0.28, r: m.aoe, hits: 1 });
+    for (const e of aoeHits(m.x, m.y, m.aoe, this.enemies)) {
+      this.hurtEnemy(e as Enemy, m.damage, false);
+    }
+  }
+
+  private syncDrones() {
+    const n = droneCount(this.build.drone);
+    for (let i = 0; i < this.drones.length; i += 1) {
+      const d = this.drones[i];
+      if (i < n) {
+        if (!d.active) {
+          d.active = true;
+          d.x = this.px + 20;
+          d.y = this.py - 20;
+          d.vx = 0;
+          d.vy = 0;
+          d.fireT = 0.3 + i * 0.1;
+          d.slot = i;
+        }
+      } else d.active = false;
+    }
+  }
+
+  private stepDrones(dt: number) {
+    const live = this.drones.filter((d) => d.active);
+    for (const d of live) {
+      const { fire } = stepDrone(d, dt, this.px, this.py, live.length, this.droneClock);
+      if (!fire) continue;
+      const target = this.nearest(d.x, d.y);
+      if (!target) continue;
+      const b = this.bullets.find((x) => !x.active);
+      if (!b) continue;
+      const a = Math.atan2(target.y - d.y, target.x - d.x);
+      b.active = true;
+      b.hostile = false;
+      b.x = d.x;
+      b.y = d.y;
+      b.vx = Math.cos(a) * 360;
+      b.vy = Math.sin(a) * 360;
+      b.life = 520;
+      b.damage = this.build.damage * 0.42;
+      b.r = 3;
+      b.chain = 0;
+      b.pierce = 0;
+      b.split = 0;
+      b.over = false;
+      b.kind = "drone";
+      b.aoe = 0;
+      b.turn = 0;
+      this.synth.tone(620, 0.03, "triangle", 0.018, 0.08);
+    }
   }
 
   private nearest(x: number, y: number, ignore?: Enemy) {
@@ -471,7 +634,8 @@ export class SwarmPlayScene extends Phaser.Scene {
     for (const e of this.enemies) {
       if (!e.active) continue;
       e.flash = Math.max(0, e.flash - dt);
-      if (e.kind === "boss" || e.kind === "warden") this.stepBoss(e, dt);
+      if (e.kind === "boss") this.stepCore(e, dt);
+      else if (e.kind === "warden") this.stepWardenBoss(e, dt);
       else if (e.kind === "spitter") this.stepSpitter(e, dt);
       else if (e.kind === "elite") this.stepElite(e, dt);
       else if (e.kind === "tank") {
@@ -483,15 +647,27 @@ export class SwarmPlayScene extends Phaser.Scene {
         e.x += Math.cos(a) * e.speed * dt;
         e.y += Math.sin(a) * e.speed * dt;
       }
+      const pushed = resolveCircleVsSolids(e.x, e.y, e.r, this.solids);
+      e.x = pushed.x;
+      e.y = pushed.y;
 
-      const drones = Math.max(3, this.build.orbital);
-      for (let i = 0; i < drones; i += 1) {
-        const sa = this.shieldA + (i * Math.PI * 2) / drones;
-        const sx = this.px + Math.cos(sa) * 48;
-        const sy = this.py + Math.sin(sa) * 48;
-        if ((e.x - sx) ** 2 + (e.y - sy) ** 2 < (e.r + 12) ** 2) {
-          this.hurtEnemy(e, this.build.damage * 0.4, false);
+      const shards = this.build.orbital;
+      if (shards > 0 && this.build.blade <= 0) {
+        for (let i = 0; i < shards; i += 1) {
+          const pose = bladePose(i, shards, this.shieldA, this.px, this.py, shards, 0);
+          if ((e.x - pose.x) ** 2 + (e.y - pose.y) ** 2 < (e.r + 12) ** 2) {
+            this.hurtEnemy(e, this.build.damage * 0.4, false);
+          }
         }
+      } else if (this.build.blade > 0) {
+        const n = Math.max(this.build.orbital, this.build.blade);
+        for (let i = 0; i < n; i += 1) {
+          const pose = bladePose(i, n, this.shieldA, this.px, this.py, this.build.orbital, this.build.blade);
+          if (bladeHitsEnemy(pose, e)) this.hurtEnemy(e, this.build.damage * (0.55 + this.build.blade * 0.2), false);
+        }
+      }
+      if (e.kind === "warden" && wardenZoneHits(e, this.px, this.py, this.time.now / 1000) && this.iFrames <= 0) {
+        this.hurtPlayer(6);
       }
 
       const d2 = (e.x - this.px) ** 2 + (e.y - this.py) ** 2;
@@ -536,41 +712,24 @@ export class SwarmPlayScene extends Phaser.Scene {
     }
   }
 
-  private stepBoss(e: Enemy, dt: number) {
-    e.patternT += dt;
-    const a = Math.atan2(this.py - e.y, this.px - e.x);
-    if (e.pattern === 0) {
-      e.telegraph = Math.min(1, e.patternT / 0.85);
-      if (e.patternT > 0.85 && e.patternT < 1.35) {
-        e.x += Math.cos(a) * 220 * dt;
-        e.y += Math.sin(a) * 220 * dt;
-      }
-      if (e.patternT > 1.8) {
-        e.pattern = 1;
-        e.patternT = 0;
-        e.telegraph = 0;
-      }
-    } else if (e.pattern === 1) {
-      e.telegraph = Math.min(1, e.patternT / 0.7);
-      if (e.patternT > 0.7 && e.patternT < 0.78) {
-        for (let i = 0; i < 8; i += 1) this.spit(e, (i / 8) * Math.PI * 2, 180);
-      }
-      if (e.patternT > 1.6) {
-        e.pattern = 2;
-        e.patternT = 0;
-        e.telegraph = 0;
-      }
-    } else {
-      e.x += Math.cos(a) * e.speed * dt;
-      e.y += Math.sin(a) * e.speed * dt;
-      if (e.patternT > 1.4) {
-        e.pattern = 0;
-        e.patternT = 0;
-      }
-    }
+  private stepCore(e: Enemy, dt: number) {
+    stepProtocolCore(
+      e,
+      dt,
+      { x: this.px, y: this.py },
+      (kind, x, y) => {
+        const slot = this.enemies.find((n) => !n.active);
+        if (slot) spawnEnemy(slot, kind, x, y, 0.85);
+      },
+      (angle, speed) => this.spit(e, angle, speed),
+    );
   }
 
-  private spit(e: Enemy, a: number, speed: number) {
+  private stepWardenBoss(e: Enemy, dt: number) {
+    stepWarden(e, dt, { x: this.px, y: this.py }, (angle, speed, kind) => this.spit(e, angle, speed, kind === "sweep" ? "sweep" : "hostile"));
+  }
+
+  private spit(e: Enemy, a: number, speed: number, kind: Bullet["kind"] = "hostile") {
     const b = this.bullets.find((x) => !x.active);
     if (!b) return;
     b.active = true;
@@ -579,13 +738,16 @@ export class SwarmPlayScene extends Phaser.Scene {
     b.y = e.y;
     b.vx = Math.cos(a) * speed;
     b.vy = Math.sin(a) * speed;
-    b.life = 1400;
-    b.damage = e.damage * 0.7;
-    b.r = e.kind === "boss" ? 7 : 5;
+    b.life = kind === "sweep" ? 900 : 1400;
+    b.damage = e.damage * (kind === "sweep" ? 0.45 : 0.7);
+    b.r = kind === "sweep" ? 4 : e.kind === "boss" ? 7 : 5;
     b.chain = 0;
     b.pierce = 0;
     b.split = 0;
     b.over = false;
+    b.kind = kind;
+    b.aoe = 0;
+    b.turn = 0;
   }
 
   private stepBullets(dt: number) {
@@ -653,6 +815,9 @@ export class SwarmPlayScene extends Phaser.Scene {
       slot.pierce = 0;
       slot.split = 0;
       slot.over = false;
+      slot.kind = "gun";
+      slot.aoe = 0;
+      slot.turn = 0;
     }
   }
 
@@ -660,14 +825,32 @@ export class SwarmPlayScene extends Phaser.Scene {
     if (this.build.pulse <= 0) return;
     if (this.pulseT < 1.6 / this.build.pulse) return;
     this.pulseT = 0;
-    const r = 70 + this.build.pulse * 12;
+    const r = plasmaPulseRadius(this.build.pulse, this.build.plasma);
     for (const e of this.enemies) {
       if (!e.active) continue;
       if ((e.x - this.px) ** 2 + (e.y - this.py) ** 2 < (r + e.r) ** 2) {
-        this.hurtEnemy(e, this.build.damage * 0.55, false);
+        this.hurtEnemy(e, this.build.damage * (0.55 + this.build.plasma * 0.2), false);
       }
     }
-    if (this.quality === "high") this.parts.burst(this.px, this.py, 8, 0xf07a3a, 80, 180);
+    this.plasmaTicks.push({ x: this.px, y: this.py, t: 0.34, r, hits: plasmaBurns(this.build.plasma) });
+    if (this.quality === "high") this.parts.burst(this.px, this.py, 8, this.build.plasma ? 0xff4ad4 : 0xf07a3a, 80, 180);
+    if (this.build.plasma) this.synth.tone(210, 0.06, "sine", 0.03, 0.04);
+  }
+
+  private stepPlasma(dt: number) {
+    for (const p of this.plasmaTicks) {
+      p.t -= dt;
+      if (p.hits > 0 && p.t < 0.16) {
+        p.hits -= 1;
+        for (const e of this.enemies) {
+          if (!e.active) continue;
+          if ((e.x - p.x) ** 2 + (e.y - p.y) ** 2 < (p.r + e.r) ** 2) {
+            this.hurtEnemy(e, this.build.damage * 0.28, false);
+          }
+        }
+      }
+    }
+    this.plasmaTicks = this.plasmaTicks.filter((p) => p.t > 0);
   }
 
   private stepTrails(dt: number) {
@@ -689,13 +872,14 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.juice.flash(0.18);
     this.synth.hit(this.time.now);
     if (this.build.nova > 0) {
-      const r = 58 + this.build.nova * 16;
+      const r = novaRadius(this.build.nova, this.build.plasma);
       for (const e of this.enemies) {
         if (!e.active) continue;
         if ((e.x - this.px) ** 2 + (e.y - this.py) ** 2 < (r + e.r) ** 2) {
           this.hurtEnemy(e, this.build.damage * 1.1 * this.build.nova, false);
         }
       }
+      this.plasmaTicks.push({ x: this.px, y: this.py, t: 0.4, r, hits: plasmaBurns(this.build.plasma) });
     }
     if (this.hp < 28) this.synth.tone(90, 0.08, "sine", 0.03, 0.05);
     if (this.hp <= 0) this.die();
@@ -741,14 +925,21 @@ export class SwarmPlayScene extends Phaser.Scene {
     if (this.build.lifesteal > 0) this.hp = Math.min(this.maxHp, this.hp + 2 * this.build.lifesteal);
     if (e.kind === "boss" || e.kind === "warden") {
       this.bossDown = true;
+      this.deathFx = 1.4;
+      this.arenaName = arenaIdFor(this.endless, true);
+      this.solids = arenaSolids(this.arenaName);
       pulseHaptic([20, 40, 30]);
       this.platform.events.emit({ name: "boss_defeated", props: { gameId: "swarm-protocol" } });
       this.synth.personalBest();
+      this.synth.crash(0.8);
       this.victorious = true;
-      this.victoryT = 1400;
-      this.juice.flash(0.35);
-      this.juice.hitStop(180);
-      this.floaters.spawn(this.px, this.py - 48, "CORE DOWN", "#ffd4a8");
+      this.victoryT = 2200;
+      this.juice.flash(0.5);
+      this.juice.hitStop(260);
+      this.juice.screenShake(10, 220);
+      this.banners.push({ text: e.kind === "warden" ? "WARDEN DOWN" : "CORE DOWN", t: 2.1, color: "#ffd4a8" });
+      this.floaters.spawn(this.px, this.py - 48, e.kind === "warden" ? "WARDEN DOWN" : "CORE DOWN", "#ffd4a8");
+      if (this.quality === "high") this.parts.burst(e.x, e.y, 36, KIND[e.kind].color, 220, 480);
       return;
     }
     if (this.kills >= 10) void this.platform.achievement.unlock("first-blood");
@@ -881,10 +1072,56 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.scene.restart();
   }
 
+  private drawArena(g: Phaser.GameObjects.Graphics, fracture: boolean) {
+    if (this.deathFx > 0) {
+      g.fillStyle(0xffe0c0, this.deathFx * 0.08);
+      g.fillRect(0, 0, ARENA, ARENA);
+    }
+    for (const s of this.solids) {
+      if (s.kind === "column") {
+        g.fillStyle(0x2a1620, 0.95);
+        g.fillRoundedRect(s.x, s.y, s.w, s.h, 6);
+        g.fillStyle(0xf07a3a, 0.35);
+        g.fillRect(s.x + 8, s.y + 10, s.w - 16, 8);
+        g.fillStyle(0xffc18a, 0.18);
+        g.fillCircle(s.x + s.w / 2, s.y + 18, 10);
+      } else if (s.kind === "reactor") {
+        g.fillStyle(0x3a2030, 0.95);
+        g.fillRoundedRect(s.x, s.y, s.w, s.h, 10);
+        g.fillStyle(0xf07a3a, 0.45 + Math.sin(this.time.now / 180) * 0.15);
+        g.fillCircle(s.x + s.w / 2, s.y + s.h / 2, 22);
+        g.lineStyle(2, 0xffc18a, 0.4);
+        g.strokeCircle(s.x + s.w / 2, s.y + s.h / 2, 30);
+      } else if (s.kind === "rail") {
+        g.fillStyle(0xf07a3a, 0.55);
+        g.fillRect(s.x, s.y, s.w, s.h);
+        g.fillStyle(0xffe0c0, 0.35);
+        g.fillRect(s.x, s.y + 6, s.w, 4);
+      } else if (s.kind === "fissure") {
+        g.fillStyle(0x080204, 0.92);
+        g.fillRect(s.x, s.y, s.w, s.h);
+        g.fillStyle(0xff4d3a, 0.35);
+        g.fillRect(s.x, s.y + 4, s.w, 6);
+      } else if (s.kind === "debris") {
+        g.fillStyle(0x3a1810, 0.88);
+        g.fillTriangle(s.x, s.y + s.h, s.x + s.w * 0.4, s.y, s.x + s.w, s.y + s.h);
+        g.fillRect(s.x + 8, s.y + s.h * 0.4, s.w * 0.5, s.h * 0.4);
+      } else {
+        g.fillStyle(0xff6a3a, 0.28 + Math.sin(this.time.now / 140) * 0.1);
+        g.fillRect(s.x, s.y, s.w, s.h);
+      }
+    }
+    if (!fracture) {
+      g.fillStyle(0x2a1620, 0.28);
+      g.fillRect(40, 40, ARENA - 80, 18);
+      g.fillRect(40, ARENA - 58, ARENA - 80, 18);
+    }
+  }
+
   private draw(dt: number) {
     const g = this.gfx;
     g.clear();
-    const fracture = this.endless || this.bossDown;
+    const fracture = this.arenaName === "fracture-zone";
     fillBackdrop(
       g,
       ARENA,
@@ -913,22 +1150,9 @@ export class SwarmPlayScene extends Phaser.Scene {
           },
       { x: this.camX, y: this.camY },
     );
-    if (fracture) {
-      g.fillStyle(0x3a1810, 0.55);
-      g.fillTriangle(80, 200, 240, 80, 300, 340);
-      g.fillTriangle(980, 1100, 1200, 860, 1320, 1280);
-    } else {
-      g.fillStyle(0x2a1620, 0.45);
-      g.fillRect(60, 60, 80, ARENA - 120);
-      g.fillRect(ARENA - 140, 60, 80, ARENA - 120);
-    }
+    this.drawArena(g, fracture);
     g.lineStyle(2, 0xf07a3a, 0.18);
     g.strokeRect(20, 20, ARENA - 40, ARENA - 40);
-    g.lineStyle(1, 0xffffff, 0.025);
-    for (let i = 0; i < ARENA; i += 80) {
-      g.lineBetween(i, 0, i, ARENA);
-      g.lineBetween(0, i, ARENA, i);
-    }
 
     for (const t of this.trails) {
       if (t.life <= 0) continue;
@@ -940,10 +1164,42 @@ export class SwarmPlayScene extends Phaser.Scene {
       g.fillStyle(0xffc58a, 0.9);
       g.fillCircle(o.x, o.y, 4);
     }
+    for (const p of this.plasmaTicks) {
+      g.lineStyle(3, this.build.plasma ? 0xff4ad4 : 0xf07a3a, Math.min(0.85, p.t * 2.4));
+      g.strokeCircle(p.x, p.y, p.r * (1.15 - p.t));
+    }
     for (const b of this.bullets) {
       if (!b.active) continue;
-      g.fillStyle(b.hostile ? 0xc45c3a : b.over ? 0xffe0c0 : 0xf7ebe3, 1);
-      g.fillCircle(b.x, b.y, b.r);
+      if (b.kind === "rail") {
+        const a = Math.atan2(b.vy, b.vx);
+        g.lineStyle(3, 0x9ad7ff, 0.95);
+        g.lineBetween(b.x - Math.cos(a) * 18, b.y - Math.sin(a) * 18, b.x + Math.cos(a) * 10, b.y + Math.sin(a) * 10);
+        g.fillStyle(0xe8f6ff, 1);
+        g.fillCircle(b.x, b.y, 2.2);
+      } else if (b.kind === "drone") {
+        g.fillStyle(0x7dffc3, 1);
+        g.fillTriangle(b.x + 5, b.y, b.x - 3, b.y - 3, b.x - 3, b.y + 3);
+      } else if (b.kind === "sweep") {
+        g.fillStyle(0xff8a6a, 0.9);
+        g.fillRect(b.x - 7, b.y - 2, 14, 4);
+      } else {
+        g.fillStyle(b.hostile ? 0xc45c3a : b.over ? 0xffe0c0 : 0xf7ebe3, 1);
+        g.fillCircle(b.x, b.y, b.r);
+      }
+    }
+    for (const m of this.missiles) {
+      if (!m.active) continue;
+      const a = Math.atan2(m.vy, m.vx);
+      g.save();
+      g.translateCanvas(m.x, m.y);
+      g.rotateCanvas(a);
+      g.fillStyle(0xff6a3a, 1);
+      g.fillTriangle(10, 0, -8, -5, -8, 5);
+      g.fillStyle(0xffc18a, 0.9);
+      g.fillRect(-10, -2, 8, 4);
+      g.fillStyle(0xffe08a, 0.45);
+      g.fillCircle(-10, 0, 4);
+      g.restore();
     }
     for (const e of this.enemies) {
       if (!e.active) continue;
@@ -974,6 +1230,19 @@ export class SwarmPlayScene extends Phaser.Scene {
         g.fillRoundedRect(e.x - e.r, e.y - e.r, e.r * 2, e.r * 2, 8);
         g.fillStyle(0xffe0c0, 0.7);
         g.fillRect(e.x - 6, e.y - e.r - 8, 12, 10);
+        if (e.pattern === 0) {
+          for (let i = 0; i < 3; i += 1) {
+            const a = this.time.now / 1000 * 1.1 + (i * Math.PI * 2) / 3;
+            g.lineStyle(4, 0xff6a3a, 0.45);
+            g.strokeCircle(e.x + Math.cos(a) * 110, e.y + Math.sin(a) * 110, 36);
+          }
+        }
+      } else if (e.kind === "boss") {
+        g.fillCircle(e.x, e.y, e.r);
+        g.fillStyle(0xffe0c0, 0.35);
+        g.fillCircle(e.x, e.y, e.r * 0.45);
+        g.lineStyle(3, 0xffc18a, 0.5);
+        g.strokeCircle(e.x, e.y, e.r + 8);
       } else g.fillCircle(e.x, e.y, e.r);
       if (e.kind === "boss" || e.kind === "elite" || e.kind === "warden") {
         g.fillStyle(0x120c10, 0.8);
@@ -988,13 +1257,36 @@ export class SwarmPlayScene extends Phaser.Scene {
       g.fillCircle(p.x, p.y, p.size);
     }
 
-    const drones = Math.max(3, this.build.orbital);
-    for (let i = 0; i < drones; i += 1) {
-      const sa = this.shieldA + (i * Math.PI * 2) / drones;
-      g.fillStyle(0xf7ebe3, 0.92);
-      g.fillCircle(this.px + Math.cos(sa) * 48, this.py + Math.sin(sa) * 48, 6);
-      g.fillStyle(0xf07a3a, 0.55);
-      g.fillCircle(this.px + Math.cos(sa) * 48, this.py + Math.sin(sa) * 48, 2.4);
+    if (this.build.blade > 0) {
+      const n = Math.max(this.build.orbital, this.build.blade);
+      for (let i = 0; i < n; i += 1) {
+        const pose = bladePose(i, n, this.shieldA, this.px, this.py, this.build.orbital, this.build.blade);
+        g.save();
+        g.translateCanvas(pose.x, pose.y);
+        g.rotateCanvas(pose.a);
+        g.fillStyle(0xf4f0ea, 1);
+        g.fillTriangle(pose.len * 0.7, 0, -pose.len * 0.35, -4, -pose.len * 0.35, 4);
+        g.fillStyle(0xf07a3a, 0.85);
+        g.fillRect(-4, -2, 8, 4);
+        g.restore();
+      }
+    } else if (this.build.orbital > 0) {
+      for (let i = 0; i < this.build.orbital; i += 1) {
+        const pose = bladePose(i, this.build.orbital, this.shieldA, this.px, this.py, this.build.orbital, 0);
+        g.fillStyle(0xf7ebe3, 0.92);
+        g.fillCircle(pose.x, pose.y, 6);
+        g.fillStyle(0xf07a3a, 0.55);
+        g.fillCircle(pose.x, pose.y, 2.4);
+      }
+    }
+    for (const d of this.drones) {
+      if (!d.active) continue;
+      g.fillStyle(0x1a2430, 1);
+      g.fillRoundedRect(d.x - 8, d.y - 6, 16, 12, 3);
+      g.fillStyle(0x7dffc3, 1);
+      g.fillTriangle(d.x + 10, d.y, d.x - 2, d.y - 5, d.x - 2, d.y + 5);
+      g.fillStyle(0xffffff, 0.7);
+      g.fillCircle(d.x - 2, d.y - 1, 2);
     }
 
     const heading = Math.atan2(this.vy, this.vx);
@@ -1019,7 +1311,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     const need = xpToLevel(this.level);
     const phase = phaseFor(survive);
     this.hud.setText(
-      `${survive.toFixed(0)}s   lv ${this.level}   ${this.kills} down\nHP ${Math.max(0, Math.ceil(this.hp))}   ${phase}${this.bossSpawned ? (this.bossDown ? "  core down" : "  CORE") : ""}`,
+      `${survive.toFixed(0)}s   lv ${this.level}   ${this.kills} down\nHP ${Math.max(0, Math.ceil(this.hp))}   ${phase}   ${this.arenaName === "fracture-zone" ? "FRACTURE" : "CORE"}${this.bossSpawned ? (this.bossDown ? "  down" : this.endless ? "  WARDEN" : "  CORE") : ""}`,
     );
     void need;
 
@@ -1030,8 +1322,22 @@ export class SwarmPlayScene extends Phaser.Scene {
       this.overlay.fillStyle(0xffffff, fa);
       this.overlay.fillRect(0, 0, this.scale.width, this.scale.height);
     }
+    if (this.deathFx > 0) {
+      this.overlay.fillStyle(0xffc18a, this.deathFx * 0.28);
+      this.overlay.fillRect(0, 0, this.scale.width, this.scale.height);
+    }
     this.overlay.fillStyle(0xc45c3a, 0.85);
     this.overlay.fillRect(22, 118, Math.max(0, (this.hp / this.maxHp) * 120), 6);
+    if (this.build.missile > 0) {
+      const ready = 1 - Math.min(1, this.missileCd / missileCooldown(this.build.missile));
+      this.overlay.fillStyle(0xff6a3a, 0.85);
+      this.overlay.fillRect(22, 128, ready * 120, 4);
+    }
+    for (const b of this.banners) {
+      this.overlay.fillStyle(0x000000, Math.min(0.45, b.t * 0.4));
+      this.overlay.fillRect(0, this.scale.height * 0.38, this.scale.width, 42);
+      this.hud.setText(`${this.hud.text}\n${b.text}`);
+    }
 
     if (this.sys.game.device.input.touch) {
       this.overlay.fillStyle(0xffffff, 0.06);

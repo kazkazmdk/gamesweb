@@ -10,12 +10,15 @@ export type Rect = {
   phase?: number;
 };
 
+export type MapEnv = "factory" | "skyworks" | "signal";
+
 export type MapDef = {
   id: string;
   name: string;
   width: number;
   height: number;
   solids: Rect[];
+  env: MapEnv;
   theme: { sky: number; ground: number; accent: number; danger: number };
 };
 
@@ -29,6 +32,7 @@ export const MAPS: MapDef[] = [
     name: "Starter Gates",
     width: 2800,
     height: 720,
+    env: "factory",
     theme: { sky: 0x0b0906, ground: 0x7a5628, accent: 0xffd166, danger: 0xff3b4e },
     solids: [
       { x: 40, y: 580, w: 40, h: 40, kind: "spawn" },
@@ -53,6 +57,7 @@ export const MAPS: MapDef[] = [
     name: "Liftwell",
     width: 1600,
     height: 2200,
+    env: "factory",
     theme: { sky: 0x07090e, ground: 0x3d5368, accent: 0xffd166, danger: 0xff4d62 },
     solids: [
       { x: 80, y: 2040, w: 40, h: 40, kind: "spawn" },
@@ -80,6 +85,7 @@ export const MAPS: MapDef[] = [
     name: "Risk Line",
     width: 3200,
     height: 800,
+    env: "skyworks",
     theme: { sky: 0x0c0708, ground: 0x6a3a28, accent: 0xffd166, danger: 0xff3d6a },
     solids: [
       { x: 50, y: 620, w: 40, h: 40, kind: "spawn" },
@@ -110,6 +116,7 @@ export const MAPS: MapDef[] = [
     name: "Hammer Run",
     width: 3000,
     height: 760,
+    env: "factory",
     theme: { sky: 0x10080c, ground: 0x6a2a38, accent: 0xffd166, danger: 0xff4d6d },
     solids: [
       { x: 40, y: 600, w: 40, h: 40, kind: "spawn" },
@@ -132,6 +139,7 @@ export const MAPS: MapDef[] = [
     name: "Disc Yard",
     width: 2600,
     height: 800,
+    env: "signal",
     theme: { sky: 0x081014, ground: 0x2a4a58, accent: 0x8fe0ff, danger: 0xff5a6e },
     solids: [
       { x: 50, y: 640, w: 40, h: 40, kind: "spawn" },
@@ -154,6 +162,7 @@ export const MAPS: MapDef[] = [
     name: "Conveyor",
     width: 3100,
     height: 740,
+    env: "factory",
     theme: { sky: 0x0c0c10, ground: 0x3a3a48, accent: 0xffd166, danger: 0xff4d62 },
     solids: [
       { x: 40, y: 580, w: 40, h: 40, kind: "spawn" },
@@ -177,6 +186,7 @@ export const MAPS: MapDef[] = [
     name: "Tile Drop",
     width: 2400,
     height: 900,
+    env: "skyworks",
     theme: { sky: 0x12080a, ground: 0x5a3020, accent: 0xffc38a, danger: 0xff3d5a },
     solids: [
       { x: 40, y: 760, w: 40, h: 40, kind: "spawn" },
@@ -198,6 +208,7 @@ export const MAPS: MapDef[] = [
     name: "Bridge Rush",
     width: 3400,
     height: 780,
+    env: "signal",
     theme: { sky: 0x081018, ground: 0x2a4050, accent: 0x9fe8ff, danger: 0xff5570 },
     solids: [
       { x: 40, y: 620, w: 40, h: 40, kind: "spawn" },

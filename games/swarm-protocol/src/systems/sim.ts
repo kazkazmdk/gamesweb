@@ -46,6 +46,27 @@ export const KIND: Record<
   warden: { hp: 820, r: 52, speed: 46, damage: 24, xp: 110, color: 0xff8a6a },
 };
 
+export function emptyBullet(): Bullet {
+  return {
+    active: false,
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    life: 0,
+    damage: 0,
+    r: 4,
+    chain: 0,
+    pierce: 0,
+    split: 0,
+    over: false,
+    hostile: false,
+    kind: "gun",
+    aoe: 0,
+    turn: 0,
+  };
+}
+
 export function emptyEnemy(): Enemy {
   return {
     active: false,
@@ -89,6 +110,8 @@ export function spawnEnemy(e: Enemy, kind: EnemyKind, x: number, y: number, scal
   e.patternT = 0;
 }
 
+export type BulletKind = "gun" | "missile" | "rail" | "drone" | "hostile" | "sweep";
+
 export type Bullet = {
   active: boolean;
   x: number;
@@ -103,6 +126,9 @@ export type Bullet = {
   split: number;
   over: boolean;
   hostile: boolean;
+  kind: BulletKind;
+  aoe: number;
+  turn: number;
 };
 
 export type Orb = {
@@ -266,10 +292,7 @@ export function applyUpgrade(b: Build, id: UpgradeId) {
   if (id === "missile") b.missile += 1;
   if (id === "blade") b.blade += 1;
   if (id === "plasma") b.plasma += 1;
-  if (id === "drone") {
-    b.drone += 1;
-    b.orbital += 1;
-  }
+  if (id === "drone") b.drone += 1;
   if (id === "shield-wall") b.shieldWall += 1;
   if (id === "lifesteal") b.lifesteal += 1;
   if (id === "coolant") {
