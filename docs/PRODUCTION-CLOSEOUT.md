@@ -56,7 +56,7 @@ Do not read “26 upgrades” as “8 unique guns”. Twin / rail / missile / bl
 
 `finishRun` is reserved for e2e and the isolated result screenshot. It is not counted as a playtest.
 
-Agent-driven natural-input sessions (keyboard / drag, no debug finish) are logged in `docs/qa-closeout/PLAYTEST.md`.
+67 agent-driven keyboard/drag sessions are logged in `docs/qa-closeout/PLAYTEST.md`. They are longer than the previous 3–8s + `finishRun` pass. They are **not** a complete natural play of every lap / course / table / 60s arena / 390s boss. That gap is documented in the playtest file, not hidden.
 
 ## Screenshots
 
