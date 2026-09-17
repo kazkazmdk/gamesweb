@@ -41,8 +41,8 @@ describe("sky stack overlap", () => {
 
 describe("new game content", () => {
   it("has three knockout maps and twelve pocket tables", () => {
-    expect(MAPS).toHaveLength(3);
-    expect(LAYOUTS).toHaveLength(12);
+    expect(MAPS).toHaveLength(8);
+    expect(LAYOUTS).toHaveLength(30);
     expect(buildCourse("2026-09-17").length).toBeGreaterThan(8);
     expect(applyOp(10, { kind: "mul", n: 2 })).toBe(20);
   });

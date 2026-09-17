@@ -248,20 +248,23 @@ test("a finished run opens the result screen and the score reaches the server", 
   await waitReady(page, "territory-rush");
   const scoreReq = page.waitForResponse((r) => r.url().includes("/api/score") && r.request().method() === "POST");
   await cmd(page, "finishRun");
+
+  const overlay = page.getByText("R or Space retries");
+  await expect(overlay).toBeVisible({ timeout: 5_000 });
+
+  // A tap still in the play rhythm must not dismiss the recap.
+  // Assert this immediately: waiting for Saved first burns the 450ms grace.
+  await page.keyboard.press("Space");
+  await expect(overlay).toBeVisible();
+
   const res = await scoreReq;
   const body = (await res.json()) as { verification?: { status: string }; alreadyApplied?: boolean };
   expect(res.status()).toBe(200);
   expect(body.alreadyApplied).toBe(false);
   expect(body.verification?.status).toBeTruthy();
-
-  const overlay = page.getByText("R or Space retries");
-  await expect(overlay).toBeVisible({ timeout: 5_000 });
   await expect(page.getByRole("button", { name: "Challenge a friend" })).toBeVisible();
   await expect(page.getByText(/^Saved$|Score under review/)).toBeVisible({ timeout: 5_000 });
 
-  // A tap still in the play rhythm must not dismiss the recap.
-  await page.keyboard.press("Space");
-  await expect(overlay).toBeVisible();
   await page.waitForTimeout(600);
   await page.keyboard.press("Space");
   await expect(overlay).toBeHidden({ timeout: 3_000 });

@@ -10,6 +10,26 @@ export { pulseHaptic } from "./haptic";
 export { hashSeed, mulberry32, seededRng } from "./rng";
 export { mixColor, fillBackdrop, fillVignette, drawParticles } from "./backdrop";
 export type { BackdropSpec, BackdropBand, BackdropBlob, GfxLike } from "./backdrop";
+export {
+  easeOutCubic,
+  easeOutBack,
+  easeInOutQuad,
+  animPhase,
+  qualityFromFps,
+  fillRound,
+  drawLamp,
+  drawChevron,
+  drawRunner,
+  drawMiniPerson,
+  drawHoverBlade,
+  drawArcadeCar,
+  drawShinyBall,
+  drawGateArch,
+  drawContainer,
+  drawCrane,
+  drawSkyline,
+} from "./production";
+export type { QualityTier, DrawGfx } from "./production";
 
 export class Pool<T> {
   private free: T[] = [];

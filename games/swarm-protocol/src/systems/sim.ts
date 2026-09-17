@@ -1,4 +1,4 @@
-export type EnemyKind = "chaser" | "dart" | "tank" | "spitter" | "splitter" | "elite" | "boss";
+export type EnemyKind = "chaser" | "dart" | "tank" | "spitter" | "splitter" | "elite" | "boss" | "swarmling" | "warden";
 
 export type Enemy = {
   active: boolean;
@@ -42,6 +42,8 @@ export const KIND: Record<
   splitter: { hp: 22, r: 16, speed: 70, damage: 9, xp: 8, color: 0xf07a3a },
   elite: { hp: 110, r: 28, speed: 86, damage: 18, xp: 32, color: 0xffd4a8 },
   boss: { hp: 680, r: 46, speed: 52, damage: 22, xp: 80, color: 0xffc18a },
+  swarmling: { hp: 4, r: 6, speed: 196, damage: 4, xp: 2, color: 0xffb48a },
+  warden: { hp: 820, r: 52, speed: 46, damage: 24, xp: 110, color: 0xff8a6a },
 };
 
 export function emptyEnemy(): Enemy {
@@ -129,7 +131,18 @@ export type UpgradeId =
   | "berserk"
   | "crit"
   | "dash"
-  | "pulse";
+  | "pulse"
+  | "twin"
+  | "rail"
+  | "missile"
+  | "blade"
+  | "plasma"
+  | "drone"
+  | "shield-wall"
+  | "lifesteal"
+  | "coolant"
+  | "focus"
+  | "spread";
 
 export type UpgradeDef = {
   id: UpgradeId;
@@ -154,6 +167,17 @@ export const UPGRADES: UpgradeDef[] = [
   { id: "crit", name: "Fault Line", desc: "Critical hits hit harder.", max: 4 },
   { id: "dash", name: "Afterimage", desc: "Shorter dash cooldown.", max: 3 },
   { id: "pulse", name: "Pulse Ring", desc: "A shockwave ticks around you.", max: 3 },
+  { id: "twin", name: "Twin Bolts", desc: "Side bolts fire with every shot.", max: 3 },
+  { id: "rail", name: "Rail Shot", desc: "Shots travel farther and hit harder.", max: 3 },
+  { id: "missile", name: "Missile Burst", desc: "Periodic homing bursts.", max: 2 },
+  { id: "blade", name: "Orbital Blade", desc: "Orbit blades grow longer.", max: 3 },
+  { id: "plasma", name: "Plasma Nova", desc: "Pulse ring is hotter.", max: 2 },
+  { id: "drone", name: "Drone Swarm", desc: "More escort drones.", max: 3 },
+  { id: "shield-wall", name: "Aegis Plate", desc: "Max integrity up.", max: 2 },
+  { id: "lifesteal", name: "Siphon", desc: "Kills restore a sliver of integrity.", max: 2 },
+  { id: "coolant", name: "Coolant Loop", desc: "Dash cools faster.", max: 2 },
+  { id: "focus", name: "Focus Core", desc: "Damage up, slightly slower fire.", max: 3 },
+  { id: "spread", name: "Wide Arc", desc: "Shot spread tightens then fans.", max: 2 },
 ];
 
 export type Build = {
@@ -174,6 +198,17 @@ export type Build = {
   overcharge: number;
   nova: number;
   pulse: number;
+  twin: number;
+  rail: number;
+  missile: number;
+  blade: number;
+  plasma: number;
+  drone: number;
+  shieldWall: number;
+  lifesteal: number;
+  coolant: number;
+  focus: number;
+  spread: number;
 };
 
 export const BASE_BUILD: Build = {
@@ -194,6 +229,17 @@ export const BASE_BUILD: Build = {
   overcharge: 0,
   nova: 0,
   pulse: 0,
+  twin: 0,
+  rail: 0,
+  missile: 0,
+  blade: 0,
+  plasma: 0,
+  drone: 0,
+  shieldWall: 0,
+  lifesteal: 0,
+  coolant: 0,
+  focus: 0,
+  spread: 0,
 };
 
 export function applyUpgrade(b: Build, id: UpgradeId) {
@@ -212,6 +258,30 @@ export function applyUpgrade(b: Build, id: UpgradeId) {
   if (id === "crit") b.crit += 0.1;
   if (id === "dash") b.dashCd *= 0.82;
   if (id === "pulse") b.pulse += 1;
+  if (id === "twin") b.twin += 1;
+  if (id === "rail") {
+    b.rail += 1;
+    b.damage *= 1.12;
+  }
+  if (id === "missile") b.missile += 1;
+  if (id === "blade") b.blade += 1;
+  if (id === "plasma") b.plasma += 1;
+  if (id === "drone") {
+    b.drone += 1;
+    b.orbital += 1;
+  }
+  if (id === "shield-wall") b.shieldWall += 1;
+  if (id === "lifesteal") b.lifesteal += 1;
+  if (id === "coolant") {
+    b.coolant += 1;
+    b.dashCd *= 0.9;
+  }
+  if (id === "focus") {
+    b.focus += 1;
+    b.damage *= 1.18;
+    b.fireRate *= 0.94;
+  }
+  if (id === "spread") b.spread += 1;
 }
 
 export function ownedCount(owned: UpgradeId[], id: UpgradeId) {
@@ -291,10 +361,11 @@ export function desiredCount(elapsedSec: number): number {
 export function pickKind(elapsedSec: number, eliteOk: boolean): EnemyKind {
   const p = phaseFor(elapsedSec);
   const roll = rng();
-  if (p === "learn") return roll < 0.75 ? "chaser" : "dart";
+  if (p === "learn") return roll < 0.62 ? "chaser" : roll < 0.88 ? "dart" : "swarmling";
   if (p === "build") {
-    if (roll < 0.45) return "chaser";
-    if (roll < 0.7) return "dart";
+    if (roll < 0.38) return "chaser";
+    if (roll < 0.58) return "dart";
+    if (roll < 0.72) return "swarmling";
     if (roll < 0.88) return "spitter";
     return "tank";
   }

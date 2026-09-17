@@ -10,6 +10,7 @@ import {
   createGameKeyboard,
   seededRng,
   drawParticles,
+  drawHoverBlade,
   fillVignette,
   type GameKeyboard,
 } from "@gamesweb/game-core";
@@ -48,6 +49,11 @@ export class TerritoryScene extends Phaser.Scene {
   private stick = { x: 0, y: 0 };
   private flashes: Array<{ cells: number[]; t: number; id: Owner }> = [];
   private names: Phaser.GameObjects.Text[] = [];
+  private vis = { x: 8, y: 14 };
+  private pickups: Array<{ x: number; y: number; kind: "speed" | "shield" | "claim" }> = [];
+  private boost = 0;
+  private shield = 0;
+  private arena = 0;
 
   constructor() {
     super("territory-play");
@@ -57,6 +63,15 @@ export class TerritoryScene extends Phaser.Scene {
     this.platform = this.game.registry.get("platform") as PlatformSDK;
     const ctx = readRunContext();
     this.rng = seededRng(ctx.seed ?? ctx.challengeCode ?? "arena");
+    this.arena = (ctx.seed ?? "arena").length % 2;
+    this.vis = { x: 8, y: 14 };
+    this.boost = 0;
+    this.shield = 0;
+    this.pickups = [
+      { x: 16, y: 8, kind: "speed" },
+      { x: 32, y: 18, kind: "shield" },
+      { x: 24, y: 22, kind: "claim" },
+    ];
     this.grid = new Array(COLS * ROWS).fill(0);
     this.paintHome(8, 14, 1);
     this.bots = [
@@ -135,7 +150,7 @@ export class TerritoryScene extends Phaser.Scene {
     if (native?.retryPressed) this.scene.restart();
     if (!this.ended) {
       this.t += dt * 1000;
-      if (this.ticks % 5 === 0) {
+      if (this.ticks % (this.boost > 0 ? 3 : 5) === 0) {
         const mx = Number(Boolean(native?.right)) - Number(Boolean(native?.left)) || Math.round(this.stick.x);
         const my = Number(Boolean(native?.down)) - Number(Boolean(native?.up)) || Math.round(this.stick.y);
         this.stepActor(1, mx, my, this.trail, false);
@@ -145,6 +160,21 @@ export class TerritoryScene extends Phaser.Scene {
         }
       }
       if (this.t >= TIME) this.finish();
+      this.boost = Math.max(0, this.boost - dt);
+      this.shield = Math.max(0, this.shield - dt);
+      this.vis.x += (this.px - this.vis.x) * (1 - Math.exp(-dt * 14));
+      this.vis.y += (this.py - this.vis.y) * (1 - Math.exp(-dt * 14));
+      this.pickups = this.pickups.filter((p) => {
+        if (Math.abs(p.x - this.px) > 0 || Math.abs(p.y - this.py) > 0) return true;
+        if (p.kind === "speed") this.boost = 4;
+        if (p.kind === "shield") this.shield = 5;
+        if (p.kind === "claim") {
+          this.paintHome(this.px, this.py, 1);
+          this.claims += 1;
+        }
+        this.synth.pickup();
+        return false;
+      });
     }
     this.parts.update(dt);
     for (const f of this.flashes) f.t -= dt * 1.8;
@@ -283,7 +313,7 @@ export class TerritoryScene extends Phaser.Scene {
   private draw() {
     const g = this.gfx;
     g.clear();
-    const colors = [0x1a1014, 0xff4d6d, 0x4dabff, 0xffd166, 0x7d5fff];
+    const colors = this.arena === 0 ? [0x1a1014, 0xff4d6d, 0x4dabff, 0xffd166, 0x7d5fff] : [0x10141c, 0x5ad4c8, 0xff8a4a, 0xd4d4ff, 0xff6ab0];
     const outlines = [0x000000, 0xffc1cc, 0xb8ddff, 0xffe9a8, 0xcbb8ff];
     const c = this.cell;
     for (let y = 0; y < ROWS; y += 1) {
@@ -313,14 +343,16 @@ export class TerritoryScene extends Phaser.Scene {
         g.fillRect(x * c, y * c, c, c);
       }
     }
-    g.fillStyle(0xffffff, 0.75);
+    g.fillStyle(this.shield > 0 ? 0x8fe8ff : 0xffffff, 0.75);
     for (const t of this.trail) g.fillRect(t.x * c + 2, t.y * c + 2, c - 4, c - 4);
-    const px = this.px * c + c / 2;
-    const py = this.py * c + c / 2;
-    g.fillStyle(0xffffff, 1);
-    g.fillCircle(px, py, c * 0.42);
-    g.fillStyle(colors[1], 1);
-    g.fillCircle(px, py, c * 0.26);
+    for (const p of this.pickups) {
+      g.fillStyle(p.kind === "speed" ? 0xffe08a : p.kind === "shield" ? 0x8fe8ff : 0xff8ad4, 0.95);
+      g.fillCircle(p.x * c + c / 2, p.y * c + c / 2, c * 0.28);
+    }
+    const px = this.vis.x * c + c / 2;
+    const py = this.vis.y * c + c / 2;
+    const heading = Math.atan2(this.py - this.vis.y, this.px - this.vis.x);
+    drawHoverBlade(g, px, py, colors[1], heading, this.trail.length > 2, this.time.now);
     this.bots.forEach((b, i) => {
       const bx = b.x * c + c / 2;
       const by = b.y * c + c / 2;

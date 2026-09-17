@@ -9,6 +9,7 @@ import {
   clearGwDebug,
   createGameKeyboard,
   drawParticles,
+  drawShinyBall,
   fillBackdrop,
   type GameKeyboard,
 } from "@gamesweb/game-core";
@@ -66,7 +67,7 @@ export class PocketScene extends Phaser.Scene {
     this.synth.setSettings(this.platform.audio.getSettings());
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
-    this.hud = this.add.text(16, 64, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#d9f5d4" }).setScrollFactor(0).setDepth(21);
+    this.hud = this.add.text(16, 64, "DRAG → RELEASE", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#d9f5d4" }).setScrollFactor(0).setDepth(21);
     this.trail = [];
     this.native?.destroy();
     this.native = createGameKeyboard();
@@ -169,6 +170,22 @@ export class PocketScene extends Phaser.Scene {
       this.synth.tone(520, 0.03, "square", 0.02, 0.08);
       this.parts.burst(this.bx, this.by, 5, 0xc4f1c2, 50, 180);
     }
+    for (const b of this.layout.bumpers ?? []) {
+      const dx = this.bx - b.x;
+      const dy = this.by - b.y;
+      const d = Math.hypot(dx, dy);
+      if (d > b.r + 11 || d < 0.1) continue;
+      const nx = dx / d;
+      const ny = dy / d;
+      const vn = this.vx * nx + this.vy * ny;
+      if (vn < 0) {
+        this.vx -= 2.1 * vn * nx;
+        this.vy -= 2.1 * vn * ny;
+      }
+      this.bx = b.x + nx * (b.r + 12);
+      this.by = b.y + ny * (b.r + 12);
+      this.synth.tone(680, 0.04, "triangle", 0.03, 0.1);
+    }
   }
 
   private predict() {
@@ -233,17 +250,20 @@ export class PocketScene extends Phaser.Scene {
   private draw() {
     const g = this.gfx;
     g.clear();
+    const theme = this.layout.theme ?? "garden";
+    const felt = theme === "workshop" ? 0x3a2a1c : theme === "arcade" ? 0x241436 : 0x1f4a32;
+    const rail = theme === "workshop" ? 0x6a4a28 : theme === "arcade" ? 0x3a2060 : 0x5a3a22;
     fillBackdrop(g, this.scale.width, this.scale.height, {
-      top: 0x102418,
-      mid: 0x173322,
+      top: theme === "arcade" ? 0x140c20 : 0x102418,
+      mid: felt,
       bottom: 0x0c1a12,
       grain: 0.04,
     });
     g.save();
     g.scaleCanvas(this.scaleX, this.scaleY);
-    g.fillStyle(0x5a3a22, 1);
+    g.fillStyle(rail, 1);
     g.fillRoundedRect(6, 6, this.layout.w - 12, this.layout.h - 12, 18);
-    g.fillStyle(0x1f4a32, 1);
+    g.fillStyle(felt, 1);
     g.fillRoundedRect(22, 22, this.layout.w - 44, this.layout.h - 44, 12);
     g.fillStyle(0x7a5230, 1);
     g.fillRect(10, 10, this.layout.w - 20, 12);
@@ -284,10 +304,13 @@ export class PocketScene extends Phaser.Scene {
         g.fillCircle(pts[i].x, pts[i].y, 2.4);
       }
     }
-    g.fillStyle(0xc4f1c2, 1);
-    g.fillCircle(this.bx, this.by, 11);
-    g.fillStyle(0xffffff, 0.4);
-    g.fillCircle(this.bx - 3, this.by - 3, 3);
+    for (const b of this.layout.bumpers ?? []) {
+      g.fillStyle(theme === "arcade" ? 0xff6ad5 : 0xe8a050, 1);
+      g.fillCircle(b.x, b.y, b.r);
+      g.fillStyle(0xffffff, 0.25);
+      g.fillCircle(b.x - 4, b.y - 4, 5);
+    }
+    drawShinyBall(g, this.bx, this.by, 11, theme === "arcade" ? 0xffd0f0 : 0xe8f6e6, this.time.now / 80);
     drawParticles(g, this.parts);
     g.restore();
     this.hud.setText(`${this.layout.name}\n${this.strokes} / par ${this.layout.par}`);

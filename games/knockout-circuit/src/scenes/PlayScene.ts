@@ -13,6 +13,7 @@ import {
   fillBackdrop,
   fillVignette,
   mixColor,
+  drawRunner,
   type GameKeyboard,
 } from "@gamesweb/game-core";
 import { knockoutCircuitManifest, readRunContext, type PlatformSDK } from "@gamesweb/game-sdk";
@@ -272,7 +273,7 @@ export class KnockoutScene extends Phaser.Scene {
       const got = new Set((localStorage.getItem(key) ?? "").split(",").filter(Boolean));
       got.add(this.map.id);
       localStorage.setItem(key, [...got].join(","));
-      if (got.size >= 3) void this.platform.achievement.unlock("all-maps");
+      if (got.size >= MAPS.length) void this.platform.achievement.unlock("all-maps");
     } catch {
       /* noop */
     }
@@ -373,18 +374,16 @@ export class KnockoutScene extends Phaser.Scene {
     drawParticles(g, this.parts);
     const bodyX = this.dying > 0 ? this.rag.x : this.x;
     const bodyY = this.dying > 0 ? this.rag.y : this.y;
-    const lean = this.dying > 0 ? this.rag.rot : this.vx * 0.0009;
-    g.save();
-    g.translateCanvas(bodyX + 11, bodyY + 16);
-    g.rotateCanvas(lean);
-    g.fillStyle(this.dying > 0 ? 0xffffff : th.accent, 1);
-    g.fillRoundedRect(-11, -16, 22, 32, 5);
-    g.fillStyle(0x1b1408, 1);
-    g.fillCircle(this.vx >= 0 ? 4 : -4, -8, 3.2);
-    g.fillStyle(th.accent, 0.85);
-    g.fillRect(-7, 10, 5, this.grounded ? 8 : 5);
-    g.fillRect(2, 10, 5, this.grounded ? 8 : 5);
-    g.restore();
+    drawRunner(g, bodyX, bodyY, 22, 32, {
+      facing: this.vx >= 0 ? 1 : -1,
+      grounded: this.grounded,
+      vx: this.vx,
+      vy: this.vy,
+      t: this.timeMs,
+      color: th.accent,
+      dying: this.dying > 0,
+      lean: this.dying > 0 ? this.rag.rot : this.vx * 0.0009,
+    });
     fillVignette(g, this.map.width, this.map.height, 0.18);
     this.hud.setText(`${this.map.name}\n${(this.timeMs / 1000).toFixed(2)}s`);
     this.overlay.clear();
