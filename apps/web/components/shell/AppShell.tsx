@@ -1,6 +1,6 @@
 "use client";
 
-import { brand } from "@gamesweb/config";
+import { brand, levelFromXp } from "@gamesweb/config";
 import { GAME_MANIFESTS } from "@gamesweb/game-sdk";
 import { analytics } from "@gamesweb/analytics";
 import Link from "next/link";
@@ -17,8 +17,6 @@ export const PLATFORM_ACCENT = "#d7c4a3";
 const DESKTOP_NAV = [
   { href: "/", label: "Games", match: (p: string) => p === "/" },
   { href: "/arcade", label: "Arcade", match: (p: string) => p.startsWith("/arcade") || p.startsWith("/challenges") || p.startsWith("/achievements") || p.startsWith("/daily") || p.startsWith("/grand-prix") },
-  { href: "/daily", label: "Daily", match: (p: string) => p.startsWith("/daily") },
-  { href: "/inbox", label: "Inbox", match: (p: string) => p.startsWith("/inbox") || p.startsWith("/c/") },
 ];
 
 const MOBILE_NAV = [
@@ -77,8 +75,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         }`}
       >
         <div className="flex items-center gap-7">
-          <Link href="/" className="display text-[13px] tracking-[0.22em] text-white/45 uppercase">
-            {brand.wordmark}
+          <Link href="/" className="flex items-center gap-2.5">
+            <span className="home-wordmark-tick" aria-hidden />
+            <span className="display text-[16px] tracking-[0.24em] text-white uppercase">{brand.wordmark}</span>
           </Link>
           <nav className="hidden items-center gap-5 text-[13px] text-white/55 md:flex" aria-label="Primary">
             {DESKTOP_NAV.map((item) => (
@@ -107,13 +106,19 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link href="/settings" className="grid h-10 w-10 place-items-center text-white/70" aria-label="Settings">
             <SettingsIcon />
           </Link>
-          <Link href="/me" className="relative grid h-10 w-10 place-items-center" aria-label="Profile">
-            <Avatar id={player.avatar} size={28} />
+          <Link href="/inbox" className="relative grid h-10 w-10 place-items-center text-white/70" aria-label={unread ? `Inbox, ${unread} unread` : "Inbox"}>
+            <InboxIcon />
+            {unread > 0 ? (
+              <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[var(--accent)]" />
+            ) : null}
+          </Link>
+          <Link href="/me" className="relative flex h-11 items-center gap-2 pl-1" aria-label="Profile">
+            <Avatar id={player.avatar} size={30} />
+            <span className="hidden text-[11px] tracking-[0.16em] text-white/70 uppercase md:block">
+              {levelFromXp(player.xp).level}
+            </span>
             {player.backend === "local" ? (
-              <span
-                className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-[var(--accent)]"
-                title="Saved on this device"
-              />
+              <span className="absolute right-0 top-1 h-2 w-2 rounded-full bg-[var(--accent)]" title="Saved on this device" />
             ) : null}
           </Link>
         </div>
@@ -210,6 +215,15 @@ function SettingsIcon() {
     <IconFrame>
       <circle cx="9" cy="9" r="2.2" />
       <path d="M9 3.4 V5.2 M9 12.8 V14.6 M3.4 9 H5.2 M12.8 9 H14.6 M5 5 L6.3 6.3 M11.7 11.7 L13 13 M13 5 L11.7 6.3 M6.3 11.7 L5 13" />
+    </IconFrame>
+  );
+}
+
+function InboxIcon() {
+  return (
+    <IconFrame>
+      <rect x="3.2" y="4.5" width="11.6" height="9" rx="1.2" />
+      <path d="M4 5.4 9 9.2 14 5.4" />
     </IconFrame>
   );
 }

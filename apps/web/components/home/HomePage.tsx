@@ -1,18 +1,19 @@
 "use client";
 
+import { analytics } from "@gamesweb/analytics";
 import { GAME_MANIFESTS, getManifest, nextBestAction, utcDayKey, dailyArcadeEvents } from "@gamesweb/game-sdk";
 import { useArcade } from "@/lib/social/use-arcade";
-import { levelFromXp } from "@gamesweb/config";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { GameArt } from "@/components/game/GameArt";
-import { ActivityCard, ActivityRail, EmptyState, QuickAction, SectionHeader } from "@/components/platform";
-import { useAccent } from "@/components/shell/AppShell";
+import { Avatar, useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
 import { focusedGameContext } from "@/lib/platform/focus";
-import { formatPlayScore, hasRecord } from "@/lib/platform/format";
 import { loadPlayIndex, playModeOptions, savePlayIndex } from "@/lib/platform/modes";
+import { GameRail, type RailMark, type RailPresence } from "./GameRail";
+import { HomeSocial } from "./HomeSocial";
+import { HomeStage } from "./HomeStage";
+import { TodayArcade } from "./TodayArcade";
 
 export default function HomePage() {
   const player = usePlayer();
@@ -20,10 +21,8 @@ export default function HomePage() {
   const router = useRouter();
   const [focus, setFocus] = useState(0);
   const [playIndex, setPlayIndex] = useState(0);
-  const [modeOpen, setModeOpen] = useState(false);
   const game = GAME_MANIFESTS[focus] ?? GAME_MANIFESTS[0];
   useAccent(game.accent);
-  const lv = levelFromXp(player.xp);
   const reduced = player.settings.reducedMotion;
 
   useEffect(() => {
@@ -45,6 +44,10 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    analytics.track("home_game_focused", { gameId: game.id, index: focus });
+  }, [game.id, focus]);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (!el) return;
@@ -62,16 +65,15 @@ export default function HomePage() {
       if (e.key === "Enter") {
         if (el.closest("a,button")) return;
         e.preventDefault();
+        analytics.track("home_game_play_clicked", { gameId: game.id, source: "enter" });
         router.push(`/play/${game.slug}`);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [game.slug, router, setFocusSafe]);
+  }, [game.id, game.slug, router, setFocusSafe]);
 
   const modes = playModeOptions(game.id);
-  const fade = reduced ? "" : "duration-[320ms] ease-[var(--ease-out)]";
-  const line = ctx.pbLabel ? `${ctx.modeLabel} · Personal best ${ctx.pbLabel}` : ctx.modeLabel;
   const snap = useArcade();
   const day = utcDayKey();
   const openChallenges = snap.challenges.filter((c) => c.status === "open");
@@ -95,338 +97,185 @@ export default function HomePage() {
   const lastRun = player.history[0];
   const lastGame = lastRun ? getManifest(lastRun.gameId) : undefined;
   const rival = snap.rivals[0];
-  const touristLeft = Math.max(0, 5 - played.size);
+  const gameChallenge = openChallenges.find((c) => c.gameId === game.id);
+  const dailyHere = dailyLeft.find((e) => e.gameId === game.id);
+  const friends = player.friends.filter((f) => f.status === "accepted");
+  const online = friends.filter((f) => f.presence !== "offline");
+
+  const primary = resolvePrimary({
+    gameSlug: game.slug,
+    playLabel: ctx.playLabel,
+    challenge: gameChallenge,
+    daily: dailyHere,
+    continueHere: lastGame?.id === game.id,
+  });
+  const secondary = resolveSecondary(primary.kind, {
+    playHref: `/play/${game.slug}`,
+    challenge: gameChallenge,
+    dailyLeft: dailyLeft.length,
+    nba,
+  });
+
+  const marks: RailMark[] = GAME_MANIFESTS.map((g) => {
+    if (challengeIds.has(g.id)) return "challenge";
+    if (dailyIds.has(g.id)) return "daily";
+    if (lastGame?.id === g.id) return "continue";
+    if (!played.has(g.id)) return "new";
+    return null;
+  });
+
+  const presence: RailPresence[] = GAME_MANIFESTS.map((g) =>
+    friends
+      .filter((f) => f.presence === "playing" && f.gameId === g.id)
+      .slice(0, 2)
+      .map((f) => ({ name: f.displayName, avatar: f.avatar })),
+  );
+
+  const stepMode = (delta: number) => {
+    if (modes.length < 2) return;
+    const next = (playIndex + delta + modes.length) % modes.length;
+    setPlayIndex(next);
+    savePlayIndex(game.id, next);
+  };
 
   return (
     <div className="relative min-h-dvh" data-testid="games-home">
-      <div className={`absolute inset-0 overflow-hidden ${reduced ? "" : "transition-opacity duration-[320ms]"}`}>
-        <GameArt
-          slug={game.slug}
-          variant="backdrop"
-          className="absolute inset-0 h-full w-full max-md:scale-125 max-md:object-[62%_38%]"
-        />
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-[min(58%,42rem)] bg-gradient-to-r from-black/78 via-black/36 to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[min(38%,28rem)] bg-gradient-to-l from-black/55 to-transparent md:block" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/70 to-transparent" />
-      </div>
+      <HomeStage slug={game.slug} reduced={reduced} />
 
-      <div className="relative flex min-h-[min(88dvh,920px)] flex-col px-5 pb-10 pt-[calc(var(--header-h)+16px)] md:px-10">
-        <div className="mt-auto grid gap-8 pb-4 pt-20 md:grid-cols-[minmax(0,1fr)_minmax(240px,320px)] md:items-end">
-          <div className={reduced ? "" : "transition-all duration-[300ms]"}>
-            <p className="meta text-white/60">{game.genre}</p>
-            <h1 className="display mt-2 text-[40px] text-white md:text-[64px]">{game.title}</h1>
-            <p className="mt-2 max-w-md text-[15px] text-white/72">{game.tagline}</p>
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <QuickAction href={`/play/${game.slug}`}>{ctx.playLabel}</QuickAction>
-              <QuickAction href="/daily" tone="ghost">
-                Daily Arcade
-              </QuickAction>
-              <QuickAction href="/party" tone="ghost">
-                Party
-              </QuickAction>
-              <QuickAction href="/grand-prix" tone="ghost">
-                Grand Prix
-              </QuickAction>
-            </div>
-            {nba.type !== "play" ? (
-              <p className="mt-3 text-[13px] text-white/80">
-                <Link href={nba.href} className="underline decoration-white/25">
-                  {nba.label}
-                </Link>
-                <span className="text-white/45"> · {nba.reason}</span>
-              </p>
-            ) : null}
-            <p className="mt-3 text-[13px] text-white/55">
-              {line || "Set a first record"}
-              {modes.length > 1 ? (
-                <button
-                  type="button"
-                  className="ml-3 text-[12px] text-white/40"
-                  aria-expanded={modeOpen}
-                  onClick={() => setModeOpen((v) => !v)}
-                >
-                  Change
-                </button>
-              ) : null}
-            </p>
-            {modeOpen && modes.length > 1 ? (
-              <div className="relative">
-                <div className="absolute left-0 top-2 z-10 min-w-[180px] bg-black/80 py-1" role="listbox">
-                  {modes.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      role="option"
-                      aria-selected={String(playIndex) === m.id}
-                      className={`block min-h-9 w-full px-3 text-left text-[12px] ${
-                        String(playIndex) === m.id ? "text-white" : "text-white/50"
-                      }`}
-                      onClick={() => {
-                        setPlayIndex(Number(m.id));
-                        savePlayIndex(game.id, Number(m.id));
-                        setModeOpen(false);
-                      }}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
+      <div className="relative flex min-h-dvh flex-col px-5 pb-[calc(var(--bottom-nav)+12px)] pt-[calc(var(--header-h)+8px)] md:px-10 md:pb-8">
+        <div className="min-h-[12vh] flex-1 md:min-h-[16vh]" />
+
+        <div className={`max-w-xl ${reduced ? "" : "home-copy-in"}`} key={game.id}>
+          <p className="meta text-white/50">{game.genre}</p>
+          <h1 className="display mt-1.5 text-[40px] text-white md:text-[56px] xl:text-[68px]">{game.title}</h1>
+          <p className="mt-2 max-w-md text-[14px] leading-snug text-white/68 md:text-[15px]">{game.tagline}</p>
+
+          {ctx.pbLabel || rival || ctx.friendBest?.scoreLabel || dailyHere ? (
+            <div className="mt-5 flex flex-wrap items-end gap-x-8 gap-y-3">
+              {ctx.pbLabel ? (
+                <div>
+                  <p className="meta text-white/38">Personal best</p>
+                  <p className="metric mt-1 text-[30px] text-white md:text-[36px]">{ctx.pbLabel}</p>
                 </div>
-              </div>
+              ) : null}
+              {rival ? (
+                <Link
+                  href="/friends"
+                  className="flex items-center gap-2.5"
+                  onClick={() => analytics.track("home_social_action", { kind: "rival" })}
+                >
+                  <Avatar id={rival.otherId} size={34} />
+                  <span>
+                    <span className="block text-[14px] text-white">{rival.otherName}</span>
+                    <span className="stat block text-[12px] text-white/55">
+                      {rival.winsA}–{rival.winsB}
+                    </span>
+                  </span>
+                </Link>
+              ) : ctx.friendBest?.scoreLabel ? (
+                <div>
+                  <p className="text-[14px] text-white">{ctx.friendBest.name}</p>
+                  <p className="stat mt-1 text-[18px] text-white/80">{ctx.friendBest.scoreLabel}</p>
+                </div>
+              ) : null}
+              {dailyHere ? <p className="meta text-[var(--accent)]">Daily live</p> : null}
+            </div>
+          ) : null}
+
+          {modes.length > 1 ? (
+            <div className="home-mode mt-5 inline-flex items-center">
+              <button type="button" className="grid h-11 w-11 place-items-center text-white/80" aria-label="Previous mode" onClick={() => stepMode(-1)}>
+                ‹
+              </button>
+              <span className="min-w-[9rem] px-1 text-center text-[12px] tracking-[0.12em] text-white uppercase">
+                {modes[playIndex]?.label ?? ctx.modeLabel}
+              </span>
+              <button type="button" className="grid h-11 w-11 place-items-center text-white/80" aria-label="Next mode" onClick={() => stepMode(1)}>
+                ›
+              </button>
+            </div>
+          ) : null}
+
+          <div className="mt-5 flex flex-wrap items-center gap-4">
+            <Link
+              href={primary.href}
+              className="home-play inline-flex min-h-12 items-center justify-center gap-3 px-7 py-3 text-[16px] font-semibold md:min-h-14 md:px-8"
+              onClick={() => analytics.track("home_game_play_clicked", { gameId: game.id, source: "cta" })}
+            >
+              <span className="home-play-mark" aria-hidden />
+              {primary.label}
+            </Link>
+            {secondary ? (
+              <Link
+                href={secondary.href}
+                className="inline-flex min-h-11 items-center text-[13px] text-white/70 underline decoration-white/22 underline-offset-4"
+                onClick={() => analytics.track("home_event_opened", { href: secondary.href })}
+              >
+                {secondary.label}
+              </Link>
             ) : null}
           </div>
+        </div>
 
-          <aside className="hidden space-y-3 md:block" aria-label="Focused game status">
-            <HomePanel kicker="Record" title={ctx.pbLabel ?? "No record yet"} body={ctx.pbLabel ? ctx.modeLabel : `Set your first ${game.title} score.`} />
-            <HomePanel
-              kicker="Rival"
-              title={rival ? rival.otherName : "No rivalry yet"}
-              body={rival ? `${rival.winsA}–${rival.winsB} · ${rival.totalMatches} matches` : "Beat a challenge to start one."}
-            />
-            <HomePanel
-              kicker="Daily"
-              title={dailyLeft[0] ? dailyLeft[0].label : "Daily clear"}
-              body={dailyLeft[0] ? `${dailyLeft.length} event${dailyLeft.length === 1 ? "" : "s"} left today` : "Every event is done. Come back tomorrow."}
-            />
-          </aside>
+        <div className="mt-7 md:mt-8">
+          <GameRail
+            games={GAME_MANIFESTS}
+            focus={focus}
+            marks={marks}
+            presence={presence}
+            reduced={reduced}
+            onFocus={(i) => setFocus(i)}
+            onPlay={(i) => {
+              const g = GAME_MANIFESTS[i];
+              analytics.track("home_game_play_clicked", { gameId: g.id, source: "rail" });
+              router.push(`/play/${g.slug}`);
+            }}
+          />
+          {online.length ? (
+            <p className="mt-3 text-[12px] text-white/45">
+              {online.length} friend{online.length === 1 ? "" : "s"} online
+            </p>
+          ) : null}
         </div>
       </div>
 
-      <section className="relative px-5 pb-12 md:px-10" aria-label="All games">
-        <SectionHeader title="All games" meta={`${GAME_MANIFESTS.length} worlds · ${lv.level}`} />
-        <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4" role="listbox" aria-label="Games">
-          {GAME_MANIFESTS.map((g, i) => {
-            const on = i === focus;
-            const badges = [
-              dailyIds.has(g.id) ? "Daily" : null,
-              challengeIds.has(g.id) ? "Challenge" : null,
-              played.has(g.id) ? "Played" : null,
-            ].filter(Boolean) as string[];
-            return (
-              <button
-                key={g.id}
-                type="button"
-                role="option"
-                aria-selected={on}
-                aria-label={g.title}
-                onClick={() => setFocus(i)}
-                className={`group relative overflow-hidden text-left ${fade} ${on ? "ring-2 ring-white/80" : "opacity-85 hover:opacity-100"}`}
-                style={{ aspectRatio: "16 / 9" }}
-              >
-                <GameArt slug={g.slug} variant="tile" className="h-full w-full transition-transform duration-300 group-hover:scale-[1.04]" />
-                <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
-                <span className="absolute inset-x-0 bottom-0 p-3">
-                  <span className="meta block text-white/60">{g.genre}</span>
-                  <span className="display mt-0.5 block text-[18px] text-white md:text-[22px]">{g.title}</span>
-                  {badges.length ? (
-                    <span className="mt-1 flex flex-wrap gap-1">
-                      {badges.map((b) => (
-                        <span key={b} className="rounded-full bg-white/12 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/80">
-                          {b}
-                        </span>
-                      ))}
-                    </span>
-                  ) : null}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {openChallenges.length ? (
-        <section className="relative px-5 pb-10 md:px-10" aria-label="Challenges">
-          <SectionHeader title="Challenges" meta={`${openChallenges.length} open`} action={<QuickAction href="/inbox" tone="quiet">Inbox</QuickAction>} />
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            {openChallenges.slice(0, 3).map((c) => {
-              const g = getManifest(c.gameId);
-              return (
-                <Link key={c.id} href={`/c/${c.publicCode}`} className="relative min-h-[140px] overflow-hidden">
-                  {g ? <GameArt slug={g.slug} variant="tile" className="absolute inset-0 h-full w-full" /> : null}
-                  <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
-                  <span className="relative flex h-full flex-col justify-end p-4">
-                    <span className="meta text-white/65">{c.challengerName}</span>
-                    <span className="display mt-1 text-[24px] text-white">{g?.title ?? c.gameId}</span>
-                    <span className="mt-1 text-[12px] text-white/70">{c.type.replace("-", " ")}</span>
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
-
-      {dailyLeft.length ? (
-        <section className="relative px-5 pb-10 md:px-10" aria-label="Daily Arcade">
-          <SectionHeader title="Daily Arcade" meta={`${dailyLeft.length} remaining`} action={<QuickAction href="/daily" tone="quiet">Open</QuickAction>} />
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            {dailyLeft.slice(0, 3).map((e) => {
-              const g = getManifest(e.gameId);
-              if (!g) return null;
-              return (
-                <Link key={`${e.gameId}:${e.mode}`} href={`/play/${g.slug}?daily=1`} className="relative min-h-[132px] overflow-hidden">
-                  <GameArt slug={g.slug} variant="tile" className="absolute inset-0 h-full w-full" />
-                  <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
-                  <span className="relative flex h-full flex-col justify-end p-4">
-                    <span className="meta text-white/65">Daily</span>
-                    <span className="display mt-1 text-[24px] text-white">{e.label}</span>
-                    <span className="mt-1 text-[12px] text-white/70">{e.mode}</span>
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
-
-      {snap.rivals.length ? (
-        <section className="relative px-5 pb-10 md:px-10" aria-label="Rivals">
-          <SectionHeader title="Rivals" action={<QuickAction href="/friends" tone="quiet">Friends</QuickAction>} />
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            {snap.rivals.slice(0, 3).map((r) => (
-              <div key={r.otherId} className="bg-black/35 px-4 py-4">
-                <p className="meta text-white/55">Rivalry</p>
-                <p className="display mt-1 text-[26px] text-white">{r.otherName}</p>
-                <p className="mt-1 text-[13px] text-white/70">
-                  {r.winsA}–{r.winsB}
-                  {r.draws ? ` · ${r.draws} draws` : ""}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {lastGame ? (
-        <section className="relative px-5 pb-10 md:px-10" aria-label="Continue">
-          <SectionHeader title="Continue" />
-          <Link href={`/play/${lastGame.slug}`} className="relative mt-4 block min-h-[160px] overflow-hidden md:min-h-[200px]">
-            <GameArt slug={lastGame.slug} variant="hero" className="absolute inset-0 h-full w-full" />
-            <span className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/30 to-transparent" />
-            <span className="relative flex min-h-[160px] flex-col justify-end p-5 md:min-h-[200px]">
-              <span className="meta text-white/65">Last run</span>
-              <span className="display mt-1 text-[32px] text-white">{lastGame.title}</span>
-              <span className="mt-1 text-[13px] text-white/70">
-                {formatPlayScore(lastGame.id, lastRun.score) ?? lastGame.sessionHint}
-              </span>
-            </span>
-          </Link>
-        </section>
-      ) : null}
-
-      <section className="relative px-5 pb-16 md:px-10" aria-label="Activities">
-        <p className="meta">Activities</p>
-        <div className="mt-4">
-          {played.size === 0 ? (
-            <div className="space-y-4">
-              <EmptyState
-                title="Arcade Tourist"
-                body="Play 5 different games. The next-best-action loop starts after your first finish."
-                slug={game.slug}
-                action={<QuickAction href={`/play/${game.slug}`}>Start with {game.title}</QuickAction>}
-              />
-              <ActivityRail>
-                {GAME_MANIFESTS.slice(0, 3).map((g, i) => (
-                  <ActivityCard
-                    key={g.id}
-                    featured={i === 0}
-                    slug={g.slug}
-                    kicker={g.genre}
-                    title={g.title}
-                    meta={g.tagline}
-                    href={`/play/${g.slug}`}
-                    cta="Play"
-                  />
-                ))}
-              </ActivityRail>
-            </div>
-          ) : (
-            <ActivityRail>
-              {ctx.daily ? (
-                <ActivityCard
-                  featured
-                  slug={game.slug}
-                  kicker="Daily"
-                  title={ctx.daily.label}
-                  progress={Number(ctx.daily.current.replace(/[^\d.-]/g, "")) || 0}
-                  target={Number(ctx.daily.target.replace(/[^\d.-]/g, "")) || 1}
-                  reward={ctx.daily.done ? "Complete" : "+XP"}
-                  href={`/play/${game.slug}`}
-                  cta={ctx.daily.done ? "Replay" : "Continue"}
-                />
-              ) : touristLeft > 0 ? (
-                <ActivityCard
-                  featured
-                  slug={GAME_MANIFESTS.find((g) => !played.has(g.id))?.slug ?? game.slug}
-                  kicker="Arcade Tourist"
-                  title={`${touristLeft} worlds left`}
-                  meta="Play 5 different games to unlock the tourist trophy."
-                  href={`/play/${GAME_MANIFESTS.find((g) => !played.has(g.id))?.slug ?? game.slug}`}
-                  cta="Play"
-                />
-              ) : (
-                <ActivityCard
-                  featured
-                  slug={game.slug}
-                  kicker="Session"
-                  title={game.title}
-                  meta={`${lv.level} · ${ctx.pbLabel ?? "set a first record"}`}
-                  href={`/play/${game.slug}`}
-                  cta={ctx.playLabel}
-                />
-              )}
-              {ctx.nextTrophy ? (
-                <ActivityCard
-                  slug={game.slug}
-                  kicker="Next trophy"
-                  title={ctx.nextTrophy.name}
-                  meta={ctx.nextTrophy.description}
-                  href={`/achievements`}
-                  cta="Trophies"
-                  reward=""
-                />
-              ) : (
-                <ActivityCard
-                  slug={GAME_MANIFESTS[(focus + 2) % GAME_MANIFESTS.length].slug}
-                  kicker="World tour"
-                  title={GAME_MANIFESTS[(focus + 2) % GAME_MANIFESTS.length].title}
-                  meta={GAME_MANIFESTS[(focus + 2) % GAME_MANIFESTS.length].tagline}
-                  href={`/play/${GAME_MANIFESTS[(focus + 2) % GAME_MANIFESTS.length].slug}`}
-                  cta="Play"
-                />
-              )}
-              {ctx.friendBest?.scoreLabel ? (
-                <ActivityCard
-                  slug={game.slug}
-                  kicker="Friend score"
-                  title={ctx.friendBest.name}
-                  meta={ctx.friendBest.scoreLabel}
-                  href={`/friends`}
-                  cta="Friends"
-                />
-              ) : (
-                <ActivityCard
-                  slug={GAME_MANIFESTS[(focus + 1) % GAME_MANIFESTS.length].slug}
-                  kicker={hasRecord(ctx.pb) ? "Record" : "Next up"}
-                  title={hasRecord(ctx.pb) ? (ctx.pbLabel ?? game.title) : GAME_MANIFESTS[(focus + 1) % GAME_MANIFESTS.length].title}
-                  meta={hasRecord(ctx.pb) ? ctx.modeLabel : GAME_MANIFESTS[(focus + 1) % GAME_MANIFESTS.length].tagline}
-                  href={hasRecord(ctx.pb) ? `/play/${game.slug}` : `/play/${GAME_MANIFESTS[(focus + 1) % GAME_MANIFESTS.length].slug}`}
-                  cta="Play"
-                />
-              )}
-            </ActivityRail>
-          )}
-        </div>
-      </section>
+      <TodayArcade dailies={dailies} remaining={dailyLeft.length} gpPoints={snap.grandPrix.points} />
+      <HomeSocial friends={friends} rivals={snap.rivals} challenges={openChallenges} />
     </div>
   );
 }
 
-function HomePanel({ kicker, title, body }: { kicker: string; title: string; body: string }) {
-  return (
-    <div className="bg-black/45 px-4 py-3 backdrop-blur-sm">
-      <p className="meta text-white/50">{kicker}</p>
-      <p className="mt-1 text-[16px] text-white">{title}</p>
-      <p className="mt-0.5 text-[12px] text-white/60">{body}</p>
-    </div>
-  );
+function resolvePrimary(input: {
+  gameSlug: string;
+  playLabel: "Play" | "Continue";
+  challenge?: { publicCode: string; challengerName: string };
+  daily?: { gameId: string };
+  continueHere: boolean;
+}) {
+  if (input.challenge) {
+    return { kind: "challenge" as const, href: `/c/${input.challenge.publicCode}`, label: `Beat ${input.challenge.challengerName}` };
+  }
+  if (input.continueHere) {
+    return { kind: "continue" as const, href: `/play/${input.gameSlug}`, label: "Continue" };
+  }
+  if (input.daily) {
+    return { kind: "daily" as const, href: `/play/${input.gameSlug}?daily=1`, label: "Play Daily" };
+  }
+  return { kind: "play" as const, href: `/play/${input.gameSlug}`, label: input.playLabel };
+}
+
+function resolveSecondary(
+  primary: "challenge" | "continue" | "daily" | "play",
+  input: {
+    playHref: string;
+    challenge?: { publicCode: string };
+    dailyLeft: number;
+    nba: { type: string; href: string; label: string };
+  },
+) {
+  if (primary === "challenge") return { href: input.playHref, label: "Play" };
+  if (input.challenge) return { href: `/c/${input.challenge.publicCode}`, label: "Challenge" };
+  if (primary !== "daily" && input.dailyLeft > 0) return { href: "/daily", label: "Daily" };
+  if (input.nba.type !== "play" && input.nba.href !== "/") return { href: input.nba.href, label: input.nba.label };
+  return null;
 }

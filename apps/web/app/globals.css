@@ -178,3 +178,104 @@ html.reduce-motion .gw-interactive:focus-within {
 .gw-complete {
   animation: gw-complete var(--motion-standard) var(--ease-out);
 }
+
+.home-art {
+  object-position: var(--home-crop-desktop, center);
+  transform: scale(var(--home-scale, 1)) translate3d(0, var(--home-lift, 0px), 0);
+  transform-origin: var(--home-crop-desktop, center);
+}
+
+.home-art-bloom {
+  transform: scale(1.7);
+  transform-origin: center;
+}
+
+@media (max-width: 1366px) {
+  .home-art {
+    object-position: var(--home-crop-laptop, center);
+    transform-origin: var(--home-crop-laptop, center);
+  }
+}
+
+@media (max-width: 767px) {
+  .home-art {
+    object-position: var(--home-crop-mobile, center);
+    transform: scale(var(--home-scale-mobile, 1)) translate3d(0, var(--home-lift, 0px), 0);
+    transform-origin: var(--home-crop-mobile, center);
+  }
+}
+
+.home-play {
+  background: var(--accent);
+  color: #140d12;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  box-shadow: 10px 0 0 color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+.home-play:hover,
+.home-play:focus-visible {
+  filter: brightness(1.07);
+}
+
+.home-play-mark {
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 6px 0 6px 10px;
+  border-color: transparent transparent transparent #140d12;
+}
+
+.home-mode {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.home-select-frame {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.home-select-frame::before,
+.home-select-frame::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: var(--accent);
+  border-style: solid;
+}
+
+.home-select-frame::before {
+  top: 0;
+  right: 0;
+  border-width: 2px 2px 0 0;
+}
+
+.home-select-frame::after {
+  bottom: 0;
+  left: 0;
+  border-width: 0 0 2px 2px;
+}
+
+.home-wordmark-tick {
+  width: 2px;
+  height: 12px;
+  background: var(--accent);
+}
+
+.home-copy-in {
+  animation: home-copy-in var(--motion-large) var(--ease-out);
+}
+
+@keyframes home-copy-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+html.reduce-motion .home-copy-in {
+  animation: none;
+}
