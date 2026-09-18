@@ -14,6 +14,7 @@ import { GameRail, type RailMark, type RailPresence } from "./GameRail";
 import { HomeSocial } from "./HomeSocial";
 import { HomeStage } from "./HomeStage";
 import { TodayArcade } from "./TodayArcade";
+import { homeStage } from "./home-stage";
 
 export default function HomePage() {
   const player = usePlayer();
@@ -21,9 +22,11 @@ export default function HomePage() {
   const router = useRouter();
   const [focus, setFocus] = useState(0);
   const [playIndex, setPlayIndex] = useState(0);
+  const [travel, setTravel] = useState(1);
   const game = GAME_MANIFESTS[focus] ?? GAME_MANIFESTS[0];
   useAccent(game.accent);
   const reduced = player.settings.reducedMotion;
+  const stage = homeStage(game.slug);
 
   useEffect(() => {
     setPlayIndex(loadPlayIndex(game.id));
@@ -40,8 +43,17 @@ export default function HomePage() {
   }, [store, game.id, ctx.boardMode]);
 
   const setFocusSafe = useCallback((delta: number) => {
+    setTravel(delta >= 0 ? 1 : -1);
     setFocus((current) => (current + delta + GAME_MANIFESTS.length) % GAME_MANIFESTS.length);
   }, []);
+
+  const setFocusAt = useCallback(
+    (index: number) => {
+      setTravel(index >= focus ? 1 : -1);
+      setFocus(index);
+    },
+    [focus],
+  );
 
   useEffect(() => {
     analytics.track("home_game_focused", { gameId: game.id, index: focus });
@@ -91,8 +103,7 @@ export default function HomePage() {
       : undefined,
   });
 
-  const played = new Set(store.playedIds());
-  const dailyIds = new Set(dailies.map((e) => e.gameId));
+  const dailyIds = new Set(dailyLeft.map((e) => e.gameId));
   const challengeIds = new Set(openChallenges.map((c) => c.gameId));
   const lastRun = player.history[0];
   const lastGame = lastRun ? getManifest(lastRun.gameId) : undefined;
@@ -100,7 +111,6 @@ export default function HomePage() {
   const gameChallenge = openChallenges.find((c) => c.gameId === game.id);
   const dailyHere = dailyLeft.find((e) => e.gameId === game.id);
   const friends = player.friends.filter((f) => f.status === "accepted");
-  const online = friends.filter((f) => f.presence !== "offline");
 
   const primary = resolvePrimary({
     gameSlug: game.slug,
@@ -120,7 +130,6 @@ export default function HomePage() {
     if (challengeIds.has(g.id)) return "challenge";
     if (dailyIds.has(g.id)) return "daily";
     if (lastGame?.id === g.id) return "continue";
-    if (!played.has(g.id)) return "new";
     return null;
   });
 
@@ -138,47 +147,61 @@ export default function HomePage() {
     savePlayIndex(game.id, next);
   };
 
+  const showRival = Boolean(rival && !gameChallenge);
+  const showPb = Boolean(ctx.pbLabel);
+
   return (
     <div className="relative min-h-dvh" data-testid="games-home">
-      <HomeStage slug={game.slug} reduced={reduced} />
+      <HomeStage slug={game.slug} reduced={reduced} step={travel} />
 
       <div className="relative flex min-h-dvh flex-col px-5 pb-[calc(var(--bottom-nav)+12px)] pt-[calc(var(--header-h)+8px)] md:px-10 md:pb-8">
-        <div className="min-h-[12vh] flex-1 md:min-h-[16vh]" />
+        <div
+          className={
+            stage.copy === "low" ? "min-h-[20vh] flex-1 md:min-h-[26vh]" : "min-h-[12vh] flex-1 md:min-h-[16vh]"
+          }
+        />
 
-        <div className={`max-w-xl ${reduced ? "" : "home-copy-in"}`} key={game.id}>
+        <div
+          className={`max-w-xl ${reduced ? "" : "home-copy-in"} ${stage.copy === "offset" ? "md:ml-[10%]" : ""}`}
+          key={game.id}
+        >
           <p className="meta text-white/50">{game.genre}</p>
-          <h1 className="display mt-1.5 text-[40px] text-white md:text-[56px] xl:text-[68px]">{game.title}</h1>
+          <h1
+            className={`display mt-1.5 text-white ${
+              stage.family === "vertical" ? "text-[42px] md:text-[60px] xl:text-[72px]" : "text-[40px] md:text-[56px] xl:text-[68px]"
+            }`}
+          >
+            {game.title}
+          </h1>
           <p className="mt-2 max-w-md text-[14px] leading-snug text-white/68 md:text-[15px]">{game.tagline}</p>
 
-          {ctx.pbLabel || rival || ctx.friendBest?.scoreLabel || dailyHere ? (
+          {showPb || showRival ? (
             <div className="mt-5 flex flex-wrap items-end gap-x-8 gap-y-3">
-              {ctx.pbLabel ? (
+              {showPb ? (
                 <div>
                   <p className="meta text-white/38">Personal best</p>
                   <p className="metric mt-1 text-[30px] text-white md:text-[36px]">{ctx.pbLabel}</p>
                 </div>
               ) : null}
-              {rival ? (
+              {showRival && rival ? (
                 <Link
                   href="/friends"
-                  className="flex items-center gap-2.5"
+                  className="flex items-center gap-3"
                   onClick={() => analytics.track("home_social_action", { kind: "rival" })}
                 >
-                  <Avatar id={rival.otherId} size={34} />
+                  <Avatar id={player.avatar} size={30} />
+                  <span className="home-versus" aria-hidden>
+                    VS
+                  </span>
+                  <Avatar id={rival.otherId} size={30} />
                   <span>
                     <span className="block text-[14px] text-white">{rival.otherName}</span>
-                    <span className="stat block text-[12px] text-white/55">
+                    <span className="stat block text-[13px] text-white/60">
                       {rival.winsA}–{rival.winsB}
                     </span>
                   </span>
                 </Link>
-              ) : ctx.friendBest?.scoreLabel ? (
-                <div>
-                  <p className="text-[14px] text-white">{ctx.friendBest.name}</p>
-                  <p className="stat mt-1 text-[18px] text-white/80">{ctx.friendBest.scoreLabel}</p>
-                </div>
               ) : null}
-              {dailyHere ? <p className="meta text-[var(--accent)]">Daily live</p> : null}
             </div>
           ) : null}
 
@@ -187,7 +210,7 @@ export default function HomePage() {
               <button type="button" className="grid h-11 w-11 place-items-center text-white/80" aria-label="Previous mode" onClick={() => stepMode(-1)}>
                 ‹
               </button>
-              <span className="min-w-[9rem] px-1 text-center text-[12px] tracking-[0.12em] text-white uppercase">
+              <span className="min-w-[9.5rem] px-1 text-center text-[12px] tracking-[0.14em] text-white uppercase">
                 {modes[playIndex]?.label ?? ctx.modeLabel}
               </span>
               <button type="button" className="grid h-11 w-11 place-items-center text-white/80" aria-label="Next mode" onClick={() => stepMode(1)}>
@@ -196,7 +219,7 @@ export default function HomePage() {
             </div>
           ) : null}
 
-          <div className="mt-5 flex flex-wrap items-center gap-4">
+          <div className="mt-5 flex flex-wrap items-center gap-5">
             <Link
               href={primary.href}
               className="home-play inline-flex min-h-12 items-center justify-center gap-3 px-7 py-3 text-[16px] font-semibold md:min-h-14 md:px-8"
@@ -208,7 +231,7 @@ export default function HomePage() {
             {secondary ? (
               <Link
                 href={secondary.href}
-                className="inline-flex min-h-11 items-center text-[13px] text-white/70 underline decoration-white/22 underline-offset-4"
+                className="home-secondary inline-flex min-h-11 items-center"
                 onClick={() => analytics.track("home_event_opened", { href: secondary.href })}
               >
                 {secondary.label}
@@ -224,23 +247,23 @@ export default function HomePage() {
             marks={marks}
             presence={presence}
             reduced={reduced}
-            onFocus={(i) => setFocus(i)}
+            onFocus={setFocusAt}
             onPlay={(i) => {
               const g = GAME_MANIFESTS[i];
               analytics.track("home_game_play_clicked", { gameId: g.id, source: "rail" });
               router.push(`/play/${g.slug}`);
             }}
           />
-          {online.length ? (
-            <p className="mt-3 text-[12px] text-white/45">
-              {online.length} friend{online.length === 1 ? "" : "s"} online
-            </p>
-          ) : null}
         </div>
       </div>
 
       <TodayArcade dailies={dailies} remaining={dailyLeft.length} gpPoints={snap.grandPrix.points} />
-      <HomeSocial friends={friends} rivals={snap.rivals} challenges={openChallenges} />
+      <HomeSocial
+        friends={friends}
+        rivals={snap.rivals}
+        challenges={openChallenges}
+        you={{ name: player.displayName || "You", avatar: player.avatar }}
+      />
     </div>
   );
 }
@@ -273,9 +296,9 @@ function resolveSecondary(
     nba: { type: string; href: string; label: string };
   },
 ) {
-  if (primary === "challenge") return { href: input.playHref, label: "Play" };
-  if (input.challenge) return { href: `/c/${input.challenge.publicCode}`, label: "Challenge" };
-  if (primary !== "daily" && input.dailyLeft > 0) return { href: "/daily", label: "Daily" };
-  if (input.nba.type !== "play" && input.nba.href !== "/") return { href: input.nba.href, label: input.nba.label };
+  if (primary === "challenge") return { href: input.playHref, label: "Play ›" };
+  if (input.challenge) return { href: `/c/${input.challenge.publicCode}`, label: "View challenge ›" };
+  if (primary !== "daily" && input.dailyLeft > 0) return { href: "/daily", label: "Daily ›" };
+  if (input.nba.type !== "play" && input.nba.href !== "/") return { href: input.nba.href, label: `${input.nba.label} ›` };
   return null;
 }
