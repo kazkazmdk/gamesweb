@@ -33,7 +33,18 @@ export function GameRail({
   useEffect(() => {
     const root = scroller.current;
     const tile = root?.querySelector<HTMLElement>(`[data-rail-index="${focus}"]`);
-    tile?.scrollIntoView({ inline: "center", block: "nearest", behavior: reduced ? "auto" : "smooth" });
+    if (!root || !tile) return;
+    const quiet =
+      reduced ||
+      document.documentElement.classList.contains("reduce-motion") ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const align = () => {
+      const inset = window.innerWidth < 768 ? 4 : Math.max(0, (root.clientWidth - tile.offsetWidth) / 2);
+      root.scrollTo({ left: Math.max(0, tile.offsetLeft - inset), behavior: quiet ? "auto" : "smooth" });
+    };
+    align();
+    const id = window.setTimeout(align, quiet ? 0 : 340);
+    return () => window.clearTimeout(id);
   }, [focus, reduced]);
 
   return (
@@ -44,7 +55,7 @@ export function GameRail({
         ref={scroller}
         role="listbox"
         aria-label="Games"
-        className="scrollbar-none flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-1 pt-1 md:gap-3"
+        className="scrollbar-none flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-1 pt-1 md:gap-3 max-md:snap-start"
         onScroll={() => {
           if (scrolled.current) return;
           scrolled.current = true;
@@ -65,23 +76,23 @@ export function GameRail({
               aria-selected={on}
               aria-label={g.title}
               onClick={() => (on ? onPlay(i) : onFocus(i))}
-              className={`group relative shrink-0 snap-center overflow-hidden text-left ${
+              className={`group relative shrink-0 snap-start overflow-hidden text-left md:snap-center ${
                 reduced ? "" : "transition-[width,opacity] duration-[320ms] ease-[var(--ease-out)]"
-              } ${on ? "w-[min(78vw,21rem)] opacity-100 md:w-[22rem]" : "w-[9.75rem] opacity-80 hover:opacity-100 md:w-[11.5rem]"}`}
+              } ${on ? "w-[min(70vw,21rem)] opacity-100 md:w-[22rem]" : "w-[9.75rem] opacity-80 hover:opacity-100 md:w-[11.5rem]"}`}
               style={{ aspectRatio: on ? "16 / 9" : "16 / 10" }}
             >
               <GameArt
                 slug={g.slug}
                 variant="tile"
                 position={dir.tile}
-                className={`h-full w-full ${reduced ? "" : "transition-transform duration-300 group-hover:scale-[1.03]"}`}
+                className={`h-full w-full brightness-110 ${reduced ? "" : "transition-transform duration-300 group-hover:scale-[1.03]"}`}
               />
               <span className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/15 to-transparent" />
               {on ? <span className="home-select-frame absolute inset-0" aria-hidden /> : null}
               {live.length ? (
                 <span className="absolute right-2 top-2 flex -space-x-1.5">
                   {live.map((p) => (
-                    <Avatar key={p.avatar + p.name} id={p.avatar} size={18} />
+                    <Avatar key={p.avatar + p.name} id={p.avatar} size={22} />
                   ))}
                 </span>
               ) : null}

@@ -144,35 +144,45 @@ const ARCADE = {
 
 async function seed(page, populated) {
   await page.addInitScript(
-    ({ player, arcade }) => {
+    ({ player }) => {
       localStorage.setItem("gw:reduced-motion", "1");
       document.documentElement.classList.add("reduce-motion");
       localStorage.setItem("gamesweb.player", JSON.stringify(player));
-      if (arcade) localStorage.setItem("gw:arcade-social", JSON.stringify(arcade));
     },
-    { player: populated ? POPULATED : GUEST, arcade: populated ? ARCADE : null },
+    { player: populated ? POPULATED : GUEST },
+  );
+  if (!populated) return;
+  await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });
+  await page.evaluate(
+    ({ player, arcade }) => {
+      localStorage.setItem("gamesweb.player", JSON.stringify(player));
+      localStorage.setItem("gw:arcade-social", JSON.stringify(arcade));
+    },
+    { player: POPULATED, arcade: ARCADE },
   );
 }
 
 async function ready(page, populated) {
   await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { level: 1 }).waitFor({ timeout: 20000 });
-  if (populated) {
-    await page.getByText("82,400").waitFor({ timeout: 8000 });
-  }
-  await page.waitForTimeout(350);
+  if (populated) await page.waitForTimeout(1200);
+  else await page.waitForTimeout(400);
 }
 
 const browser = await chromium.launch({ headless: true });
 
 async function shot(name, size, arrows = 0, populated = false, full = false) {
-  const page = await browser.newPage({ viewport: size });
+  const context = await browser.newContext({ viewport: size });
+  const page = await context.newPage();
   await seed(page, populated);
   await ready(page, populated);
-  for (let i = 0; i < arrows; i += 1) await page.keyboard.press("ArrowRight");
-  await page.waitForTimeout(280);
+  for (let i = 0; i < arrows; i += 1) {
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(120);
+  }
+  await page.waitForTimeout(450);
   await page.screenshot({ path: join(out, name), fullPage: full });
-  await page.close();
+  await context.close();
 }
 
 await shot("home-neon-1440.png", { width: 1440, height: 900 });

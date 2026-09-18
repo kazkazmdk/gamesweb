@@ -181,7 +181,7 @@ html.reduce-motion .gw-interactive:focus-within {
 
 .home-art {
   object-position: var(--home-crop-desktop, center);
-  transform: scale(var(--home-scale, 1));
+  transform: scale(var(--home-scale, 1)) translate3d(0, var(--home-lift, 0px), 0);
   transform-origin: var(--home-crop-desktop, center);
 }
 
@@ -200,7 +200,7 @@ html.reduce-motion .gw-interactive:focus-within {
 @media (max-width: 767px) {
   .home-art {
     object-position: var(--home-crop-mobile, center);
-    transform: scale(var(--home-scale-mobile, 1));
+    transform: scale(var(--home-scale-mobile, 1)) translate3d(0, var(--home-lift, 0px), 0);
     transform-origin: var(--home-crop-mobile, center);
   }
 }

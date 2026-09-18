@@ -2,6 +2,7 @@ export type HomeStageDir = {
   crop: { desktop: string; laptop: string; mobile: string };
   tile: string;
   scale: { desktop: number; mobile: number };
+  lift: string;
   glow: string;
   glowX: string;
   glowY: string;
@@ -16,6 +17,7 @@ export const HOME_STAGE: Record<string, HomeStageDir> = {
     crop: { desktop: "50% 40%", laptop: "48% 42%", mobile: "62% 36%" },
     tile: "48% 40%",
     scale: { desktop: 1.42, mobile: 1.28 },
+    lift: "-4%",
     glow: "#5ad4f0",
     glowX: "62%",
     glowY: "36%",
@@ -27,7 +29,8 @@ export const HOME_STAGE: Record<string, HomeStageDir> = {
   "velocity-run": {
     crop: { desktop: "24% 70%", laptop: "22% 72%", mobile: "16% 74%" },
     tile: "22% 72%",
-    scale: { desktop: 1.48, mobile: 1.32 },
+    scale: { desktop: 1.62, mobile: 1.4 },
+    lift: "-16%",
     glow: "#3ec6e8",
     glowX: "20%",
     glowY: "68%",
@@ -39,7 +42,8 @@ export const HOME_STAGE: Record<string, HomeStageDir> = {
   "swarm-protocol": {
     crop: { desktop: "50% 48%", laptop: "50% 50%", mobile: "50% 46%" },
     tile: "50% 48%",
-    scale: { desktop: 1.58, mobile: 1.4 },
+    scale: { desktop: 1.88, mobile: 1.55 },
+    lift: "0%",
     glow: "#ff7a2e",
     glowX: "52%",
     glowY: "46%",
@@ -51,7 +55,8 @@ export const HOME_STAGE: Record<string, HomeStageDir> = {
   "sky-stack": {
     crop: { desktop: "48% 74%", laptop: "50% 76%", mobile: "50% 70%" },
     tile: "50% 78%",
-    scale: { desktop: 1.22, mobile: 1.16 },
+    scale: { desktop: 1.28, mobile: 1.2 },
+    lift: "-12%",
     glow: "#9fd6ff",
     glowX: "48%",
     glowY: "28%",
@@ -63,7 +68,8 @@ export const HOME_STAGE: Record<string, HomeStageDir> = {
   "knockout-circuit": {
     crop: { desktop: "22% 60%", laptop: "20% 62%", mobile: "18% 64%" },
     tile: "20% 62%",
-    scale: { desktop: 1.4, mobile: 1.26 },
+    scale: { desktop: 1.5, mobile: 1.32 },
+    lift: "-14%",
     glow: "#ffb703",
     glowX: "18%",
     glowY: "58%",
@@ -75,7 +81,8 @@ export const HOME_STAGE: Record<string, HomeStageDir> = {
   "pocket-striker": {
     crop: { desktop: "30% 62%", laptop: "28% 64%", mobile: "26% 60%" },
     tile: "28% 58%",
-    scale: { desktop: 1.28, mobile: 1.18 },
+    scale: { desktop: 1.32, mobile: 1.2 },
+    lift: "-10%",
     glow: "#9ee0a4",
     glowX: "28%",
     glowY: "58%",
@@ -88,6 +95,7 @@ export const HOME_STAGE: Record<string, HomeStageDir> = {
     crop: { desktop: "46% 48%", laptop: "44% 50%", mobile: "42% 48%" },
     tile: "48% 50%",
     scale: { desktop: 1.16, mobile: 1.1 },
+    lift: "-2%",
     glow: "#ff4d6d",
     glowX: "58%",
     glowY: "42%",
@@ -100,6 +108,7 @@ export const HOME_STAGE: Record<string, HomeStageDir> = {
     crop: { desktop: "50% 42%", laptop: "50% 44%", mobile: "50% 40%" },
     tile: "50% 40%",
     scale: { desktop: 1.12, mobile: 1.08 },
+    lift: "-6%",
     glow: "#ff7a59",
     glowX: "50%",
     glowY: "18%",

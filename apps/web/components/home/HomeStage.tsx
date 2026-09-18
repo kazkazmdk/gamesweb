@@ -41,7 +41,7 @@ export function HomeStage({ slug, reduced }: { slug: string; reduced: boolean })
       />
       <div className="absolute inset-0" style={{ background: dir.wash }} />
       <div className="absolute inset-y-0 left-0 w-[min(58%,38rem)] bg-gradient-to-r from-black/58 via-black/18 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black/88 via-black/36 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-[30%] bg-gradient-to-t from-black/86 via-black/28 to-transparent" />
       <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/50 to-transparent" />
     </div>
   );
@@ -70,6 +70,7 @@ function Layer({ slug, reduced, active }: { slug: string; reduced: boolean; acti
           ["--home-crop-mobile" as string]: dir.crop.mobile,
           ["--home-scale" as string]: String(dir.scale.desktop),
           ["--home-scale-mobile" as string]: String(dir.scale.mobile),
+          ["--home-lift" as string]: dir.lift,
         }}
       />
     </div>
