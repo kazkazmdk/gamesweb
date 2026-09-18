@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
-import { loadPlayIndex, boardModeFromPlayIndex } from "@/lib/platform/modes";
+import { boardModeFromPlayIndex, resolvePlayIndex } from "@/lib/platform/modes";
 import { formatScore } from "@/lib/player-store";
 import { arcadeStore } from "@/lib/social/arcade-store";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
@@ -99,7 +99,7 @@ export function GameView({ slug }: { slug: string }) {
       let instance: Phaser.Game | null = null;
       stage = "import";
       const daily = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("daily") === "1";
-      const playIndex = loadPlayIndex(game!.id);
+      const playIndex = resolvePlayIndex(game!.id);
       if (game!.id === "neon-drift") {
         const mod = await import("@gamesweb/neon-drift");
         stage = "mount";
@@ -127,11 +127,11 @@ export function GameView({ slug }: { slug: string }) {
       } else if (game!.id === "territory-rush") {
         const mod = await import("@gamesweb/territory-rush");
         stage = "mount";
-        instance = mod.mountTerritoryRush(parent, platform);
+        instance = mod.mountTerritoryRush(parent, platform, playIndex);
       } else {
         const mod = await import("@gamesweb/crowd-control");
         stage = "mount";
-        instance = mod.mountCrowdControl(parent, platform);
+        instance = mod.mountCrowdControl(parent, platform, playIndex);
       }
       stage = "create";
       if (dead) {
@@ -256,7 +256,7 @@ export function GameView({ slug }: { slug: string }) {
   const gameId = game.id;
 
   const daily = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("daily") === "1";
-  const pbMode = boardModeFromPlayIndex(gameId, loadPlayIndex(gameId), daily);
+  const pbMode = boardModeFromPlayIndex(gameId, resolvePlayIndex(gameId), daily);
   const pb = store.personalBest(gameId, pbMode, lowerIsBetter(gameId));
   const friendsHere = player.friends.filter((f) => f.status === "accepted" && f.gameId === gameId);
 
@@ -577,7 +577,7 @@ function Results({
     const game = getManifest(gameId);
     const made = arcadeStore.createChallenge({
       gameId,
-      mode: boardModeFromPlayIndex(gameId, loadPlayIndex(gameId), daily),
+      mode: boardModeFromPlayIndex(gameId, resolvePlayIndex(gameId), daily),
       seed: params.get("seed") ?? `${gameId}:${Date.now()}`,
       type: game ? defaultChallengeType(game) : "beat-score",
       challengerId: player.id,

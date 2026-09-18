@@ -50,6 +50,7 @@ import {
   stepDrone,
   stepMissile,
   stepProtocolCore,
+  shouldSpawnBoss,
   stepWarden,
   wardenZoneHits,
   type ArenaSolid,
@@ -58,7 +59,6 @@ import {
 } from "../systems/combat";
 
 const ARENA = 1400;
-const BOSS_AT = 390;
 
 export class SwarmPlayScene extends Phaser.Scene {
   private platform!: PlatformSDK;
@@ -425,7 +425,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     const elapsed = (this.time.now - this.started) / 1000;
     const live = this.enemies.reduce((n, e) => n + (e.active && e.kind !== "boss" && e.kind !== "warden" ? 1 : 0), 0);
     const want = desiredCount(elapsed);
-    if (!this.bossSpawned && elapsed >= BOSS_AT) {
+    if (!this.bossSpawned && shouldSpawnBoss(elapsed, this.kills, this.level)) {
       const slot = this.enemies.find((e) => !e.active);
       if (slot) {
         spawnEnemy(slot, this.endless ? "warden" : "boss", ARENA / 2, 120, 1);
@@ -1194,11 +1194,11 @@ export class SwarmPlayScene extends Phaser.Scene {
       g.translateCanvas(m.x, m.y);
       g.rotateCanvas(a);
       g.fillStyle(0xff6a3a, 1);
-      g.fillTriangle(10, 0, -8, -5, -8, 5);
-      g.fillStyle(0xffc18a, 0.9);
-      g.fillRect(-10, -2, 8, 4);
-      g.fillStyle(0xffe08a, 0.45);
-      g.fillCircle(-10, 0, 4);
+      g.fillTriangle(16, 0, -12, -7, -12, 7);
+      g.fillStyle(0xffc18a, 0.95);
+      g.fillRect(-14, -2.5, 12, 5);
+      g.fillStyle(0xffe08a, 0.55);
+      g.fillCircle(-14, 0, 6);
       g.restore();
     }
     for (const e of this.enemies) {
@@ -1265,9 +1265,9 @@ export class SwarmPlayScene extends Phaser.Scene {
         g.translateCanvas(pose.x, pose.y);
         g.rotateCanvas(pose.a);
         g.fillStyle(0xf4f0ea, 1);
-        g.fillTriangle(pose.len * 0.7, 0, -pose.len * 0.35, -4, -pose.len * 0.35, 4);
-        g.fillStyle(0xf07a3a, 0.85);
-        g.fillRect(-4, -2, 8, 4);
+        g.fillTriangle(pose.len * 0.85, 0, -pose.len * 0.4, -6, -pose.len * 0.4, 6);
+        g.fillStyle(0xf07a3a, 0.9);
+        g.fillRect(-6, -3, 12, 6);
         g.restore();
       }
     } else if (this.build.orbital > 0) {
@@ -1400,6 +1400,8 @@ export class SwarmPlayScene extends Phaser.Scene {
         level: this.level,
         tick: this.ticks,
         frozen: false,
+        contentId: this.arenaName,
+        boss: this.bossDown ? "down" : this.bossSpawned ? (this.endless ? "warden" : "core") : "none",
       },
       {
         pickUpgrade: (i) => this.take(i),

@@ -1,4 +1,4 @@
-import { medalForTime } from "./constants";
+import { GAME_MODES, VELOCITY_MEDALS, medalForTime } from "./constants";
 import type { VerifiedStatus } from "./types";
 
 export type ScorePayload = {
@@ -94,7 +94,7 @@ function validateNeonDrift(payload: ScorePayload, durationSec: number, reasons: 
 }
 
 function validateVelocity(payload: ScorePayload, reasons: string[]) {
-  if (!["course-1", "course-2", "course-3"].includes(payload.mode)) reasons.push("invalid_mode");
+  if (!(payload.mode in VELOCITY_MEDALS)) reasons.push("invalid_mode");
   if (payload.score < 6_000 || payload.score > 180_000) reasons.push("time_out_of_range");
   if (payload.durationMs + 800 < payload.score) reasons.push("timer_desync");
   if (payload.durationMs > payload.score + 15_000) reasons.push("timer_desync");
@@ -131,7 +131,7 @@ function validateSkyStack(payload: ScorePayload, durationSec: number, reasons: s
 }
 
 function validateKnockout(payload: ScorePayload, reasons: string[]) {
-  if (!["map-a", "map-b", "map-c", "daily"].includes(payload.mode)) reasons.push("invalid_mode");
+  if (!GAME_MODES["knockout-circuit"].includes(payload.mode)) reasons.push("invalid_mode");
   if (payload.score < 4_000 || payload.score > 240_000) reasons.push("time_out_of_range");
   if (payload.durationMs + 1200 < payload.score) reasons.push("timer_desync");
   if (payload.durationMs > payload.score + 20_000) reasons.push("timer_desync");

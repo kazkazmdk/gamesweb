@@ -32,6 +32,12 @@ export function missileSpeed() {
   return 280;
 }
 
+export const BOSS_CLOCK_SEC = 75;
+
+export function shouldSpawnBoss(elapsedSec: number, kills: number, level: number) {
+  return elapsedSec >= BOSS_CLOCK_SEC || kills >= 50 || level >= 6;
+}
+
 export function stepMissile(
   m: Missile,
   dt: number,

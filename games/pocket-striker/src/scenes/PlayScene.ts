@@ -56,8 +56,13 @@ export class PocketScene extends Phaser.Scene {
   create() {
     this.platform = this.game.registry.get("platform") as PlatformSDK;
     const ctx = readRunContext();
-    this.layoutIndex = Number(this.game.registry.get("layoutIndex") ?? ctx.modeIndex ?? 0) % LAYOUTS.length;
-    if (ctx.seed) this.layoutIndex = Math.abs([...ctx.seed].reduce((h, c) => h + c.charCodeAt(0), 0)) % LAYOUTS.length;
+    if (ctx.modeIndex !== undefined && Number.isFinite(ctx.modeIndex)) {
+      this.layoutIndex = Math.abs(ctx.modeIndex) % LAYOUTS.length;
+    } else if (ctx.seed) {
+      this.layoutIndex = Math.abs([...ctx.seed].reduce((h, c) => h + c.charCodeAt(0), 0)) % LAYOUTS.length;
+    } else {
+      this.layoutIndex = Math.abs(Number(this.game.registry.get("layoutIndex") ?? 0)) % LAYOUTS.length;
+    }
     this.layout = LAYOUTS[this.layoutIndex];
     this.bx = this.layout.ball.x;
     this.by = this.layout.ball.y;
@@ -430,6 +435,7 @@ export class PocketScene extends Phaser.Scene {
         longFrames: this.longFrames,
         tick: this.ticks,
         frozen: false,
+        contentId: this.layout.id,
       },
       {
         finishRun: () => this.sink(true),

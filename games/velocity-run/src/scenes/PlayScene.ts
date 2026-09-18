@@ -714,6 +714,7 @@ export class VelocityPlayScene extends Phaser.Scene {
         sessionDeaths: this.sessionDeaths,
         timeMs: this.timeMs,
         courseId: this.course.id,
+        contentId: this.course.id,
         tick: this.ticks,
         frozen: false,
       },

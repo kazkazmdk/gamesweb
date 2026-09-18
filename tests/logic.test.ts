@@ -83,6 +83,25 @@ describe("validateScore", () => {
     expect(v.status).toBe("flagged");
   });
 
+  it("accepts authored Velocity and Knockout modes beyond the first three", () => {
+    const vel = validateScore({
+      ...base,
+      gameId: "velocity-run",
+      mode: "course-1b",
+      score: 34000,
+      metadata: { deaths: 0, medal: "none" },
+    });
+    expect(vel.status).toBe("verified");
+    const ko = validateScore({
+      ...base,
+      gameId: "knockout-circuit",
+      mode: "map-d",
+      score: 42000,
+      metadata: {},
+    });
+    expect(ko.status).toBe("verified");
+  });
+
   it("rejects a negative velocity time", () => {
     const v = validateScore({
       ...base,

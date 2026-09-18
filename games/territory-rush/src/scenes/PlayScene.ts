@@ -70,7 +70,11 @@ export class TerritoryScene extends Phaser.Scene {
     this.platform = this.game.registry.get("platform") as PlatformSDK;
     const ctx = readRunContext();
     this.rng = seededRng(ctx.seed ?? ctx.challengeCode ?? "arena");
-    this.arena = (ctx.seed ?? "arena").length % 2;
+    if (ctx.modeIndex !== undefined && Number.isFinite(ctx.modeIndex)) {
+      this.arena = Math.abs(ctx.modeIndex) % 2;
+    } else {
+      this.arena = Math.abs(Number(this.game.registry.get("arenaIndex") ?? 0)) % 2;
+    }
     this.vis = { x: 8, y: 14 };
     this.boost = 0;
     this.shield = 0;
@@ -224,6 +228,7 @@ export class TerritoryScene extends Phaser.Scene {
     const actor = isBot ? this.bots.find((b) => b.id === id)! : { x: this.px, y: this.py };
     const nx = Math.max(0, Math.min(COLS - 1, actor.x + Math.sign(dx)));
     const ny = Math.max(0, Math.min(ROWS - 1, actor.y + Math.sign(dy)));
+    if (nx === actor.x && ny === actor.y) return;
     if (this.blocked.has(this.idx(nx, ny))) return;
     if (trail.some((c) => c.x === nx && c.y === ny)) {
       if (!isBot) this.finish();
@@ -443,6 +448,7 @@ export class TerritoryScene extends Phaser.Scene {
         longFrames: this.longFrames,
         tick: this.ticks,
         frozen: false,
+        contentId: this.arena === 0 ? "circuit-floor" : "shatter-field",
       },
       {
         finishRun: () => this.finish(),
@@ -462,7 +468,7 @@ export class TerritoryScene extends Phaser.Scene {
   }
 }
 
-export function mountTerritoryRush(parent: HTMLElement, platform: PlatformSDK) {
+export function mountTerritoryRush(parent: HTMLElement, platform: PlatformSDK, arenaIndex = 0) {
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
@@ -479,6 +485,7 @@ export function mountTerritoryRush(parent: HTMLElement, platform: PlatformSDK) {
     render: { preserveDrawingBuffer: true },
   });
   game.registry.set("platform", platform);
+  game.registry.set("arenaIndex", arenaIndex);
   game.registry.set("manifest", territoryRushManifest);
   (game as Phaser.Game & { restartRun: () => void }).restartRun = () => {
     game.scene.getScene("territory-play")?.scene.restart();

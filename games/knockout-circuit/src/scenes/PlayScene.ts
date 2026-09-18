@@ -492,6 +492,7 @@ export class KnockoutScene extends Phaser.Scene {
         longFrames: this.longFrames,
         tick: this.ticks,
         frozen: false,
+        contentId: this.map.id,
       },
       {
         finishRun: () => this.win(),

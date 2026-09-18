@@ -17,6 +17,8 @@ import {
   missileVolleyCount,
   plasmaPulseRadius,
   resolveCircleVsSolids,
+  shouldSpawnBoss,
+  BOSS_CLOCK_SEC,
   stepDrone,
   stepMissile,
   stepProtocolCore,
@@ -85,6 +87,14 @@ describe("swarm upgrade truth", () => {
     const { fire } = stepDrone(d, 0.016, 100, 100, 1, 0);
     expect(fire).toBe(true);
     expect(Math.hypot(d.x - 100, d.y - 100)).toBeLessThan(200);
+  });
+
+  it("spawns the boss on a reachable clock, kill, or level gate — not a 390s sit", () => {
+    expect(BOSS_CLOCK_SEC).toBeLessThanOrEqual(90);
+    expect(shouldSpawnBoss(0, 0, 1)).toBe(false);
+    expect(shouldSpawnBoss(BOSS_CLOCK_SEC, 0, 1)).toBe(true);
+    expect(shouldSpawnBoss(20, 50, 1)).toBe(true);
+    expect(shouldSpawnBoss(20, 0, 6)).toBe(true);
   });
 
   it("gives Protocol Core and Warden different opening attacks", () => {

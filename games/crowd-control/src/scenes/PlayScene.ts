@@ -57,6 +57,7 @@ export class CrowdScene extends Phaser.Scene {
   private breaks = new Set<number>();
   private payoff = 0;
   private banners: Array<{ text: string; t: number }> = [];
+  private levelIndex = 0;
 
   constructor() {
     super("crowd-play");
@@ -66,8 +67,14 @@ export class CrowdScene extends Phaser.Scene {
     this.platform = this.game.registry.get("platform") as PlatformSDK;
     const ctx = readRunContext();
     this.seed = ctx.seed ?? ctx.challengeCode ?? "rush";
-    const idx = Math.abs([...this.seed].reduce((h, c) => h + c.charCodeAt(0), 0)) % LEVELS.length;
-    this.segs = LEVELS[idx] ?? buildCourse(this.seed);
+    if (ctx.modeIndex !== undefined && Number.isFinite(ctx.modeIndex)) {
+      this.levelIndex = Math.abs(ctx.modeIndex) % LEVELS.length;
+    } else if (ctx.seed && ctx.seed !== "rush") {
+      this.levelIndex = Math.abs([...this.seed].reduce((h, c) => h + c.charCodeAt(0), 0)) % LEVELS.length;
+    } else {
+      this.levelIndex = Math.abs(Number(this.game.registry.get("levelIndex") ?? 0)) % LEVELS.length;
+    }
+    this.segs = LEVELS[this.levelIndex] ?? buildCourse(this.seed);
     this.z = 0;
     this.x = 0.5;
     this.pack = 12;
@@ -454,6 +461,8 @@ export class CrowdScene extends Phaser.Scene {
         longFrames: this.longFrames,
         tick: this.ticks,
         frozen: false,
+        contentId: `route-${this.levelIndex}`,
+        boss: this.boss ? (this.boss.dead ? "down" : `hp:${Math.ceil(this.boss.hp)}`) : "none",
       },
       {
         finishRun: () => this.finish(),
@@ -473,7 +482,7 @@ export class CrowdScene extends Phaser.Scene {
   }
 }
 
-export function mountCrowdControl(parent: HTMLElement, platform: PlatformSDK) {
+export function mountCrowdControl(parent: HTMLElement, platform: PlatformSDK, levelIndex = 0) {
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
@@ -490,6 +499,7 @@ export function mountCrowdControl(parent: HTMLElement, platform: PlatformSDK) {
     render: { preserveDrawingBuffer: true },
   });
   game.registry.set("platform", platform);
+  game.registry.set("levelIndex", levelIndex);
   game.registry.set("manifest", crowdControlManifest);
   (game as Phaser.Game & { restartRun: () => void }).restartRun = () => {
     game.scene.getScene("crowd-play")?.scene.restart();
