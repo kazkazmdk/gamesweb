@@ -5,7 +5,7 @@ import { getManifest, GRAND_PRIX_PLAYLIST, type DailyEvent } from "@gamesweb/gam
 import { analytics } from "@gamesweb/analytics";
 import { GameArt } from "@/components/game/GameArt";
 import { formatCountdown, msUntilUtcMidnight } from "@/lib/platform/format";
-import { homeStage } from "./home-stage";
+import { homeGameLabel, homeStage } from "./home-stage";
 
 export function TodayArcade({
   dailies,
@@ -55,25 +55,20 @@ export function TodayArcade({
           </span>
           <p className="meta text-white/55">Grand Prix</p>
           <p className="display mt-3 text-[28px] text-white md:text-[36px]">Cup route</p>
-          <ol className="mt-6 flex flex-wrap items-end gap-x-2 gap-y-4">
+          <ol className="home-gp-route mt-6" aria-label="Cup route">
             {GRAND_PRIX_PLAYLIST.map((round, i) => {
               const g = getManifest(round.gameId);
               if (!g) return null;
               const last = i === GRAND_PRIX_PLAYLIST.length - 1;
               const dir = homeStage(g.slug);
               return (
-                <li key={`${round.gameId}-${i}`} className="flex items-end gap-2">
-                  <span className="block">
-                    <span className="meta mb-1.5 block text-white/40">{last ? "Final" : `R${i + 1}`}</span>
-                    <span className="relative block h-14 w-[4.6rem] overflow-hidden md:h-16 md:w-20">
-                      <GameArt slug={g.slug} variant="tile" position={dir.tile} className="h-full w-full" />
-                      <span className="home-select-ticks pointer-events-none absolute inset-0" aria-hidden />
-                    </span>
-                    <span className="mt-1.5 block text-[11px] leading-tight text-white/80">
-                      {g.title.split(" ")[0]}
-                    </span>
+                <li key={`${round.gameId}-${i}`} className="home-gp-step">
+                  <span className="meta mb-1.5 block text-white/40">{last ? "Final" : `R${i + 1}`}</span>
+                  <span className="home-gp-art relative block overflow-hidden">
+                    <GameArt slug={g.slug} variant="tile" position={dir.tile} className="h-full w-full" />
+                    <span className="home-select-ticks pointer-events-none absolute inset-0" aria-hidden />
                   </span>
-                  {!last ? <span className="mb-6 text-white/35">→</span> : null}
+                  <span className="home-gp-name mt-1.5 block text-white/80">{homeGameLabel(g.slug, g.title)}</span>
                 </li>
               );
             })}
