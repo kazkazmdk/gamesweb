@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 const POSITION: Record<string, Record<string, string>> = {
   "neon-drift": { backdrop: "48% 52%", hero: "46% 58%", tile: "46% 58%" },
   "velocity-run": { backdrop: "22% 68%", hero: "18% 70%", tile: "20% 68%" },
@@ -24,13 +26,19 @@ export function GameArt({
   slug,
   className = "",
   variant = "hero",
+  position,
+  priority = false,
+  style,
 }: {
   slug: string;
   className?: string;
   variant?: "hero" | "tile" | "backdrop";
+  position?: string;
+  priority?: boolean;
+  style?: CSSProperties;
 }) {
   const file = variant === "tile" ? "hero" : variant === "backdrop" ? "backdrop" : "hero";
-  const pos = POSITION[slug]?.[variant] ?? "center";
+  const pos = position ?? POSITION[slug]?.[variant] ?? "center";
   const src = JPG.has(slug)
     ? `/art/${slug}-${file}.jpg`
     : `/art/${slug}-${variant === "tile" ? "card" : "hero"}.svg`;
@@ -39,8 +47,10 @@ export function GameArt({
       src={src}
       alt=""
       draggable={false}
+      fetchPriority={priority ? "high" : "low"}
+      loading={priority ? "eager" : "lazy"}
       className={`pointer-events-none h-full w-full object-cover ${className}`}
-      style={{ objectPosition: pos }}
+      style={{ objectPosition: pos, ...style }}
     />
   );
 }

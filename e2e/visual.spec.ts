@@ -51,7 +51,7 @@ test.describe("visual regression", () => {
     await page.goto("/");
     await page.getByRole("heading", { level: 1, name: "Neon Drift" }).waitFor();
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await expect(page.getByText("Activities")).toBeVisible();
+    await expect(page.getByText("Today")).toBeVisible();
     await page.screenshot({ path: "test-results/visual-home-neon-activities-1440.png", fullPage: false });
     await expect(page).toHaveScreenshot("home-neon-activities-1440.png", shot);
   });
