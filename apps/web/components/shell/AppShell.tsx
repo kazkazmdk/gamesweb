@@ -75,8 +75,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         }`}
       >
         <div className="flex items-center gap-7">
-          <Link href="/" className="display text-[15px] tracking-[0.28em] text-white/82 uppercase">
-            {brand.wordmark}
+          <Link href="/" className="flex items-center gap-2.5">
+            <span className="home-wordmark-tick" aria-hidden />
+            <span className="display text-[16px] tracking-[0.24em] text-white uppercase">{brand.wordmark}</span>
           </Link>
           <nav className="hidden items-center gap-5 text-[13px] text-white/55 md:flex" aria-label="Primary">
             {DESKTOP_NAV.map((item) => (
@@ -111,9 +112,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[var(--accent)]" />
             ) : null}
           </Link>
-          <Link href="/me" className="relative flex h-10 items-center gap-2 pl-1" aria-label="Profile">
-            <Avatar id={player.avatar} size={28} />
-            <span className="hidden text-[11px] tracking-[0.14em] text-white/55 uppercase md:block">
+          <Link href="/me" className="relative flex h-11 items-center gap-2 pl-1" aria-label="Profile">
+            <Avatar id={player.avatar} size={30} />
+            <span className="hidden text-[11px] tracking-[0.16em] text-white/70 uppercase md:block">
               {levelFromXp(player.xp).level}
             </span>
             {player.backend === "local" ? (

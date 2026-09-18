@@ -9,9 +9,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar, useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
 import { focusedGameContext } from "@/lib/platform/focus";
-import { formatPlayScore } from "@/lib/platform/format";
 import { loadPlayIndex, playModeOptions, savePlayIndex } from "@/lib/platform/modes";
-import { GameRail, type RailMark } from "./GameRail";
+import { GameRail, type RailMark, type RailPresence } from "./GameRail";
 import { HomeSocial } from "./HomeSocial";
 import { HomeStage } from "./HomeStage";
 import { TodayArcade } from "./TodayArcade";
@@ -125,6 +124,13 @@ export default function HomePage() {
     return null;
   });
 
+  const presence: RailPresence[] = GAME_MANIFESTS.map((g) =>
+    friends
+      .filter((f) => f.presence === "playing" && f.gameId === g.id)
+      .slice(0, 2)
+      .map((f) => ({ name: f.displayName, avatar: f.avatar })),
+  );
+
   const stepMode = (delta: number) => {
     if (modes.length < 2) return;
     const next = (playIndex + delta + modes.length) % modes.length;
@@ -136,62 +142,73 @@ export default function HomePage() {
     <div className="relative min-h-dvh" data-testid="games-home">
       <HomeStage slug={game.slug} reduced={reduced} />
 
-      <div className="relative flex min-h-dvh flex-col px-5 pb-8 pt-[calc(var(--header-h)+12px)] md:px-10 md:pb-10">
-        <div className={`mt-6 max-w-xl md:mt-10 ${reduced ? "" : "home-copy-in"}`} key={game.id}>
-          <p className="meta text-white/55">{game.genre}</p>
-          <h1 className="display mt-2 text-[42px] text-white md:text-[72px]">{game.title}</h1>
-          <p className="mt-3 max-w-md text-[15px] leading-snug text-white/70">{game.tagline}</p>
+      <div className="relative flex min-h-dvh flex-col px-5 pb-[calc(var(--bottom-nav)+12px)] pt-[calc(var(--header-h)+8px)] md:px-10 md:pb-8">
+        <div className="min-h-[12vh] flex-1 md:min-h-[16vh]" />
 
-          <div className="mt-5 flex flex-wrap items-end gap-x-8 gap-y-3">
-            {ctx.pbLabel ? (
-              <div>
-                <p className="meta text-white/40">Personal best</p>
-                <p className="metric mt-1 text-[28px] text-white md:text-[34px]">{ctx.pbLabel}</p>
-              </div>
-            ) : null}
-            {rival ? (
-              <Link href="/friends" className="flex items-center gap-2.5">
-                <Avatar id={rival.otherId} size={32} />
-                <span>
-                  <span className="block text-[13px] text-white">{rival.otherName}</span>
-                  <span className="stat block text-[12px] text-white/55">
-                    {rival.winsA}–{rival.winsB}
+        <div className={`max-w-xl ${reduced ? "" : "home-copy-in"}`} key={game.id}>
+          <p className="meta text-white/50">{game.genre}</p>
+          <h1 className="display mt-1.5 text-[40px] text-white md:text-[56px] xl:text-[68px]">{game.title}</h1>
+          <p className="mt-2 max-w-md text-[14px] leading-snug text-white/68 md:text-[15px]">{game.tagline}</p>
+
+          {ctx.pbLabel || rival || ctx.friendBest?.scoreLabel || dailyHere ? (
+            <div className="mt-5 flex flex-wrap items-end gap-x-8 gap-y-3">
+              {ctx.pbLabel ? (
+                <div>
+                  <p className="meta text-white/38">Personal best</p>
+                  <p className="metric mt-1 text-[30px] text-white md:text-[36px]">{ctx.pbLabel}</p>
+                </div>
+              ) : null}
+              {rival ? (
+                <Link
+                  href="/friends"
+                  className="flex items-center gap-2.5"
+                  onClick={() => analytics.track("home_social_action", { kind: "rival" })}
+                >
+                  <Avatar id={rival.otherId} size={34} />
+                  <span>
+                    <span className="block text-[14px] text-white">{rival.otherName}</span>
+                    <span className="stat block text-[12px] text-white/55">
+                      {rival.winsA}–{rival.winsB}
+                    </span>
                   </span>
-                </span>
-              </Link>
-            ) : ctx.friendBest?.scoreLabel ? (
-              <div>
-                <p className="meta text-white/40">{ctx.friendBest.name}</p>
-                <p className="stat mt-1 text-[18px] text-white">{ctx.friendBest.scoreLabel}</p>
-              </div>
-            ) : null}
-            {dailyHere ? <p className="meta text-[var(--accent)]">Daily live</p> : null}
-          </div>
+                </Link>
+              ) : ctx.friendBest?.scoreLabel ? (
+                <div>
+                  <p className="text-[14px] text-white">{ctx.friendBest.name}</p>
+                  <p className="stat mt-1 text-[18px] text-white/80">{ctx.friendBest.scoreLabel}</p>
+                </div>
+              ) : null}
+              {dailyHere ? <p className="meta text-[var(--accent)]">Daily live</p> : null}
+            </div>
+          ) : null}
 
           {modes.length > 1 ? (
-            <div className="mt-4 flex items-center gap-2 text-[13px] text-white/70">
-              <button type="button" className="grid h-11 w-11 place-items-center" aria-label="Previous mode" onClick={() => stepMode(-1)}>
+            <div className="home-mode mt-5 inline-flex items-center">
+              <button type="button" className="grid h-11 w-11 place-items-center text-white/80" aria-label="Previous mode" onClick={() => stepMode(-1)}>
                 ‹
               </button>
-              <span className="min-w-[8rem] text-center tracking-[0.08em] uppercase">{modes[playIndex]?.label ?? ctx.modeLabel}</span>
-              <button type="button" className="grid h-11 w-11 place-items-center" aria-label="Next mode" onClick={() => stepMode(1)}>
+              <span className="min-w-[9rem] px-1 text-center text-[12px] tracking-[0.12em] text-white uppercase">
+                {modes[playIndex]?.label ?? ctx.modeLabel}
+              </span>
+              <button type="button" className="grid h-11 w-11 place-items-center text-white/80" aria-label="Next mode" onClick={() => stepMode(1)}>
                 ›
               </button>
             </div>
           ) : null}
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
+          <div className="mt-5 flex flex-wrap items-center gap-4">
             <Link
               href={primary.href}
-              className="home-play inline-flex min-h-12 items-center justify-center px-8 text-[15px] font-semibold"
+              className="home-play inline-flex min-h-12 items-center justify-center gap-3 px-7 py-3 text-[16px] font-semibold md:min-h-14 md:px-8"
               onClick={() => analytics.track("home_game_play_clicked", { gameId: game.id, source: "cta" })}
             >
+              <span className="home-play-mark" aria-hidden />
               {primary.label}
             </Link>
             {secondary ? (
               <Link
                 href={secondary.href}
-                className="inline-flex min-h-12 items-center px-2 text-[13px] text-white/70 underline decoration-white/20 underline-offset-4"
+                className="inline-flex min-h-11 items-center text-[13px] text-white/70 underline decoration-white/22 underline-offset-4"
                 onClick={() => analytics.track("home_event_opened", { href: secondary.href })}
               >
                 {secondary.label}
@@ -200,11 +217,12 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="mt-auto pt-10">
+        <div className="mt-7 md:mt-8">
           <GameRail
             games={GAME_MANIFESTS}
             focus={focus}
             marks={marks}
+            presence={presence}
             reduced={reduced}
             onFocus={(i) => setFocus(i)}
             onPlay={(i) => {

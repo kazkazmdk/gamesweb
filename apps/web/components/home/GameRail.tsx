@@ -1,15 +1,20 @@
 "use client";
 
+import { analytics } from "@gamesweb/analytics";
 import { useEffect, useRef } from "react";
 import type { GameManifest } from "@gamesweb/game-sdk";
 import { GameArt } from "@/components/game/GameArt";
+import { Avatar } from "@/components/shell/AppShell";
+import { homeStage } from "./home-stage";
 
 export type RailMark = "challenge" | "daily" | "continue" | "new" | null;
+export type RailPresence = Array<{ name: string; avatar: string }>;
 
 export function GameRail({
   games,
   focus,
   marks,
+  presence,
   reduced,
   onFocus,
   onPlay,
@@ -17,11 +22,13 @@ export function GameRail({
   games: GameManifest[];
   focus: number;
   marks: RailMark[];
+  presence: RailPresence[];
   reduced: boolean;
   onFocus: (index: number) => void;
   onPlay: (index: number) => void;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
+  const scrolled = useRef(false);
 
   useEffect(() => {
     const root = scroller.current;
@@ -31,17 +38,24 @@ export function GameRail({
 
   return (
     <div className="relative">
-      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-black/70 to-transparent md:w-12" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-black/70 to-transparent md:w-16" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-black/75 to-transparent md:w-10" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-black/75 to-transparent md:w-14" />
       <div
         ref={scroller}
         role="listbox"
         aria-label="Games"
-        className="scrollbar-none flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 pt-1 md:gap-3"
+        className="scrollbar-none flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-1 pt-1 md:gap-3"
+        onScroll={() => {
+          if (scrolled.current) return;
+          scrolled.current = true;
+          analytics.track("home_rail_scrolled", { focus });
+        }}
       >
         {games.map((g, i) => {
           const on = i === focus;
           const mark = marks[i];
+          const live = presence[i] ?? [];
+          const dir = homeStage(g.slug);
           return (
             <button
               key={g.id}
@@ -52,24 +66,28 @@ export function GameRail({
               aria-label={g.title}
               onClick={() => (on ? onPlay(i) : onFocus(i))}
               className={`group relative shrink-0 snap-center overflow-hidden text-left ${
-                reduced ? "" : "transition-[width,box-shadow,opacity] duration-[320ms] ease-[var(--ease-out)]"
-              } ${on ? "w-[min(72vw,17.5rem)] opacity-100 md:w-[20rem]" : "w-[7.25rem] opacity-75 hover:opacity-95 md:w-[8.5rem]"}`}
-              style={{ aspectRatio: on ? "16 / 9" : "4 / 5" }}
+                reduced ? "" : "transition-[width,opacity] duration-[320ms] ease-[var(--ease-out)]"
+              } ${on ? "w-[min(78vw,21rem)] opacity-100 md:w-[22rem]" : "w-[9.75rem] opacity-80 hover:opacity-100 md:w-[11.5rem]"}`}
+              style={{ aspectRatio: on ? "16 / 9" : "16 / 10" }}
             >
               <GameArt
                 slug={g.slug}
                 variant="tile"
+                position={dir.tile}
                 className={`h-full w-full ${reduced ? "" : "transition-transform duration-300 group-hover:scale-[1.03]"}`}
               />
-              <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
-              {on ? (
-                <span className="home-select-frame absolute inset-0" aria-hidden />
-              ) : (
-                <span className="absolute inset-y-2 left-0 w-0.5 bg-white/0 group-hover:bg-white/35" aria-hidden />
-              )}
+              <span className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/15 to-transparent" />
+              {on ? <span className="home-select-frame absolute inset-0" aria-hidden /> : null}
+              {live.length ? (
+                <span className="absolute right-2 top-2 flex -space-x-1.5">
+                  {live.map((p) => (
+                    <Avatar key={p.avatar + p.name} id={p.avatar} size={18} />
+                  ))}
+                </span>
+              ) : null}
               <span className="absolute inset-x-0 bottom-0 p-2.5 md:p-3">
                 {mark ? <span className="meta mb-1 block text-[10px] text-[var(--accent)]">{railCopy(mark)}</span> : null}
-                <span className={`display block text-white ${on ? "text-[20px] md:text-[26px]" : "text-[13px] md:text-[15px]"}`}>
+                <span className={`display block text-white ${on ? "text-[22px] md:text-[28px]" : "text-[14px] md:text-[16px]"}`}>
                   {on ? g.title : shortTitle(g.title)}
                 </span>
               </span>
