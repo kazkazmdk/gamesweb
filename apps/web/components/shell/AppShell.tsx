@@ -71,13 +71,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-dvh">
       <header
         className={`fixed inset-x-0 top-0 z-40 flex h-[var(--header-h)] items-center justify-between px-5 pt-[var(--safe-top)] md:px-8 ${
-          home ? "bg-gradient-to-b from-black/55 to-transparent" : "bg-[color-mix(in_srgb,var(--bg)_72%,transparent)] backdrop-blur-md"
+          home ? "bg-gradient-to-b from-black/28 to-transparent" : "bg-[color-mix(in_srgb,var(--bg)_72%,transparent)] backdrop-blur-md"
         }`}
       >
         <div className="flex items-center gap-7">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="home-wordmark-tick" aria-hidden />
-            <span className="display text-[16px] tracking-[0.24em] text-white uppercase">{brand.wordmark}</span>
+          <Link href="/" className="flex items-center gap-2.5" aria-label={brand.wordmark}>
+            <BrandMark />
+            <span className="display text-[15px] tracking-[0.2em] text-white uppercase">{brand.wordmark}</span>
           </Link>
           <nav className="hidden items-center gap-5 text-[13px] text-white/55 md:flex" aria-label="Primary">
             {DESKTOP_NAV.map((item) => (
@@ -87,38 +87,32 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className={item.match(path) ? "nav-active pb-0.5 text-white" : "hover:text-white"}
               >
                 {item.label}
-                {item.href === "/inbox" && unread > 0 ? (
-                  <span className="ml-1 rounded-full bg-[var(--accent)] px-1.5 text-[10px] text-[#140d12]">{unread}</span>
-                ) : null}
               </Link>
             ))}
           </nav>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => setQuery(true)}
-            className="grid h-10 w-10 place-items-center text-white/70"
+            className="hidden h-10 w-10 place-items-center text-white/70 md:grid"
             aria-label="Search games"
           >
             <SearchIcon />
           </button>
-          <Link href="/settings" className="grid h-10 w-10 place-items-center text-white/70" aria-label="Settings">
-            <SettingsIcon />
-          </Link>
           <Link href="/inbox" className="relative grid h-10 w-10 place-items-center text-white/70" aria-label={unread ? `Inbox, ${unread} unread` : "Inbox"}>
             <InboxIcon />
             {unread > 0 ? (
-              <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[var(--accent)]" />
+              <span className="absolute right-1 top-1 h-2 w-2 bg-[var(--accent)]" />
             ) : null}
           </Link>
           <Link href="/me" className="relative flex h-11 items-center gap-2 pl-1" aria-label="Profile">
-            <Avatar id={player.avatar} size={30} />
+            <Avatar id={player.avatar} size={28} />
             <span className="hidden text-[11px] tracking-[0.16em] text-white/70 uppercase md:block">
               {levelFromXp(player.xp).level}
             </span>
             {player.backend === "local" ? (
-              <span className="absolute right-0 top-1 h-2 w-2 rounded-full bg-[var(--accent)]" title="Saved on this device" />
+              <span className="absolute right-0 top-1 h-2 w-2 bg-[var(--accent)]" title="Saved on this device" />
             ) : null}
           </Link>
         </div>
@@ -210,15 +204,6 @@ function SearchIcon() {
   );
 }
 
-function SettingsIcon() {
-  return (
-    <IconFrame>
-      <circle cx="9" cy="9" r="2.2" />
-      <path d="M9 3.4 V5.2 M9 12.8 V14.6 M3.4 9 H5.2 M12.8 9 H14.6 M5 5 L6.3 6.3 M11.7 11.7 L13 13 M13 5 L11.7 6.3 M6.3 11.7 L5 13" />
-    </IconFrame>
-  );
-}
-
 function InboxIcon() {
   return (
     <IconFrame>
@@ -248,20 +233,56 @@ function MeIcon() {
   );
 }
 
+function BrandMark() {
+  return (
+    <svg className="home-brand-mark" width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+      <path d="M2 2.2 H12.2 L15.8 5.8 V16 H5.8 L2 12.2 Z" />
+      <path d="M7 6.2 L12.1 9 L7 11.8 Z" className="home-brand-mark-play" />
+    </svg>
+  );
+}
+
+function avatarIndex(id: string) {
+  let h = 0;
+  for (let i = 0; i < id.length; i += 1) h = (h * 33 + id.charCodeAt(i)) | 0;
+  return Math.abs(h) % 8;
+}
+
+function AvatarGlyph({ n }: { n: number }) {
+  if (n === 0) return <path d="M12 8 L22 16 L12 24 Z" />;
+  if (n === 1) return <path d="M16 6 L26 16 L16 26 L6 16 Z" />;
+  if (n === 2) return <path d="M7 7 H14 V25 H7 Z M18 7 H25 V25 H18 Z" />;
+  if (n === 3) return <path d="M9 6 H6 V26 H9 M23 6 H26 V26 H23" />;
+  if (n === 4) return <path d="M7 7 H25 V11 H7 Z M7 14 H25 V18 H7 Z M7 21 H25 V25 H7 Z" />;
+  if (n === 5) return <circle cx="16" cy="16" r="8" />;
+  if (n === 6) return <path d="M16 6 L26 25 H6 Z" />;
+  return <path d="M15 5 H17 V14 H26 V16 H17 V27 H15 V16 H6 V14 H15 Z" />;
+}
+
 export function Avatar({ id, size = 32 }: { id: string; size?: number }) {
-  const n = Number(String(id).replace(/\D/g, "") || 0) % 8;
-  const hues = [28, 340, 190, 18, 210, 12, 45, 160];
+  const n = avatarIndex(String(id || "0"));
+  const hues = [28, 340, 192, 18, 210, 12, 46, 158];
   return (
     <span
-      className="inline-block rounded-full"
+      className="gw-avatar inline-grid place-items-center"
       style={{
         width: size,
         height: size,
-        background: `conic-gradient(from 210deg, hsl(${hues[n]} 18% 62%), hsl(${hues[n]} 10% 22%))`,
-        boxShadow: `inset 0 0 0 1px rgba(255,255,255,.12), 0 0 0 ${size >= 72 ? 3 : 2}px color-mix(in srgb, var(--accent) 35%, transparent)`,
+        background: `linear-gradient(160deg, hsl(${hues[n]} 16% 28%), hsl(${hues[n]} 22% 12%))`,
+        boxShadow: `inset 0 0 0 1px rgba(255,255,255,.16), 0 0 0 ${size >= 72 ? 2 : 1}px color-mix(in srgb, var(--accent) 40%, transparent)`,
       }}
       aria-hidden
-    />
+    >
+      <svg width={size * 0.72} height={size * 0.72} viewBox="0 0 32 32" fill="none">
+        <g
+          stroke={`hsl(${hues[n]} 42% 78%)`}
+          strokeWidth="1.7"
+          fill={n === 0 || n === 1 ? `hsl(${hues[n]} 38% 70%)` : "none"}
+        >
+          <AvatarGlyph n={n} />
+        </g>
+      </svg>
+    </span>
   );
 }
 
