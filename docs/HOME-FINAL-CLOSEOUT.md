@@ -64,20 +64,26 @@ Home visual snapshots are updated only after reviewing Playwright `actual` frame
 
 ## CI
 
-Recorded after the GitHub workflow on the final SHA.
+Local (this machine), after visual review of Swarm + activities actuals:
 
 ```text
-pnpm --filter @gamesweb/web typecheck
-pnpm --filter @gamesweb/web lint
-pnpm test
-pnpm build
-pnpm exec playwright test
+pnpm --filter @gamesweb/web typecheck   # pass
+pnpm --filter @gamesweb/web lint        # pass (existing GameArt img warning)
+pnpm test                               # 99 passed
+pnpm build                              # pass
+pnpm exec playwright test               # 61 passed / 0 failed
 ```
+
+Visual: 6 home snapshots were red on `639fa8f`. After this pass, Neon/Velocity/390/1920 already matched the closeout baselines; Swarm 1440 and Neon activities were reviewed and replaced. Re-run without `--update-snapshots` is green.
+
+GitHub Actions (`check`, `database`) and Vercel are recorded on the final pushed SHA — not from this local run alone.
 
 ## Vercel
 
-Recorded after the deployment that matches the final SHA.
+Must match the final head SHA. Pending until that deployment is READY and `/` returns 200.
 
 ## Remaining
 
-Filled only after GitHub CI + Vercel on the final SHA are verified.
+- **P0:** do not write `none` until GitHub `check` + `database` are success and Vercel is READY on the final SHA.
+- **P1:** Swarm mobile hero is quieter than desktop (tile carries the swarm). Crowd pack stays tiny because of the camera. Neon car is track-led on 390.
+- **P2:** Daily chain still uses first-word split (out of scope). GP tile labels wrap to two lines on purpose.
