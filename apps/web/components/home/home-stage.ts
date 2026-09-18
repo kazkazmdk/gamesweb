@@ -63,9 +63,9 @@ export const HOME_STAGE: Record<string, HomeStageDir> = {
   "swarm-protocol": {
     family: "arena",
     copy: "offset",
-    crop: { desktop: "50% 46%", laptop: "48% 48%", mobile: "52% 44%" },
-    tile: "52% 46%",
-    scale: { desktop: 1.1, mobile: 1.06 },
+    crop: { desktop: "58% 46%", laptop: "56% 48%", mobile: "60% 44%" },
+    tile: "54% 46%",
+    scale: { desktop: 1.08, mobile: 1.04 },
     lift: "0%",
     glow: "#ff7a2e",
     glowX: "48%",
