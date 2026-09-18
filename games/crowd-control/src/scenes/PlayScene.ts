@@ -17,6 +17,7 @@ import {
 } from "@gamesweb/game-core";
 import { crowdControlManifest, readRunContext, type PlatformSDK } from "@gamesweb/game-sdk";
 import { applyOp, buildCourse, opLabel, type Segment } from "../systems/course";
+import { finishMultiplier, resolveCrowdClash, stepBossFight } from "../systems/combat";
 import { LEVELS } from "../levels/levels";
 
 type Member = { ox: number; oy: number; vx: number; vy: number; phase: number };
@@ -51,6 +52,12 @@ export class CrowdScene extends Phaser.Scene {
   private seed = "rush";
   private stepAcc = 0;
   private audioReady = false;
+  private clash: { t: number; left: number; right: number; lane: number } | null = null;
+  private boss: { hp: number; max: number; t: number; dead: number } | null = null;
+  private breaks = new Set<number>();
+  private payoff = 0;
+  private banners: Array<{ text: string; t: number }> = [];
+  private levelIndex = 0;
 
   constructor() {
     super("crowd-play");
@@ -60,8 +67,14 @@ export class CrowdScene extends Phaser.Scene {
     this.platform = this.game.registry.get("platform") as PlatformSDK;
     const ctx = readRunContext();
     this.seed = ctx.seed ?? ctx.challengeCode ?? "rush";
-    const idx = Math.abs([...this.seed].reduce((h, c) => h + c.charCodeAt(0), 0)) % LEVELS.length;
-    this.segs = LEVELS[idx] ?? buildCourse(this.seed);
+    if (ctx.modeIndex !== undefined && Number.isFinite(ctx.modeIndex)) {
+      this.levelIndex = Math.abs(ctx.modeIndex) % LEVELS.length;
+    } else if (ctx.seed && ctx.seed !== "rush") {
+      this.levelIndex = Math.abs([...this.seed].reduce((h, c) => h + c.charCodeAt(0), 0)) % LEVELS.length;
+    } else {
+      this.levelIndex = Math.abs(Number(this.game.registry.get("levelIndex") ?? 0)) % LEVELS.length;
+    }
+    this.segs = LEVELS[this.levelIndex] ?? buildCourse(this.seed);
     this.z = 0;
     this.x = 0.5;
     this.pack = 12;
@@ -73,6 +86,11 @@ export class CrowdScene extends Phaser.Scene {
     this.ghost = [];
     this.members = [];
     this.stepAcc = 0;
+    this.clash = null;
+    this.boss = null;
+    this.breaks = new Set();
+    this.payoff = 0;
+    this.banners = [];
     this.syncPack(true);
     try {
       const raw = localStorage.getItem("gw:crowd-ghost");
@@ -154,6 +172,31 @@ export class CrowdScene extends Phaser.Scene {
         this.touch(seg);
       }
       this.flock(dt);
+      if (this.clash) {
+        this.clash.t -= dt;
+        if (this.clash.t <= 0) this.clash = null;
+      }
+      if (this.boss && this.boss.dead <= 0) {
+        const next = stepBossFight(this.boss, this.pack, dt);
+        this.boss.hp = next.hp;
+        this.pack = next.pack;
+        this.syncPack();
+        if (next.dead) {
+          this.boss.dead = 0.8;
+          this.synth.crash(0.8);
+          this.juice.flash(0.25);
+          this.banners.push({ text: "GUARDIAN DOWN", t: 1.1 });
+        }
+      } else if (this.boss) {
+        this.boss.dead -= dt;
+        if (this.boss.dead <= 0) this.boss = null;
+      }
+      if (this.payoff > 0) {
+        this.payoff -= dt;
+        if (this.payoff <= 0) this.finish();
+      }
+      for (const b of this.banners) b.t -= dt;
+      this.banners = this.banners.filter((b) => b.t > 0);
     }
     this.parts.update(dt);
     this.draw();
@@ -202,34 +245,43 @@ export class CrowdScene extends Phaser.Scene {
       if (op?.kind === "mul" && op.n >= 4) void this.platform.achievement.unlock("x4");
       pulseHaptic(7);
       this.parts.burst(this.scale.width * (0.2 + this.x * 0.6), this.scale.height * 0.78, 10, 0xff7a59, 80, 280);
-      if (seg.type === "finish") this.finish();
+      if (seg.type === "finish") {
+        this.payoff = 1.35;
+        this.banners.push({ text: `${this.pack >= 96 ? "96" : this.pack >= 48 ? "48" : this.pack >= 24 ? "24" : "12"}`, t: 1.2 });
+      }
     } else if (seg.type === "enemy") {
       if ((seg.lane === "left" && side === "left") || (seg.lane === "right" && side === "right")) {
-        this.pack = Math.max(0, this.pack - 8);
+        const foe = 8 + Math.floor(this.pack * 0.15);
+        const clash = resolveCrowdClash(this.pack, foe);
+        this.clash = { t: 0.85, left: this.pack, right: foe, lane: side === "left" ? 0 : 1 };
+        this.pack = clash.left;
         this.hit += 1;
         this.syncPack();
         this.synth.impact(0.4);
         this.juice.flash(0.12);
+        this.banners.push({ text: clash.left > 0 ? "PUSHED THROUGH" : "ROUTE BROKEN", t: 0.7 });
       }
     } else if (seg.type === "shortcut" && side === "left") {
       this.shortcut = true;
       this.speed += 40;
       void this.platform.achievement.unlock("cut-in");
     } else if (seg.type === "boss") {
-      this.pack = Math.max(1, this.pack - 14);
-      this.syncPack();
-      this.juice.flash(0.22);
-      this.synth.crash(0.7);
-      this.parts.burst(this.scale.width * 0.5, this.scale.height * 0.7, 22, 0xff4d6d, 140, 360);
+      this.boss = { hp: 36 + Math.round(this.pack * 0.4), max: 36 + Math.round(this.pack * 0.4), t: 0, dead: 0 };
+      this.juice.flash(0.18);
+      this.synth.tone(90, 0.16, "sawtooth", 0.05, 0.08);
+      this.banners.push({ text: "GUARDIAN", t: 0.9 });
     } else if (seg.type === "break") {
-      this.speed += 20;
-      this.synth.impact(0.5);
+      this.breaks.add(seg.z);
+      this.speed += 24;
+      this.synth.impact(0.55);
+      this.parts.burst(this.scale.width * (0.25 + this.x * 0.5), this.scale.height * 0.72, 16, 0xffc18a, 100, 280);
+      this.banners.push({ text: "BREAK", t: 0.55 });
     }
     if (this.pack <= 0) this.finish();
   }
 
   private qualityMembers() {
-    const cap = this.sys.game.device.input.touch ? 40 : 80;
+    const cap = this.sys.game.device.input.touch ? 56 : 72;
     if (this.members.length <= cap) return this.members;
     const step = Math.ceil(this.members.length / cap);
     return this.members.filter((_, i) => i % step === 0);
@@ -238,7 +290,7 @@ export class CrowdScene extends Phaser.Scene {
   private finish() {
     if (this.ended) return;
     this.ended = true;
-    const score = Math.round(this.pack * 120 + this.z);
+    const score = Math.round(this.pack * 120 * finishMultiplier(this.pack) + this.z);
     if (this.pack >= 80) void this.platform.achievement.unlock("finish-80");
     try {
       localStorage.setItem("gw:crowd-ghost", JSON.stringify(this.ghost));
@@ -321,23 +373,47 @@ export class CrowdScene extends Phaser.Scene {
         drawGateArch(g, w * 0.2, y - 36, w * 0.26, 56, leftC);
         drawGateArch(g, w * 0.54, y - 36, w * 0.26, 56, rightC);
         if (s.type === "finish") {
-          g.fillStyle(0xffd166, 0.85);
-          g.fillRect(w * 0.42, y - 90, w * 0.16, 90);
-          g.fillRect(w * 0.4, y - 110, w * 0.2, 22);
+          g.fillStyle(0x2a2018, 1);
+          g.fillRect(w * 0.4, y - 150, w * 0.2, 150);
+          g.fillStyle(0xffd166, 0.85 + (this.payoff > 0 ? 0.15 : 0));
+          g.fillRect(w * 0.43, y - 140, w * 0.14, 110);
+          g.fillRect(w * 0.38, y - 160, w * 0.24, 18);
+          g.fillStyle(0xff8a4a, 0.55);
+          g.fillCircle(w * 0.5, y - 170, 16 + Math.min(28, this.pack * 0.15));
         }
         this.labelAt(labelN, w * 0.33, y - 18, opLabel(s.left), "#fff4ea");
         labelN += 1;
         this.labelAt(labelN, w * 0.67, y - 18, opLabel(s.right), "#fff4ea");
         labelN += 1;
       } else if (s.type === "enemy") {
-        for (let i = 0; i < 5; i += 1) {
-          drawMiniPerson(g, (s.lane === "left" ? w * 0.3 : w * 0.64) + i * 8, y + (i % 2) * 6, 0xff4d6d, this.time.now / 120 + i, 1.1);
+        const n = this.clash && Math.abs(s.z - this.z) < 40 ? Math.max(2, Math.round(this.clash.right * (this.clash.t / 0.85))) : 10;
+        for (let i = 0; i < n; i += 1) {
+          drawMiniPerson(g, (s.lane === "left" ? w * 0.28 : w * 0.62) + (i % 6) * 9, y + (i % 3) * 7, 0xff4d6d, this.time.now / 120 + i, 1.05);
         }
       } else if (s.type === "boss") {
+        const shake = this.boss && this.boss.dead <= 0 ? Math.sin(this.time.now / 40) * 3 : 0;
+        g.fillStyle(0x3a1218, 1);
+        g.fillRoundedRect(w * 0.34 + shake, y - 70, w * 0.32, 110, 12);
         g.fillStyle(0xff3d5a, 1);
-        g.fillRoundedRect(w * 0.38, y - 40, w * 0.24, 70, 10);
-        g.fillStyle(0xffe0d4, 0.8);
-        g.fillCircle(w * 0.5, y - 18, 16);
+        g.fillRoundedRect(w * 0.37 + shake, y - 52, w * 0.26, 70, 10);
+        g.fillStyle(0xffe0d4, 0.85);
+        g.fillCircle(w * 0.5 + shake, y - 28, 16);
+        if (this.boss) {
+          g.fillStyle(0x120c10, 0.85);
+          g.fillRect(w * 0.37, y - 78, w * 0.26, 6);
+          g.fillStyle(0xffd166, 1);
+          g.fillRect(w * 0.37, y - 78, w * 0.26 * Math.max(0, this.boss.hp / this.boss.max), 6);
+        }
+      } else if (s.type === "break") {
+        if (!this.breaks.has(s.z)) {
+          g.fillStyle(0x6a4630, 1);
+          g.fillRect(w * 0.22, y - 28, w * 0.56, 36);
+          g.fillStyle(0x3a2418, 1);
+          for (let i = 0; i < 5; i += 1) g.fillRect(w * 0.24 + i * 36, y - 24, 20, 28);
+        } else {
+          g.fillStyle(0xffc18a, 0.25);
+          g.fillRect(w * 0.22, y - 10, w * 0.56, 8);
+        }
       } else if (s.type === "shortcut") {
         g.fillStyle(0xffd166, 0.7);
         g.fillRoundedRect(w * 0.18, y - 10, 22, 20, 4);
@@ -356,9 +432,13 @@ export class CrowdScene extends Phaser.Scene {
       const my = cy + m.oy * 0.35;
       drawMiniPerson(g, mx, my, 0xff8a62, this.time.now / 140 + m.phase, this.pack > 50 ? 0.85 : 1);
     }
+    if (this.pack > shown.length) {
+      g.fillStyle(0xff8a62, 0.18);
+      g.fillCircle(cx, cy + 8, 18 + Math.min(40, (this.pack - shown.length) * 0.35));
+    }
     drawParticles(g, this.parts);
     fillVignette(g, w, h, 0.28);
-    this.hud.setText(`${this.pack}`);
+    this.hud.setText(`${this.pack}${this.banners[0] ? `\n${this.banners[0].text}` : ""}`);
     this.overlay.clear();
     const fa = this.juice.flashAlpha(0.016);
     if (fa) {
@@ -381,6 +461,8 @@ export class CrowdScene extends Phaser.Scene {
         longFrames: this.longFrames,
         tick: this.ticks,
         frozen: false,
+        contentId: `route-${this.levelIndex}`,
+        boss: this.boss ? (this.boss.dead ? "down" : `hp:${Math.ceil(this.boss.hp)}`) : "none",
       },
       {
         finishRun: () => this.finish(),
@@ -400,7 +482,7 @@ export class CrowdScene extends Phaser.Scene {
   }
 }
 
-export function mountCrowdControl(parent: HTMLElement, platform: PlatformSDK) {
+export function mountCrowdControl(parent: HTMLElement, platform: PlatformSDK, levelIndex = 0) {
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
@@ -417,6 +499,7 @@ export function mountCrowdControl(parent: HTMLElement, platform: PlatformSDK) {
     render: { preserveDrawingBuffer: true },
   });
   game.registry.set("platform", platform);
+  game.registry.set("levelIndex", levelIndex);
   game.registry.set("manifest", crowdControlManifest);
   (game as Phaser.Game & { restartRun: () => void }).restartRun = () => {
     game.scene.getScene("crowd-play")?.scene.restart();

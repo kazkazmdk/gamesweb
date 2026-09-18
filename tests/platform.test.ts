@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { activityFromHistory, challengeViewModel, friendsBoard, latestUnlocks, playerStatsFromSnapshot } from "../apps/web/lib/platform/adapters";
 import { formatCountdown, formatPlayScore, formatRank, greeting, hasRecord } from "../apps/web/lib/platform/format";
-import { boardModeOptions, boardModeFromPlayIndex, defaultBoardMode, isCompactCatalog, neonBoardMode, playModeOptions } from "../apps/web/lib/platform/modes";
+import { boardModeOptions, boardModeFromPlayIndex, defaultBoardMode, isCompactCatalog, neonBoardMode, playModeOptions, resolvePlayIndex } from "../apps/web/lib/platform/modes";
 import type { PlayerSnapshot } from "../apps/web/lib/player-store";
 
 const player = {
@@ -37,7 +37,14 @@ describe("catalog and modes", () => {
   });
   it("maps play indexes onto neon and velocity boards", () => {
     expect(boardModeFromPlayIndex("neon-drift", 1)).toBe("technical");
-    expect(boardModeFromPlayIndex("velocity-run", 2)).toBe("course-3");
+    expect(boardModeFromPlayIndex("velocity-run", 2)).toBe("course-1c");
+    expect(boardModeFromPlayIndex("velocity-run", 4)).toBe("course-2");
+    expect(boardModeFromPlayIndex("knockout-circuit", 4)).toBe("map-e");
+    expect(playModeOptions("velocity-run")).toHaveLength(12);
+    expect(playModeOptions("knockout-circuit")).toHaveLength(8);
+    expect(playModeOptions("pocket-striker")).toHaveLength(18);
+    expect(playModeOptions("crowd-control")).toHaveLength(15);
+    expect(playModeOptions("territory-rush")).toHaveLength(2);
     expect(boardModeOptions("neon-drift").map((m) => m.id)).toEqual([
       "foundation",
       "technical",
@@ -50,6 +57,9 @@ describe("catalog and modes", () => {
     expect(neonBoardMode(0, true)).toBe("daily");
     expect(defaultBoardMode("neon-drift")).toBe("foundation");
     expect(defaultBoardMode("velocity-run")).toBe("course-1");
+    expect(resolvePlayIndex("velocity-run", "?mode=course-1b")).toBe(1);
+    expect(resolvePlayIndex("knockout-circuit", "?play=7")).toBe(7);
+    expect(resolvePlayIndex("pocket-striker", "?mode=13")).toBe(13);
   });
 });
 

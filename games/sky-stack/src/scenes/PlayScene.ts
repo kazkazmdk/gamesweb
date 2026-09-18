@@ -433,6 +433,7 @@ export class SkyStackScene extends Phaser.Scene {
         longFrames: this.longFrames,
         tick: this.ticks,
         frozen: false,
+        level: this.floors,
       },
       {
         finishRun: () => {

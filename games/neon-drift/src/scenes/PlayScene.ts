@@ -621,6 +621,8 @@ export class DriftPlayScene extends Phaser.Scene {
         lateral: q?.lateral,
         headingError,
         surface: q?.surface,
+        laps: this.lap,
+        contentId: this.def.id,
         drifting: this.car.drifting,
         lookError: (() => {
           if (!q || !this.samples.length) return headingError;

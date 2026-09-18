@@ -15,6 +15,8 @@ import {
   type GameKeyboard,
 } from "@gamesweb/game-core";
 import { readRunContext, territoryRushManifest, type PlatformSDK } from "@gamesweb/game-sdk";
+import { brickDir, needleDir, sweepDir } from "../systems/bots";
+import { contourSpans, drawRibbon, ribbonPoints } from "../systems/render";
 
 const COLS = 48;
 const ROWS = 28;
@@ -54,6 +56,11 @@ export class TerritoryScene extends Phaser.Scene {
   private boost = 0;
   private shield = 0;
   private arena = 0;
+  private blocked = new Set<number>();
+  private botSteps = [0, 0, 0];
+  private banners: Array<{ text: string; t: number }> = [];
+  private captureWave = 0;
+  private lastPct = 0;
 
   constructor() {
     super("territory-play");
@@ -63,14 +70,31 @@ export class TerritoryScene extends Phaser.Scene {
     this.platform = this.game.registry.get("platform") as PlatformSDK;
     const ctx = readRunContext();
     this.rng = seededRng(ctx.seed ?? ctx.challengeCode ?? "arena");
-    this.arena = (ctx.seed ?? "arena").length % 2;
+    if (ctx.modeIndex !== undefined && Number.isFinite(ctx.modeIndex)) {
+      this.arena = Math.abs(ctx.modeIndex) % 2;
+    } else {
+      this.arena = Math.abs(Number(this.game.registry.get("arenaIndex") ?? 0)) % 2;
+    }
     this.vis = { x: 8, y: 14 };
     this.boost = 0;
     this.shield = 0;
+    this.botSteps = [0, 0, 0];
+    this.banners = [];
+    this.captureWave = 0;
+    this.blocked = this.arena === 0
+      ? this.blockRects([
+          [20, 10, 6, 4],
+          [30, 16, 5, 5],
+        ])
+      : this.blockRects([
+          [14, 6, 3, 8],
+          [22, 18, 8, 3],
+          [34, 8, 4, 10],
+          [8, 20, 6, 3],
+        ]);
     this.pickups = [
       { x: 16, y: 8, kind: "speed" },
       { x: 32, y: 18, kind: "shield" },
-      { x: 24, y: 22, kind: "claim" },
     ];
     this.grid = new Array(COLS * ROWS).fill(0);
     this.paintHome(8, 14, 1);
@@ -119,6 +143,16 @@ export class TerritoryScene extends Phaser.Scene {
     this.platform.events.emit({ name: "gameplay_started", props: { gameId: "territory-rush" } });
   }
 
+  private blockRects(rects: Array<[number, number, number, number]>) {
+    const set = new Set<number>();
+    for (const [x, y, w, h] of rects) {
+      for (let yy = y; yy < y + h; yy += 1) {
+        for (let xx = x; xx < x + w; xx += 1) set.add(this.idx(xx, yy));
+      }
+    }
+    return set;
+  }
+
   private paintHome(x: number, y: number, id: Owner) {
     for (let dy = -2; dy <= 2; dy += 1) {
       for (let dx = -2; dx <= 2; dx += 1) this.set(x + dx, y + dy, id);
@@ -154,10 +188,16 @@ export class TerritoryScene extends Phaser.Scene {
         const mx = Number(Boolean(native?.right)) - Number(Boolean(native?.left)) || Math.round(this.stick.x);
         const my = Number(Boolean(native?.down)) - Number(Boolean(native?.up)) || Math.round(this.stick.y);
         this.stepActor(1, mx, my, this.trail, false);
-        for (const b of this.bots) {
-          if (this.rng() < 0.08) b.dir = { x: Math.round(this.rng() * 2 - 1), y: Math.round(this.rng() * 2 - 1) };
+        this.bots.forEach((b, i) => {
+          this.botSteps[i] += 1;
+          if (b.name === "BRICK") b.dir = brickDir(this.botSteps[i], b.x, b.y, 40, 6);
+          else if (b.name === "NEEDLE") b.dir = needleDir(this.botSteps[i], b.x, b.y, 6, 22);
+          else b.dir = sweepDir(this.botSteps[i], b.x, b.y);
           this.stepActor(b.id, b.dir.x, b.dir.y, b.trail, true);
-        }
+        });
+        this.captureWave = Math.max(0, this.captureWave - dt * 1.8);
+        for (const b of this.banners) b.t -= dt;
+        this.banners = this.banners.filter((b) => b.t > 0);
       }
       if (this.t >= TIME) this.finish();
       this.boost = Math.max(0, this.boost - dt);
@@ -188,6 +228,8 @@ export class TerritoryScene extends Phaser.Scene {
     const actor = isBot ? this.bots.find((b) => b.id === id)! : { x: this.px, y: this.py };
     const nx = Math.max(0, Math.min(COLS - 1, actor.x + Math.sign(dx)));
     const ny = Math.max(0, Math.min(ROWS - 1, actor.y + Math.sign(dy)));
+    if (nx === actor.x && ny === actor.y) return;
+    if (this.blocked.has(this.idx(nx, ny))) return;
     if (trail.some((c) => c.x === nx && c.y === ny)) {
       if (!isBot) this.finish();
       else this.resetBot(id);
@@ -197,6 +239,9 @@ export class TerritoryScene extends Phaser.Scene {
       if (other.id !== id && other.trail.some((c) => c.x === nx && c.y === ny)) {
         this.cuts += 1;
         void this.platform.achievement.unlock("cut");
+        this.banners.push({ text: isBot && id !== 1 ? `ELIMINATED ${other.name}` : `CUT ${other.name}`, t: 0.9 });
+        if (!isBot) this.banners.push({ text: "REVENGE", t: 0.7 });
+        this.synth.impact(0.5);
         this.resetBot(other.id);
       }
     }
@@ -222,6 +267,11 @@ export class TerritoryScene extends Phaser.Scene {
           this.claims += 1;
           this.largest = Math.max(this.largest, n);
           this.combo += 1;
+          this.captureWave = 1;
+          const gained = this.pct(id) - this.lastPct;
+          this.lastPct = this.pct(1);
+          if (!isBot && gained > 0.2) this.banners.push({ text: `+${gained.toFixed(0)}%`, t: 0.7 });
+          this.juice.cameraPunch(0.35);
           this.synth.tone(240 + this.combo * 20, 0.05, "sine", 0.04, 0.12);
           if (!isBot) void this.platform.achievement.unlock("first-claim");
         }
@@ -240,7 +290,7 @@ export class TerritoryScene extends Phaser.Scene {
     const push = (x: number, y: number) => {
       if (x < 0 || y < 0 || x >= COLS || y >= ROWS) return;
       const i = this.idx(x, y);
-      if (seen[i] || blocked.has(i) || this.grid[i] === id) return;
+      if (seen[i] || blocked.has(i) || this.blocked.has(i) || this.grid[i] === id) return;
       seen[i] = 1;
       q.push(i);
     };
@@ -263,7 +313,7 @@ export class TerritoryScene extends Phaser.Scene {
     }
     let n = 0;
     for (let i = 0; i < this.grid.length; i += 1) {
-      if (!seen[i] && this.grid[i] !== id && !blocked.has(i)) {
+      if (!seen[i] && this.grid[i] !== id && !blocked.has(i) && !this.blocked.has(i)) {
         this.grid[i] = id;
         n += 1;
       }
@@ -313,26 +363,35 @@ export class TerritoryScene extends Phaser.Scene {
   private draw() {
     const g = this.gfx;
     g.clear();
-    const colors = this.arena === 0 ? [0x1a1014, 0xff4d6d, 0x4dabff, 0xffd166, 0x7d5fff] : [0x10141c, 0x5ad4c8, 0xff8a4a, 0xd4d4ff, 0xff6ab0];
+    const colors = this.arena === 0 ? [0x141018, 0xff4d6d, 0x4dabff, 0xffd166, 0x7d5fff] : [0x10141c, 0x5ad4c8, 0xff8a4a, 0xd4d4ff, 0xff6ab0];
     const outlines = [0x000000, 0xffc1cc, 0xb8ddff, 0xffe9a8, 0xcbb8ff];
     const c = this.cell;
-    for (let y = 0; y < ROWS; y += 1) {
-      for (let x = 0; x < COLS; x += 1) {
-        const owner = this.get(x, y);
-        g.fillStyle(colors[owner], 1);
-        g.fillRect(x * c, y * c, c, c);
-      }
+    g.fillStyle(this.arena === 0 ? 0x16101a : 0x12161e, 1);
+    g.fillRect(0, 0, COLS * c, ROWS * c);
+    if (this.arena === 0) {
+      g.lineStyle(2, 0xffffff, 0.05);
+      g.strokeRect(8, 8, COLS * c - 16, ROWS * c - 16);
     }
-    g.lineStyle(2.4, 0xffffff, 0.85);
-    for (let y = 0; y < ROWS; y += 1) {
-      for (let x = 0; x < COLS; x += 1) {
-        const owner = this.get(x, y);
-        if (!owner) continue;
-        g.lineStyle(2.4, outlines[owner], 0.9);
-        if (this.get(x, y - 1) !== owner) g.lineBetween(x * c, y * c, (x + 1) * c, y * c);
-        if (this.get(x, y + 1) !== owner) g.lineBetween(x * c, (y + 1) * c, (x + 1) * c, (y + 1) * c);
-        if (this.get(x - 1, y) !== owner) g.lineBetween(x * c, y * c, x * c, (y + 1) * c);
-        if (this.get(x + 1, y) !== owner) g.lineBetween((x + 1) * c, y * c, (x + 1) * c, (y + 1) * c);
+    for (const i of this.blocked) {
+      const x = i % COLS;
+      const y = (i / COLS) | 0;
+      g.fillStyle(this.arena === 0 ? 0x2a2430 : 0x0a0c10, 1);
+      g.fillRoundedRect(x * c, y * c, c, c, this.arena === 0 ? 2 : 0);
+    }
+    for (let owner = 1; owner <= 4; owner += 1) {
+      g.fillStyle(colors[owner], 0.92);
+      for (const span of contourSpans(this.grid, COLS, ROWS, owner)) {
+        g.fillRoundedRect(span.x * c, span.y * c, span.w * c, c + 0.6, 3);
+      }
+      g.lineStyle(2.2, outlines[owner], 0.85);
+      for (let y = 0; y < ROWS; y += 1) {
+        for (let x = 0; x < COLS; x += 1) {
+          if (this.get(x, y) !== owner) continue;
+          if (this.get(x, y - 1) !== owner) g.lineBetween(x * c, y * c, (x + 1) * c, y * c);
+          if (this.get(x, y + 1) !== owner) g.lineBetween(x * c, (y + 1) * c, (x + 1) * c, (y + 1) * c);
+          if (this.get(x - 1, y) !== owner) g.lineBetween(x * c, y * c, x * c, (y + 1) * c);
+          if (this.get(x + 1, y) !== owner) g.lineBetween((x + 1) * c, y * c, (x + 1) * c, (y + 1) * c);
+        }
       }
     }
     for (const f of this.flashes) {
@@ -343,8 +402,12 @@ export class TerritoryScene extends Phaser.Scene {
         g.fillRect(x * c, y * c, c, c);
       }
     }
-    g.fillStyle(this.shield > 0 ? 0x8fe8ff : 0xffffff, 0.75);
-    for (const t of this.trail) g.fillRect(t.x * c + 2, t.y * c + 2, c - 4, c - 4);
+    if (this.captureWave > 0) {
+      g.fillStyle(0xffffff, this.captureWave * 0.12);
+      g.fillRect(0, 0, COLS * c, ROWS * c);
+    }
+    drawRibbon(g, ribbonPoints(this.trail, c), this.shield > 0 ? 0x8fe8ff : 0xffffff, this.trail.length > 8 ? 1.15 : 1);
+    for (const b of this.bots) drawRibbon(g, ribbonPoints(b.trail, c), colors[b.id], 0.85);
     for (const p of this.pickups) {
       g.fillStyle(p.kind === "speed" ? 0xffe08a : p.kind === "shield" ? 0x8fe8ff : 0xff8ad4, 0.95);
       g.fillCircle(p.x * c + c / 2, p.y * c + c / 2, c * 0.28);
@@ -366,7 +429,9 @@ export class TerritoryScene extends Phaser.Scene {
     });
     drawParticles(g, this.parts);
     fillVignette(g, this.scale.width, this.scale.height, 0.2);
-    this.hud.setText(`${Math.max(0, (TIME - this.t) / 1000).toFixed(0)}s   ${this.pct(1).toFixed(0)}%`);
+    this.hud.setText(
+      `${Math.max(0, (TIME - this.t) / 1000).toFixed(0)}s   ${this.pct(1).toFixed(0)}%   ${this.arena === 0 ? "CIRCUIT" : "SHATTER"}${this.banners[0] ? `\n${this.banners[0].text}` : ""}`,
+    );
   }
 
   private publishDebug() {
@@ -383,6 +448,7 @@ export class TerritoryScene extends Phaser.Scene {
         longFrames: this.longFrames,
         tick: this.ticks,
         frozen: false,
+        contentId: this.arena === 0 ? "circuit-floor" : "shatter-field",
       },
       {
         finishRun: () => this.finish(),
@@ -402,7 +468,7 @@ export class TerritoryScene extends Phaser.Scene {
   }
 }
 
-export function mountTerritoryRush(parent: HTMLElement, platform: PlatformSDK) {
+export function mountTerritoryRush(parent: HTMLElement, platform: PlatformSDK, arenaIndex = 0) {
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
@@ -419,6 +485,7 @@ export function mountTerritoryRush(parent: HTMLElement, platform: PlatformSDK) {
     render: { preserveDrawingBuffer: true },
   });
   game.registry.set("platform", platform);
+  game.registry.set("arenaIndex", arenaIndex);
   game.registry.set("manifest", territoryRushManifest);
   (game as Phaser.Game & { restartRun: () => void }).restartRun = () => {
     game.scene.getScene("territory-play")?.scene.restart();

@@ -299,6 +299,36 @@ export class KnockoutScene extends Phaser.Scene {
     this.scene.restart();
   }
 
+  private drawPlace(g: Phaser.GameObjects.Graphics, th: MapDef["theme"]) {
+    const env = this.map.env;
+    if (env === "factory") {
+      g.fillStyle(mixColor(th.sky, 0x000000, 0.25), 1);
+      for (let i = 0; i < 8; i += 1) {
+        const x = i * 380 + this.camX * 0.3;
+        g.fillRect(x, this.map.height * 0.35, 70, this.map.height * 0.65);
+        g.fillStyle(th.accent, 0.08);
+        g.fillRect(x + 12, this.map.height * 0.4, 10, 12);
+        g.fillStyle(mixColor(th.sky, 0x000000, 0.25), 1);
+      }
+      g.fillStyle(0x2a2218, 0.45);
+      g.fillRect(0, this.map.height - 40, this.map.width, 40);
+    } else if (env === "skyworks") {
+      g.fillStyle(mixColor(th.sky, 0xffffff, 0.06), 1);
+      g.fillCircle(this.map.width * 0.7, 90, 50);
+      g.fillStyle(mixColor(th.sky, 0x000000, 0.4), 1);
+      for (let i = 0; i < 7; i += 1) {
+        const x = i * 460 + this.camX * 0.2;
+        g.fillRect(x + 80, 80, 8, this.map.height);
+        g.fillRect(x, 120 + (i % 3) * 40, 180, 8);
+      }
+    } else {
+      g.fillStyle(th.accent, 0.08);
+      for (let i = 0; i < 12; i += 1) g.fillRect(i * 280 + this.camX * 0.15, 40, 4, this.map.height);
+      g.fillStyle(mixColor(th.sky, 0x000000, 0.3), 1);
+      g.fillRect(0, this.map.height * 0.2, this.map.width, 10);
+    }
+  }
+
   private draw() {
     const g = this.gfx;
     const th = this.map.theme;
@@ -320,11 +350,7 @@ export class KnockoutScene extends Phaser.Scene {
       },
       { x: this.camX, y: this.camY },
     );
-    g.fillStyle(mixColor(th.sky, 0x000000, 0.35), 1);
-    for (let i = 0; i < 10; i += 1) {
-      const x = i * 420 + this.camX * 0.62;
-      g.fillTriangle(x, this.map.height, x + 160, this.map.height - 210 - (i % 3) * 40, x + 340, this.map.height);
-    }
+    this.drawPlace(g, th);
     for (const s of this.map.solids) {
       const live = this.liveRect(s, t);
       if (s.kind === "spawn") continue;
@@ -332,23 +358,30 @@ export class KnockoutScene extends Phaser.Scene {
         const a = t * 2.8 + (s.phase ?? 0);
         const cx = live.x + live.w / 2;
         const cy = live.y + live.h / 2;
+        g.fillStyle(0x2a2218, 1);
+        g.fillRect(cx - 6, cy + 18, 12, 28);
         g.save();
         g.translateCanvas(cx, cy);
         g.rotateCanvas(a);
         g.fillStyle(th.danger, 0.95);
-        g.fillRect(-40, -5, 80, 10);
-        g.fillRect(-5, -40, 10, 80);
+        g.fillRect(-52, -6, 104, 12);
+        g.fillRect(-6, -52, 12, 104);
+        g.fillStyle(0xc4b48a, 1);
+        g.fillCircle(0, 0, 10);
         g.fillStyle(0xffffff, 0.85);
-        g.fillCircle(0, 0, 7);
+        g.fillCircle(0, 0, 4);
         g.restore();
         continue;
       }
       if (s.kind === "beam") {
         const pulse = 0.45 + Math.sin(t * 9 + (s.phase ?? 0)) * 0.3;
+        g.fillStyle(0x2a2a30, 1);
+        g.fillRect(live.x - 10, live.y - 8, 16, live.h + 16);
+        g.fillRect(live.x + live.w - 6, live.y - 8, 16, live.h + 16);
         g.fillStyle(th.danger, pulse);
-        g.fillRect(live.x, live.y, live.w, live.h);
+        g.fillRect(live.x, live.y + live.h / 2 - 3, live.w, 6);
         g.fillStyle(0xffffff, 0.55);
-        g.fillRect(live.x, live.y + live.h / 2 - 2, live.w, 4);
+        g.fillRect(live.x, live.y + live.h / 2 - 1, live.w, 2);
         continue;
       }
       if (s.kind === "spike") {
@@ -356,20 +389,64 @@ export class KnockoutScene extends Phaser.Scene {
         g.fillTriangle(live.x, live.y + live.h, live.x + live.w / 2, live.y, live.x + live.w, live.y + live.h);
         continue;
       }
-      if (s.kind === "finish") g.fillStyle(0xffe08a, 0.95);
-      else if (s.kind === "gate") g.fillStyle(0xffffff, 0.28 + Math.sin(t * 3) * 0.08);
-      else g.fillStyle(s.route === "expert" ? 0x8a4a18 : th.ground, 1);
-      g.fillRect(live.x, live.y, live.w, live.h);
-      if (s.kind === "solid" || s.kind === "mover" || s.kind === "fall") {
-        g.fillStyle(0xffe8b0, 0.35);
-        g.fillRect(live.x, live.y, live.w, 4);
+      if (s.kind === "finish") {
+        g.fillStyle(0x2a2218, 1);
+        g.fillRect(live.x, live.y, 10, live.h);
+        g.fillRect(live.x + live.w - 10, live.y, 10, live.h);
+        g.fillStyle(0xffe08a, 0.95);
+        g.fillRect(live.x, live.y, live.w, 16);
+        for (let i = 0; i < 6; i += 1) {
+          g.fillStyle(i % 2 ? 0x111113 : 0xf3f1ec, 1);
+          g.fillRect(live.x + 8 + i * 8, live.y, 8, 16);
+        }
+        continue;
       }
+      if (s.kind === "gate") {
+        g.fillStyle(0x3a3a44, 1);
+        g.fillRect(live.x - 8, live.y, 8, live.h);
+        g.fillRect(live.x + live.w, live.y, 8, live.h);
+        g.fillStyle(0xffffff, 0.28 + Math.sin(t * 3) * 0.08);
+        g.fillRect(live.x, live.y, live.w, live.h);
+        continue;
+      }
+      if (s.kind === "mover") {
+        g.fillStyle(0x2a2a30, 1);
+        g.fillRect(live.x - 20, live.y + live.h / 2 - 2, live.w + 40, 4);
+        g.fillStyle(th.ground, 1);
+        g.fillRoundedRect(live.x, live.y, live.w, live.h, 4);
+        g.fillStyle(0xffe8b0, 0.4);
+        g.fillRect(live.x, live.y, live.w, 4);
+        continue;
+      }
+      if (s.kind === "fall") {
+        g.fillStyle(mixColor(th.ground, 0x000000, 0.2), 1);
+        g.fillRect(live.x, live.y, live.w, live.h);
+        g.lineStyle(2, th.danger, 0.55);
+        g.lineBetween(live.x + 6, live.y + 4, live.x + live.w - 6, live.y + live.h - 4);
+        continue;
+      }
+      g.fillStyle(s.route === "expert" ? 0x8a4a18 : th.ground, 1);
+      g.fillRect(live.x, live.y, live.w, live.h);
+      g.fillStyle(0x000000, 0.18);
+      g.fillRect(live.x, live.y + live.h - 6, live.w, 6);
+      g.fillStyle(0xffe8b0, 0.35);
+      g.fillRect(live.x, live.y, live.w, 4);
+      g.fillStyle(th.accent, 0.25);
+      g.fillRect(live.x + 4, live.y + 2, 6, 3);
     }
     for (const ghost of this.ghosts) {
       const pose = ghost.samples.find((s) => s.t >= this.timeMs) ?? ghost.samples[ghost.samples.length - 1];
       if (!pose) continue;
-      g.fillStyle(ghost.color, 0.35);
-      g.fillRoundedRect(pose.x, pose.y, 22, 32, 4);
+      drawRunner(g, pose.x, pose.y, 22, 32, {
+        facing: 1,
+        grounded: true,
+        vx: 80,
+        vy: 0,
+        t: pose.t,
+        color: ghost.color,
+      });
+      g.fillStyle(ghost.color, 0.12);
+      g.fillCircle(pose.x + 11, pose.y + 28, 14);
     }
     drawParticles(g, this.parts);
     const bodyX = this.dying > 0 ? this.rag.x : this.x;
@@ -385,7 +462,7 @@ export class KnockoutScene extends Phaser.Scene {
       lean: this.dying > 0 ? this.rag.rot : this.vx * 0.0009,
     });
     fillVignette(g, this.map.width, this.map.height, 0.18);
-    this.hud.setText(`${this.map.name}\n${(this.timeMs / 1000).toFixed(2)}s`);
+    this.hud.setText(`${this.map.name}\n${(this.timeMs / 1000).toFixed(2)}s   ${this.map.env.toUpperCase()}`);
     this.overlay.clear();
     const fa = this.juice.flashAlpha(0.016);
     if (fa) {
@@ -415,6 +492,7 @@ export class KnockoutScene extends Phaser.Scene {
         longFrames: this.longFrames,
         tick: this.ticks,
         frozen: false,
+        contentId: this.map.id,
       },
       {
         finishRun: () => this.win(),

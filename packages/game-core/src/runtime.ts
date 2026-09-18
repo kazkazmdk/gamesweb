@@ -31,6 +31,9 @@ export type GwDebugState = {
   surface?: string;
   drifting?: boolean;
   lookError?: number;
+  contentId?: string;
+  laps?: number;
+  boss?: string;
 };
 
 export type GwDebugCommands = {

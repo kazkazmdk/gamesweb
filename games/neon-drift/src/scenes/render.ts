@@ -57,6 +57,15 @@ export function drawWorld(
       g.fillStyle(0xffffff, 0.07);
       g.fillCircle(s.x + s.nx * 12, s.y + s.ny * 8, 18);
     }
+    for (let i = 0; i < samples.length; i += 3) {
+      const s = samples[i];
+      g.fillStyle(0x1a1214, 0.28);
+      g.fillCircle(s.x + s.nx * s.width * 0.22, s.y + s.ny * s.width * 0.22, 4);
+      if (i % 9 === 0) {
+        g.fillStyle(theme.accent, 0.35);
+        g.fillCircle(s.x + s.nx * s.width * 0.46, s.y + s.ny * s.width * 0.46, 3);
+      }
+    }
   }
 
   g.lineStyle(4, theme.accent, 0.7);
@@ -83,15 +92,46 @@ export function drawWorld(
   }
 
   if (quality !== "low") {
-    for (let i = 0; i < samples.length; i += 16) {
+    for (let i = 0; i < samples.length; i += 10) {
       const s = samples[i];
-      drawLamp(g, s.x + s.nx * (s.width * 0.5 + 20), s.y + s.ny * (s.width * 0.5 + 20), 28, theme.pole);
-      if (def.id === "technical" && i % 32 === 0) {
-        g.fillStyle(0xffb45a, 0.85);
-        const hx = s.x + s.nx * (s.width * 0.5 + 8);
-        const hy = s.y + s.ny * (s.width * 0.5 + 8);
-        g.fillTriangle(hx, hy, hx + s.tx * 14, hy + s.ty * 14, hx + s.nx * 10, hy + s.ny * 10);
-        g.fillTriangle(hx + s.tx * 16, hy + s.ty * 16, hx + s.tx * 30, hy + s.ty * 30, hx + s.nx * 10 + s.tx * 16, hy + s.ny * 10 + s.ty * 16);
+      const side = s.width * 0.5 + 16;
+      drawLamp(g, s.x + s.nx * (side + 8), s.y + s.ny * (side + 8), 28, theme.pole);
+      const px = s.x - s.nx * (side + 18);
+      const py = s.y - s.ny * (side + 18);
+      if (def.id === "foundation") {
+        if (i % 20 === 0) drawContainer(g, px - 18, py - 16, 36, 22, i % 40 === 0 ? 0xc45c3a : 0x3a6a88);
+        if (i === 40) drawCrane(g, px, py + 20, 90, 0x3a2430);
+        if (i === 90) drawCrane(g, px, py + 16, 70, 0x2a1c28);
+      } else if (def.id === "technical") {
+        if (i % 24 === 0) {
+          g.fillStyle(0x1c2230, 1);
+          g.fillRect(px - 12, py - 40, 28, 48);
+          g.fillStyle(0xffb45a, 0.2);
+          g.fillRect(px - 6, py - 28, 8, 8);
+        }
+        if (i % 32 === 0) {
+          g.fillStyle(0xffb45a, 0.85);
+          const hx = s.x + s.nx * (s.width * 0.5 + 8);
+          const hy = s.y + s.ny * (s.width * 0.5 + 8);
+          g.fillTriangle(hx, hy, hx + s.tx * 14, hy + s.ty * 14, hx + s.nx * 10, hy + s.ny * 10);
+        }
+        if (i === 70) {
+          g.fillStyle(0x12141c, 1);
+          g.fillRect(s.x - 40, s.y - 36, 80, 72);
+        }
+      } else {
+        if (i % 18 === 0) {
+          g.fillStyle(theme.barrier, 1);
+          g.fillRect(px - 3, py - 10, 6, 20);
+        }
+        if (i === 30) {
+          g.fillStyle(0x7ad4ff, 0.35);
+          g.fillRect(px - 8, py - 70, 6, 80);
+        }
+        if (i === 110) {
+          g.fillStyle(0x2a3444, 1);
+          g.fillRect(px - 10, py - 90, 14, 90);
+        }
       }
     }
   }
