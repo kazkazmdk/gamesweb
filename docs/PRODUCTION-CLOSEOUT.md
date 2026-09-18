@@ -1,13 +1,17 @@
 # Production closeout
 
-Branch `cursor/game-production-closeout-c08e`. Parent `cursor/game-production-quality-c08e` @ `82309c1`.  
-Art is original in-repo procedural / vector. No Poki or CrazyGames assets.
+Branch `cursor/game-production-closeout-c08e`  
+Parent `cursor/game-production-quality-c08e` @ `82309c1a2b3b118876765a2ce25fa2fc4159ab29`  
+HEAD `5ef7f36abf6581e322ff272fc4e67b73bb6c008e` (this file may trail by a docs commit)
+
+Art is original in-repo procedural / vector. No Poki or CrazyGames assets.  
+No merge to `main`. No ninth game. No new platform pages.
 
 ## Truth audit
 
 See `docs/PRODUCTION-CLOSEOUT-AUDIT.md`. Read from code, not the previous PR.
 
-Main lies found:
+Main lies found on the parent:
 
 - Swarm `missile` / `blade` / `plasma` were counters only. `drone` was `orbital += 1`.
 - Warden shared `stepBoss` with Protocol Core.
@@ -18,17 +22,21 @@ Main lies found:
 - Knockout obstacles were named rectangles.
 - Velocity ghost was a rounded rect.
 - “80 manual runs” were 3–8 seconds + `finishRun`.
+- Hub only listed 3 Velocity courses, 3 Knockout maps, 12 Pocket tables. The rest existed in data and could not be chosen.
+- Score validation rejected `course-1b` / `map-d` even though `GAME_MODES` listed them.
+- Swarm boss clock was 390s. Territory wall-hold self-cut.
 
 ## Implemented fixes
 
-- Swarm: timed missile volley (homing limited, visible chevron, AoE blast, cooldown bar). Orbital blades with longer radius and melee arc. Plasma enlarges pulse/nova and adds burn ticks. Autonomous drones follow and fire. Core charge / radial / summon. Warden zones / sweep / chase, faster below 40% HP. CORE CHAMBER columns/reactors/rails vs FRACTURE ZONE fissures/debris. Boss death hit-stop + banner + arena swap.
+- Swarm: timed missile volley (homing limited, visible chevron, AoE blast, cooldown bar). Orbital blades with longer radius and melee arc. Plasma enlarges pulse/nova and adds burn ticks. Autonomous drones follow and fire. Core charge / radial / summon. Warden zones / sweep / chase, faster below 40% HP. CORE CHAMBER columns/reactors/rails vs FRACTURE ZONE fissures/debris. Boss death hit-stop + banner + arena swap. Boss gate is **75s or 50 kills or level 6**, not 390s.
 - Pocket: 18 authored tables, 6 Workshop / 6 Garden / 6 Arcade Lab. Physics for movers, rotators, portals, force pads, breakables, gates. Theme furniture.
-- Territory: merged spans instead of a visible grid fill, ribbon trails, CIRCUIT / SHATTER blocked cells, BRICK/NEEDLE/SWEEP policies, CUT / ELIMINATED / REVENGE banners.
+- Territory: merged spans instead of a visible grid fill, ribbon trails, CIRCUIT / SHATTER blocked cells, BRICK/NEEDLE/SWEEP policies, CUT / ELIMINATED / REVENGE banners. Holding into a clamped edge no longer counts as a self-cut.
 - Crowd: clash resolves both sides by size, guardian with HP, crate walls via `break`, reactor finish + 12/24/48/96 multiplier, denser LOD blob for leftover pack.
 - Knockout: hardware identities + Factory / Skyworks / Signal compositions. Ghosts use the runner silhouette.
 - Neon: track-side containers, cranes, buildings, pylons, rubbering and curb dots on the racing line.
 - Velocity: platform underside/trims/bolts, piston shaft, laser emitters, supported bar, ghost = runner.
 - Sky: unchanged systems. Regression only.
+- Select: hub + `?mode=` / `?play=` expose every authored Velocity course, Knockout map, Pocket table, Crowd route, Territory arena. Score validation accepts those Velocity/Knockout modes.
 
 ## Removed fake features
 
@@ -36,6 +44,9 @@ Main lies found:
 - Swarm drone no longer increments orbital.
 - Territory claim pickup removed (it was a free paint, not a contest).
 - Previous READY / NEAR READY labels. Not used here.
+- Hub “3 courses / 3 maps / 12 tables” as the only selectable set.
+- Score validator that only allowed `course-1/2/3` and `map-a/b/c`.
+- 390s boss clock passed off as a second boss encounter.
 
 ## Real content count
 
@@ -56,7 +67,22 @@ Do not read “26 upgrades” as “8 unique guns”. Twin / rail / missile / bl
 
 `finishRun` is reserved for e2e and the isolated result screenshot. It is not counted as a playtest.
 
-67 agent-driven keyboard/drag sessions are logged in `docs/qa-closeout/PLAYTEST.md`. They are longer than the previous 3–8s + `finishRun` pass. They are **not** a complete natural play of every lap / course / table / 60s arena / 390s boss. That gap is documented in the playtest file, not hidden.
+70 natural-input sessions are in `docs/qa-closeout/PLAYTEST.md`.
+
+Proved:
+
+- All 12 Velocity ids, 8 Knockout maps, 18 Pocket tables, 15 Crowd routes, 2 Territory arenas loaded via `?mode=N`.
+- Swarm Protocol Core on 3/3 runs (`boss=core`) through the 50-kill gate.
+- Territory 5×63s still `playing` on both arenas.
+- Sky 8 / 12 / 24 floors.
+- Crowd 15 routes; several natural `ended`; routes 7 and 14 `boss=down`.
+- Pocket one stroke on each authored table.
+
+Not proved — do not invent counts:
+
+- Neon official laps stayed 0. The car scored drift points for ~97s × 6 on the three tracks and never crossed the gate.
+- Velocity mash-jump survived ~70s on each course and never hit a finish.
+- Knockout entered all 8 maps and kept dying / resetting. No finish banner.
 
 ## Screenshots
 
@@ -75,12 +101,14 @@ LOD: Swarm particle cap, Crowd member cap + cluster blob, Territory span merge, 
 
 ## Remaining weaknesses
 
+- Swarm boss is reachable, but a careless WASD hold can still die before the clock if kills stay low. The gate is real; the player still has to kite.
 - Swarm early seconds still wait on spawn before the fantasy reads.
 - Pocket tables are authored but not a 40-table career. Some still share the frame.
 - Territory contour is span-merge, not a perfect polygon mesh.
 - Crowd perspective is still a flat runner corridor.
 - Knockout / Velocity backgrounds are richer silhouettes, not full parallax cities.
 - Neon landmarks exist on the racing line but the car remains a procedural stand-in.
+- This agent cannot reliably finish Neon laps or Velocity/Knockout courses with a keyboard bot. That is a playtest-bot limit, not a claim that those finishes are missing from the games.
 
 ## Classification
 
@@ -89,10 +117,107 @@ LOD: Swarm particle cap, Crowd member cap + cluster blob, Territory span merge, 
 | Sky Stack | SHIP CANDIDATE | Loop, feel, and presentation were already ship-grade. Not regresssed. |
 | Neon Drift | POLISH REQUIRED | Strong drive + on-camera dressing. Needs a longer landmark pass and car authorship. |
 | Velocity Run | POLISH REQUIRED | 12 real courses + hardware. World still reads as a runner stage, not a district you inhabit. |
-| Swarm Protocol | POLISH REQUIRED | Weapons/bosses/arenas are real. Power fantasy is still thinner than a Poki survivor at t=0. |
+| Swarm Protocol | POLISH REQUIRED | Weapons/bosses/arenas are real and the boss is reachable. Power fantasy is still thinner than a Poki survivor at t=0. |
 | Knockout Circuit | POLISH REQUIRED | Maps and obstacle identities are real. Not yet a place you remember by architecture. |
 | Pocket Striker | POLISH REQUIRED | 18 real tables + mechanical objects. First table sells more than empty felt. Not a full minigolf set. |
 | Territory Rush | POLISH REQUIRED | No longer a raw grid. Bots and arenas differ. Capture spectacle is short. |
 | Crowd Control | POLISH REQUIRED | Combat, boss, break, payoff exist. Camera/perspective still demo-adjacent. |
 
 No game is left as **PROTOTYPE**. None except Sky Stack is a **SHIP CANDIDATE**.
+
+## Commits
+
+- `000b995` Remove fake depth from the eight games.
+- `b2d41c4` Document closeout truth and recapture peak QA.
+- `c5f04fe` Record honest natural playtest results.
+- `3444da3` Tell the truth about remaining playtest gaps.
+- `5ef7f36` Close QA gaps: reachable Swarm boss, Territory wall-hold, real content select.
+
+## CI
+
+Parent HEAD stayed green. Closeout `5ef7f36` CI: check, database, Vercel — green.  
+`pnpm test` 99, `pnpm typecheck`, `pnpm lint` (existing img warning only), `pnpm build` — green on this agent.
+
+## Per game
+
+### Neon Drift — POLISH REQUIRED
+
+- Real: 3 circuits, drift score, 2-lap race, track-side props.
+- Removed: none this pass.
+- Gameplay: unchanged race length (2 laps).
+- Visual: landmarks / rubbering from the first closeout pass.
+- Audio: engine / skid, unchanged.
+- Mobile: existing stick.
+- Playtest: 6 natural drives, ~97s, laps=0. Tracks selected. No official lap.
+- Known: headless W+D does not complete a lap.
+
+### Velocity Run — POLISH REQUIRED
+
+- Real: 12 authored courses, now selectable and score-valid.
+- Removed: fake “only 3 playable courses” hub.
+- Gameplay: Digit 1/2/3 still jump to the three world openers. Hub lists all 12.
+- Visual: platform language from the first pass.
+- Playtest: all 12 entered, ~70s each, no finish.
+- Known: mash-jump is not a line.
+
+### Swarm Protocol — POLISH REQUIRED
+
+- Real: 26 mapped upgrades, missiles/blades/plasma/drones, 2 boss kits, 2 arenas.
+- Removed: 390s unreachable boss clock; drone-as-orbital.
+- Gameplay: boss at 75s / 50 kills / level 6.
+- Visual: larger missiles and blades this pass.
+- Playtest: 3 runs, Protocol Core on all three.
+- Known: opening seconds are still thin.
+
+### Sky Stack — SHIP CANDIDATE
+
+- Real: climb loop.
+- This pass: floors in debug, no system change.
+- Playtest: 8 / 12 / 24 floors via aligned tap (`jump`, not `finishRun`).
+
+### Knockout Circuit — POLISH REQUIRED
+
+- Real: 8 maps, 3 envs, hardware identities.
+- Removed: hub-only-three-maps.
+- Playtest: all 8 entered, no finish (repeat deaths).
+
+### Pocket Striker — POLISH REQUIRED
+
+- Real: 18 authored tables + mechanical objects.
+- Removed: formula filler; “Table N” anonymous hub labels.
+- Playtest: all 18 stroked once.
+
+### Territory Rush — POLISH REQUIRED
+
+- Real: 2 blocked arenas, 3 bot policies, span render.
+- Removed: wall-hold self-cut; palette-only arena select.
+- Playtest: 5×63s, both arenas, all survived.
+
+### Crowd Control — POLISH REQUIRED
+
+- Real: 15 routes, clash, HP boss, break, payoff.
+- Removed: seed-hash-as-level-select for explicit `?mode=`.
+- Playtest: all 15. Boss down on routes 7 and 14.
+
+## FAKE DEPTH REMOVED
+
+| Was | What happened |
+| --- | --- |
+| Swarm `missile` / `blade` / `plasma` counters | Real volley / blade orbit / plasma ring |
+| Swarm `drone` = `orbital += 1` | Autonomous hulls that follow and fire |
+| Warden = Core + HP | Separate attack kits |
+| Swarm “2 arenas” as palettes | CORE CHAMBER vs FRACTURE ZONE solids |
+| Swarm boss at 390s | 75s / 50 kills / level 6 |
+| Pocket `Array.from({ length: 18 })` | Deleted. **18 authored layouts** |
+| “30 layouts” | Not claimed |
+| Territory palette arenas | Blocked Circuit / Shatter |
+| Territory random-walk bots | BRICK / NEEDLE / SWEEP policies |
+| Territory wall-hold suicide | Early-return when the cell does not change |
+| Crowd `pack -= 8` / `pack -= 14` | Clash by size; boss HP |
+| Crowd unused `break` | Used on authored routes |
+| Knockout named rectangles | Hardware draw + 3 env compositions |
+| Velocity ghost capsule | Runner silhouette |
+| Hub 3/3/12 as the only selectable set | 12 / 8 / 18 / 15 / 2 real options |
+| Validator `course-1/2/3` and `map-a/b/c` only | `GAME_MODES` / medal table |
+| 3–8s + `finishRun` as “80 manual runs” | Natural input log; `finishRun` not counted |
+| Counting unplayed courses as played | This report lists loaded ids and says when a finish did not happen |

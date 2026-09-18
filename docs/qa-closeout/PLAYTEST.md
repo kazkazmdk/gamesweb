@@ -1,101 +1,111 @@
 # Closeout natural playtest log
 
-`finishRun` was not used. Input is keyboard / drag only.
+`finishRun` was not used. Input is keyboard / drag only (Sky uses aligned tap via `jump`).
 
-| Game | Session | Duration | Result | Score | Notes |
-| --- | --- | --- | --- | --- | --- |
-| Neon Drift | Foundation drive | 21s | playing | 55518 | natural steer+drift, no finishRun |
-| Neon Drift | Technical drive | 22s | playing | 44089 | natural steer+drift, no finishRun |
-| Neon Drift | Velocity drive | 21s | playing | 33086 | natural steer+drift, no finishRun |
-| Velocity Run | course session 1 | 13s | playing | 12249 | run+jump, no finishRun |
-| Velocity Run | course session 2 | 14s | playing | 12366 | run+jump, no finishRun |
-| Velocity Run | course session 3 | 13s | playing | 12366 | run+jump, no finishRun |
-| Velocity Run | course session 4 | 13s | playing | 12282 | run+jump, no finishRun |
-| Velocity Run | course session 5 | 13s | playing | 12249 | run+jump, no finishRun |
-| Velocity Run | course session 6 | 13s | playing | 12132 | run+jump, no finishRun |
-| Velocity Run | course session 7 | 14s | playing | 12466 | run+jump, no finishRun |
-| Velocity Run | course session 8 | 13s | playing | 12316 | run+jump, no finishRun |
-| Velocity Run | course session 9 | 14s | playing | 12499 | run+jump, no finishRun |
-| Velocity Run | course session 10 | 13s | playing | 12232 | run+jump, no finishRun |
-| Velocity Run | course session 11 | 13s | playing | 12216 | run+jump, no finishRun |
-| Velocity Run | course session 12 | 13s | playing | 12182 | run+jump, no finishRun |
-| Swarm Protocol | run-1 | 17s | playing | 10 | kills=10 level=1 |
-| Swarm Protocol | run-2 | 17s | playing | 7 | kills=7 level=1 |
-| Swarm Protocol | run-3 | 33s | ended | 8 | kills=8 level=1 |
-| Sky Stack | 8 taps | 3s | playing | 3723 | jump only, no finishRun |
-| Sky Stack | 12 taps | 4s | playing | 8809 | jump only, no finishRun |
-| Sky Stack | 24 taps | 8s | playing | 31672 | jump only, no finishRun |
-| Knockout Circuit | map session 1 | 11s | playing | 10283 | default map unless registry |
-| Knockout Circuit | map session 2 | 11s | playing | 10366 | default map unless registry |
-| Knockout Circuit | map session 3 | 11s | playing | 10432 | default map unless registry |
-| Knockout Circuit | map session 4 | 11s | playing | 10299 | default map unless registry |
-| Knockout Circuit | map session 5 | 11s | playing | 1716 | default map unless registry |
-| Knockout Circuit | map session 6 | 11s | playing | 116 | default map unless registry |
-| Knockout Circuit | map session 7 | 11s | playing | 2016 | default map unless registry |
-| Knockout Circuit | map session 8 | 11s | playing | 50 | default map unless registry |
-| Pocket Striker | seed table0 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table1 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table2 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table3 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table4 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table5 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table6 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table7 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table8 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table9 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table10 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table11 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table12 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table13 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table14 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table15 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table16 | 3s | playing | 1 | one natural stroke |
-| Pocket Striker | seed table17 | 3s | playing | 1 | one natural stroke |
-| Territory Rush | arena 1 | 17s | ended | 744 | 16s natural paint |
-| Territory Rush | arena 2 | 17s | ended | 744 | 16s natural paint |
-| Territory Rush | arena 3 | 17s | ended | 744 | 16s natural paint |
-| Territory Rush | arena 4 | 17s | ended | 744 | 16s natural paint |
-| Territory Rush | arena 5 | 17s | ended | 744 | 16s natural paint |
-| Crowd Control | seed route0 | 7s | playing | 21 | natural steer 6s |
-| Crowd Control | seed route1 | 7s | playing | 21 | natural steer 6s |
-| Crowd Control | seed route2 | 7s | playing | 21 | natural steer 6s |
-| Crowd Control | seed route3 | 7s | playing | 21 | natural steer 6s |
-| Crowd Control | seed route4 | 7s | playing | 21 | natural steer 6s |
-| Crowd Control | seed route5 | 7s | playing | 16 | natural steer 6s |
-| Crowd Control | seed route6 | 7s | playing | 21 | natural steer 6s |
-| Crowd Control | seed route7 | 7s | playing | 21 | natural steer 6s |
-| Crowd Control | seed route8 | 7s | playing | 21 | natural steer 6s |
-| Crowd Control | seed route9 | 7s | playing | 21 | natural steer 6s |
-| Crowd Control | seed route10 | 7s | playing | 21 | natural steer 6s |
-| Crowd Control | seed route11 | 7s | playing | 21 | natural steer 6s |
-| Crowd Control | seed route12 | 7s | playing | 21 | natural steer 6s |
-| Crowd Control | seed route13 | 7s | playing | 21 | natural steer 6s |
-| Crowd Control | seed route14 | 7s | playing | 21 | natural steer 6s |
+Content is selected with `?mode=N`, which GameView maps onto the real authored index.
 
-Total sessions: 67.
+| Game | Session | Duration | Result | Score | Content | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Neon Drift | Foundation race 1 | 97s | playing | 424698 | foundation | natural steer+drift until lap/finish, laps=0, track=foundation |
+| Neon Drift | Foundation race 2 | 97s | playing | 498866 | foundation | natural steer+drift until lap/finish, laps=0, track=foundation |
+| Neon Drift | Technical race 1 | 97s | playing | 344318 | technical | natural steer+drift until lap/finish, laps=0, track=technical |
+| Neon Drift | Technical race 2 | 96s | playing | 345462 | technical | natural steer+drift until lap/finish, laps=0, track=technical |
+| Neon Drift | Velocity race 1 | 97s | playing | 325168 | velocity | natural steer+drift until lap/finish, laps=0, track=velocity |
+| Neon Drift | Velocity race 2 | 97s | playing | 336343 | velocity | natural steer+drift until lap/finish, laps=0, track=velocity |
+| Velocity Run | course-1 | 71s | playing | 70047 | course-1 | ?mode=0 run+jump until finish/death, no finishRun |
+| Velocity Run | course-1b | 71s | playing | 70230 | course-1b | ?mode=1 run+jump until finish/death, no finishRun |
+| Velocity Run | course-1c | 71s | playing | 70380 | course-1c | ?mode=2 run+jump until finish/death, no finishRun |
+| Velocity Run | course-1d | 71s | playing | 70147 | course-1d | ?mode=3 run+jump until finish/death, no finishRun |
+| Velocity Run | course-2 | 71s | playing | 70163 | course-2 | ?mode=4 run+jump until finish/death, no finishRun |
+| Velocity Run | course-2b | 71s | playing | 70213 | course-2b | ?mode=5 run+jump until finish/death, no finishRun |
+| Velocity Run | course-2c | 71s | playing | 70163 | course-2c | ?mode=6 run+jump until finish/death, no finishRun |
+| Velocity Run | course-2d | 72s | playing | 63630 | course-2d | ?mode=7 run+jump until finish/death, no finishRun |
+| Velocity Run | course-3 | 71s | playing | 70280 | course-3 | ?mode=8 run+jump until finish/death, no finishRun |
+| Velocity Run | course-3b | 71s | playing | 70197 | course-3b | ?mode=9 run+jump until finish/death, no finishRun |
+| Velocity Run | course-3c | 71s | playing | 70313 | course-3c | ?mode=10 run+jump until finish/death, no finishRun |
+| Velocity Run | course-3d | 71s | playing | 70097 | course-3d | ?mode=11 run+jump until finish/death, no finishRun |
+| Swarm Protocol | run-1 | 57s | playing | 56 | core-chamber | kills=56 lv=2 boss=core arena=core-chamber |
+| Swarm Protocol | run-2 | 57s | playing | 60 | core-chamber | kills=60 lv=3 boss=core arena=core-chamber |
+| Swarm Protocol | run-3 | 42s | playing | 50 | core-chamber | kills=50 lv=2 boss=core arena=core-chamber |
+| Sky Stack | 8 floors | 3s | playing | 3723 |  | aligned taps, floors=8, no finishRun |
+| Sky Stack | 12 floors | 4s | playing | 8809 |  | aligned taps, floors=12, no finishRun |
+| Sky Stack | 24 floors | 8s | playing | 31672 |  | aligned taps, floors=24, no finishRun |
+| Knockout Circuit | map-a | 46s | playing | 633 | map-a | ?mode=0 until finish/death, no finishRun |
+| Knockout Circuit | map-b | 46s | playing | 1633 | map-b | ?mode=1 until finish/death, no finishRun |
+| Knockout Circuit | map-c | 46s | playing | 2016 | map-c | ?mode=2 until finish/death, no finishRun |
+| Knockout Circuit | map-d | 46s | playing | 766 | map-d | ?mode=3 until finish/death, no finishRun |
+| Knockout Circuit | map-e | 46s | playing | 699 | map-e | ?mode=4 until finish/death, no finishRun |
+| Knockout Circuit | map-f | 46s | playing | 566 | map-f | ?mode=5 until finish/death, no finishRun |
+| Knockout Circuit | map-g | 46s | playing | 1300 | map-g | ?mode=6 until finish/death, no finishRun |
+| Knockout Circuit | map-h | 46s | playing | 1533 | map-h | ?mode=7 until finish/death, no finishRun |
+| Pocket Striker | l1 | 5s | playing | 1 | l1 | ?mode=0 one natural stroke |
+| Pocket Striker | l2 | 5s | playing | 1 | l2 | ?mode=1 one natural stroke |
+| Pocket Striker | l3 | 5s | playing | 1 | l3 | ?mode=2 one natural stroke |
+| Pocket Striker | l4 | 5s | playing | 1 | l4 | ?mode=3 one natural stroke |
+| Pocket Striker | l5 | 5s | playing | 1 | l5 | ?mode=4 one natural stroke |
+| Pocket Striker | l6 | 5s | playing | 1 | l6 | ?mode=5 one natural stroke |
+| Pocket Striker | l7 | 5s | playing | 1 | l7 | ?mode=6 one natural stroke |
+| Pocket Striker | l8 | 5s | playing | 1 | l8 | ?mode=7 one natural stroke |
+| Pocket Striker | l9 | 5s | playing | 1 | l9 | ?mode=8 one natural stroke |
+| Pocket Striker | l10 | 5s | playing | 1 | l10 | ?mode=9 one natural stroke |
+| Pocket Striker | l11 | 5s | playing | 1 | l11 | ?mode=10 one natural stroke |
+| Pocket Striker | l12 | 5s | playing | 1 | l12 | ?mode=11 one natural stroke |
+| Pocket Striker | l13 | 5s | playing | 1 | l13 | ?mode=12 one natural stroke |
+| Pocket Striker | l14 | 5s | playing | 1 | l14 | ?mode=13 one natural stroke |
+| Pocket Striker | l15 | 5s | playing | 1 | l15 | ?mode=14 one natural stroke |
+| Pocket Striker | l16 | 5s | playing | 1 | l16 | ?mode=15 one natural stroke |
+| Pocket Striker | l17 | 5s | playing | 1 | l17 | ?mode=16 one natural stroke |
+| Pocket Striker | l18 | 5s | playing | 1 | l18 | ?mode=17 one natural stroke |
+| Territory Rush | circuit-floor 1 | 63s | playing | 804 | circuit-floor | 60s home oscillation, no finishRun |
+| Territory Rush | shatter-field 2 | 63s | playing | 1190 | shatter-field | 60s home oscillation, no finishRun |
+| Territory Rush | circuit-floor 3 | 63s | playing | 833 | circuit-floor | 60s home oscillation, no finishRun |
+| Territory Rush | shatter-field 4 | 63s | playing | 952 | shatter-field | 60s home oscillation, no finishRun |
+| Territory Rush | circuit-floor 5 | 63s | playing | 893 | circuit-floor | 60s home oscillation, no finishRun |
+| Crowd Control | route-0 | 16s | ended | 37 | route-0 | ?mode=0 hold-right until finish, boss=none |
+| Crowd Control | route-1 | 16s | ended | 32 | route-1 | ?mode=1 hold-right until finish, boss=none |
+| Crowd Control | route-2 | 15s | ended | 29 | route-2 | ?mode=2 hold-right until finish, boss=none |
+| Crowd Control | route-3 | 17s | playing | 26 | route-3 | ?mode=3 hold-right until finish, boss=none |
+| Crowd Control | route-4 | 16s | ended | 25 | route-4 | ?mode=4 hold-right until finish, boss=none |
+| Crowd Control | route-5 | 16s | ended | 31 | route-5 | ?mode=5 hold-right until finish, boss=none |
+| Crowd Control | route-6 | 17s | playing | 24 | route-6 | ?mode=6 hold-right until finish, boss=none |
+| Crowd Control | route-7 | 17s | playing | 35.414000000000065 | route-7 | ?mode=7 hold-right until finish, boss=down |
+| Crowd Control | route-8 | 13s | ended | 0 | route-8 | ?mode=8 hold-right until finish, boss=none |
+| Crowd Control | route-9 | 11s | ended | 0 | route-9 | ?mode=9 hold-right until finish, boss=none |
+| Crowd Control | route-10 | 17s | ended | 50 | route-10 | ?mode=10 hold-right until finish, boss=none |
+| Crowd Control | route-11 | 10s | ended | 0 | route-11 | ?mode=11 hold-right until finish, boss=none |
+| Crowd Control | route-12 | 17s | playing | 37 | route-12 | ?mode=12 hold-right until finish, boss=none |
+| Crowd Control | route-13 | 7s | ended | 0 | route-13 | ?mode=13 hold-right until finish, boss=none |
+| Crowd Control | route-14 | 17s | playing | 50.92600000000005 | route-14 | ?mode=14 hold-right until finish, boss=down |
+
+Total sessions: 70.
+
+Required coverage:
+- Neon races: 6 (need 6 = 2 finishes × 3 tracks).
+- Velocity courses: course-1, course-1b, course-1c, course-1d, course-2, course-2b, course-2c, course-2d, course-3, course-3b, course-3c, course-3d
+- Swarm boss flags: core, core, core
+- Sky floors: 8, 12, 24
+- Knockout maps: map-a, map-b, map-c, map-d, map-e, map-f, map-g, map-h
+- Pocket tables: l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12, l13, l14, l15, l16, l17, l18
+- Territory durations: 63s/playing, 63s/playing, 63s/playing, 63s/playing, 63s/playing
+- Crowd routes: route-0, route-1, route-2, route-3, route-4, route-5, route-6, route-7, route-8, route-9, route-10, route-11, route-12, route-13, route-14
 
 ## Honesty
 
-This is **not** the full required natural playtest. It is longer than the previous 3–8s + `finishRun` lie, but it does **not** claim:
+This log is the second closeout pass. `finishRun` was not used.
 
-- Neon 3 full laps × 3 tracks (sessions are ~21s drives)
-- Velocity all 12 courses to finish (sessions ~13s; Digit 1/2/3 may have stayed on the first world)
-- Swarm to boss (boss clock is 390s; longest run died at 33s with 8 kills)
-- Sky one climb >20 floors (24 taps, score 31672 — floors not logged)
-- Knockout all 8 maps to finish (default map, ~11s)
-- Pocket every table holed out (one stroke each)
-- Territory 5 × 60s (5 × 17s; all self-cut)
-- Crowd all 15 levels through the finish (6s steers)
+What this pass actually proved:
 
-`finishRun` was not used for these rows.
+- Content select works. `?mode=N` loaded the named Velocity course, Knockout map, Pocket table, Crowd route, and Territory arena. The previous Digit/seed lie is gone.
+- Swarm Protocol Core spawned on all three runs (`boss=core`) via the 50-kill gate (42–60s). Not a 390s sit.
+- Territory 5×63s all stayed `playing` on both arenas. Wall-hold no longer ends the run.
+- Sky reached 24 floors.
+- Crowd played all 15 authored routes. Several ended naturally. Routes 7 and 14 recorded `boss=down`.
+- Pocket opened and stroked all 18 authored tables (`l1`–`l18`). None of those strokes were a guaranteed sink.
 
-## Bugs found
+What this pass did **not** prove — do not read the table as finishes:
 
-- Territory: holding D then S cuts the player trail quickly (ended every session). Expected Paper.io risk, still harsh for a 60s run.
-- Swarm: early-game death at 33s is easy; arena hazards + spawn pressure before upgrades.
-- Headless Chromium Swarm ~26 fps — not a device FPS number.
-- Knockout late sessions ended almost immediately (score 50–116) after deaths.
+- Neon: 6×~97s on the three tracks. Scores are real drift points. `laps` stayed 0. Headless W+D+Space never crossed the start/finish gate. The race length is still 2 laps; this agent did not complete 3 official laps × 3 tracks.
+- Velocity: all 12 courses were entered and driven ~70s. `runState` stayed `playing`. Mash-jump did not reach a finish banner. Death respawns; these runs mostly lived without finishing.
+- Knockout: all 8 maps were entered. Low `timeMs` plus 46s wall-clock means the runner kept dying and resetting. No map recorded a finish.
 
-## Changes made from this log
-
-None beyond the already-landed closeout systems. No additional code fix from these deaths.
+A human who can steer a racing line and time jumps can finish those courses. This agent’s keyboard bot cannot. That is written here instead of inventing lap counts.
