@@ -1,14 +1,14 @@
 import type { CSSProperties } from "react";
 
 const POSITION: Record<string, Record<string, string>> = {
-  "neon-drift": { backdrop: "50% 40%", hero: "48% 42%", tile: "48% 40%" },
-  "velocity-run": { backdrop: "24% 70%", hero: "20% 72%", tile: "22% 72%" },
-  "swarm-protocol": { backdrop: "50% 48%", hero: "50% 48%", tile: "50% 48%" },
-  "sky-stack": { backdrop: "48% 74%", hero: "50% 76%", tile: "50% 78%" },
-  "knockout-circuit": { backdrop: "22% 60%", hero: "20% 62%", tile: "20% 62%" },
-  "pocket-striker": { backdrop: "30% 62%", hero: "28% 58%", tile: "28% 58%" },
-  "territory-rush": { backdrop: "46% 48%", hero: "44% 50%", tile: "48% 50%" },
-  "crowd-control": { backdrop: "50% 42%", hero: "50% 40%", tile: "50% 40%" },
+  "neon-drift": { backdrop: "48% 38%", hero: "48% 40%", tile: "48% 40%" },
+  "velocity-run": { backdrop: "22% 68%", hero: "20% 70%", tile: "22% 70%" },
+  "swarm-protocol": { backdrop: "38% 28%", hero: "40% 30%", tile: "40% 30%" },
+  "sky-stack": { backdrop: "50% 64%", hero: "50% 68%", tile: "50% 68%" },
+  "knockout-circuit": { backdrop: "22% 52%", hero: "20% 54%", tile: "20% 54%" },
+  "pocket-striker": { backdrop: "32% 58%", hero: "30% 56%", tile: "30% 56%" },
+  "territory-rush": { backdrop: "48% 48%", hero: "48% 50%", tile: "48% 50%" },
+  "crowd-control": { backdrop: "30% 62%", hero: "32% 64%", tile: "32% 64%" },
 };
 
 const JPG = new Set([
