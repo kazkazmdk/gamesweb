@@ -23,6 +23,7 @@ export default function PartyCreatePage() {
         body="Same playlist. Play on your own time. Standings update after each result — this is not a live match room."
         action={
           <ChamferButton
+            tone="platform"
             onClick={() => {
               const party = arcadeStore.createParty(player.id, player.displayName || "Host");
               router.push(`/party/${party.code}`);

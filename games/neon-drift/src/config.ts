@@ -40,8 +40,8 @@ export const CAMERA = {
   lookBlend: 0.55,
   lookBase: 48,
   lookSpeed: 0.17,
-  zoomSlow: 1.3,
-  zoomFast: 1.07,
+  zoomSlow: 1.08,
+  zoomFast: 0.96,
   driftOffset: 14,
   yawMax: 0.035,
 } as const;

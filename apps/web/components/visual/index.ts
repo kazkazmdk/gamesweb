@@ -1,10 +1,13 @@
 export { ChamferButton } from "./ChamferButton";
 export { EmptyStateStage } from "./EmptyStateStage";
 export { EventRoute, type EventRouteStep } from "./EventRoute";
+export { FeaturedTrophy, TrophyShelf, type TrophyItem } from "./TrophyShelf";
+export { FriendsFloor } from "./FriendsFloor";
 export { GameBackdrop } from "./GameBackdrop";
+export { PlatformScene } from "./PlatformScene";
 export { PlayerIdentity } from "./PlayerIdentity";
 export { PlayerVersus } from "./PlayerVersus";
 export { ProgressionStrip } from "./ProgressionStrip";
 export { RankPodium } from "./RankPodium";
-export { TrophyShelf } from "./TrophyShelf";
+export { SettingsIcon, PlayIcon, InviteIcon, TrophyIcon, BoardIcon, SeatIcon } from "./Icons";
 export { useUtcCountdown } from "./use-utc-countdown";

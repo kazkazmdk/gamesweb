@@ -39,13 +39,13 @@ export function PauseOverlay({
 
   return (
     <div
-      className="absolute inset-0 z-40 bg-black/45"
+      className="absolute inset-0 z-40 bg-black/50"
       onClick={(e) => {
         if (e.target === e.currentTarget) onResume();
       }}
     >
-      <div className="absolute inset-y-0 left-0 flex w-[min(380px,92vw)] flex-col justify-center bg-black/35 px-5 py-8 md:px-8">
-        <p className="meta text-white/45">{game.title}</p>
+      <div className="gw-pause-rail absolute inset-y-0 left-0 flex w-[min(380px,92vw)] flex-col justify-center px-5 py-8 md:px-8">
+        <p className="text-[13px] text-white/50">{game.title}</p>
         <p className="display mt-2 text-[44px] text-white">Paused</p>
         <div className="mt-8 flex flex-col gap-2" role="group" aria-label="Pause">
           <button
@@ -56,6 +56,7 @@ export function PauseOverlay({
             onClick={onResume}
           >
             Resume
+            <span className="text-[10px] tracking-[0.14em] text-current/70">Enter</span>
           </button>
           <button
             type="button"
@@ -76,7 +77,8 @@ export function PauseOverlay({
             Exit
           </Link>
         </div>
-        <button type="button" className="home-secondary mt-6 text-left" onClick={() => setHelp((v) => !v)}>
+        <div className="mt-6 h-px bg-white/10" aria-hidden />
+        <button type="button" className="home-secondary mt-5 text-left" onClick={() => setHelp((v) => !v)}>
           Controls
         </button>
         {help ? (
@@ -87,7 +89,9 @@ export function PauseOverlay({
               </li>
             ))}
           </ul>
-        ) : null}
+        ) : (
+          <p className="mt-3 text-[11px] tracking-[0.08em] text-white/35">↑↓ select · Esc resume</p>
+        )}
       </div>
     </div>
   );

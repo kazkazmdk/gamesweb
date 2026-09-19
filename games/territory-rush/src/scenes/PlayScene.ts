@@ -366,11 +366,17 @@ export class TerritoryScene extends Phaser.Scene {
     const colors = this.arena === 0 ? [0x141018, 0xff4d6d, 0x4dabff, 0xffd166, 0x7d5fff] : [0x10141c, 0x5ad4c8, 0xff8a4a, 0xd4d4ff, 0xff6ab0];
     const outlines = [0x000000, 0xffc1cc, 0xb8ddff, 0xffe9a8, 0xcbb8ff];
     const c = this.cell;
-    g.fillStyle(this.arena === 0 ? 0x16101a : 0x12161e, 1);
+    g.fillStyle(this.arena === 0 ? 0x120c16 : 0x0e1218, 1);
     g.fillRect(0, 0, COLS * c, ROWS * c);
-    if (this.arena === 0) {
-      g.lineStyle(2, 0xffffff, 0.05);
-      g.strokeRect(8, 8, COLS * c - 16, ROWS * c - 16);
+    g.fillStyle(this.arena === 0 ? 0x1a1420 : 0x141820, 0.55);
+    g.fillRect(c * 0.4, c * 0.4, COLS * c - c * 0.8, ROWS * c - c * 0.8);
+    g.lineStyle(3, this.arena === 0 ? 0xff4d6d : 0x5ad4c8, 0.22);
+    g.strokeRect(10, 10, COLS * c - 20, ROWS * c - 20);
+    g.fillStyle(0xffffff, 0.04);
+    for (let y = 0; y < ROWS; y += 1) {
+      for (let x = 0; x < COLS; x += 1) {
+        if ((x + y) % 2 === 0) g.fillRect(x * c, y * c, c, c);
+      }
     }
     for (const i of this.blocked) {
       const x = i % COLS;
@@ -379,11 +385,14 @@ export class TerritoryScene extends Phaser.Scene {
       g.fillRoundedRect(x * c, y * c, c, c, this.arena === 0 ? 2 : 0);
     }
     for (let owner = 1; owner <= 4; owner += 1) {
-      g.fillStyle(colors[owner], 0.92);
+      g.fillStyle(colors[owner], owner === 1 ? 0.94 : 0.86);
       for (const span of contourSpans(this.grid, COLS, ROWS, owner)) {
         g.fillRoundedRect(span.x * c, span.y * c, span.w * c, c + 0.6, 3);
+        g.fillStyle(0xffffff, owner === 1 ? 0.08 : 0.04);
+        g.fillRect(span.x * c, span.y * c, span.w * c, 3);
+        g.fillStyle(colors[owner], owner === 1 ? 0.94 : 0.86);
       }
-      g.lineStyle(2.2, outlines[owner], 0.85);
+      g.lineStyle(2.6, outlines[owner], owner === 1 ? 0.95 : 0.7);
       for (let y = 0; y < ROWS; y += 1) {
         for (let x = 0; x < COLS; x += 1) {
           if (this.get(x, y) !== owner) continue;
@@ -403,10 +412,12 @@ export class TerritoryScene extends Phaser.Scene {
       }
     }
     if (this.captureWave > 0) {
-      g.fillStyle(0xffffff, this.captureWave * 0.1);
+      g.fillStyle(0xffffff, this.captureWave * 0.08);
       g.fillRect(0, 0, COLS * c, ROWS * c);
-      g.fillStyle(colors[1], this.captureWave * 0.16);
-      g.fillCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, 28 + (1 - this.captureWave) * 70);
+      g.fillStyle(colors[1], this.captureWave * 0.22);
+      g.fillCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, 22 + (1 - this.captureWave) * 90);
+      g.lineStyle(3, 0xffffff, this.captureWave * 0.45);
+      g.strokeCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, 18 + (1 - this.captureWave) * 70);
     }
     drawRibbon(g, ribbonPoints(this.trail, c), this.shield > 0 ? 0x8fe8ff : 0xffffff, this.trail.length > 8 ? 1.15 : 1);
     for (const b of this.bots) drawRibbon(g, ribbonPoints(b.trail, c), colors[b.id], 0.85);

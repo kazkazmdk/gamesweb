@@ -9,9 +9,7 @@ import { useArcade } from "@/lib/social/use-arcade";
 import { friendsBoard, rankViewModel } from "@/lib/platform/adapters";
 import { formatPlayScore, formatRank } from "@/lib/platform/format";
 import { boardModeOptions, defaultBoardMode } from "@/lib/platform/modes";
-import { GameBackdrop, RankPodium } from "@/components/visual";
-import { GameArt } from "@/components/game/GameArt";
-import { homeStage } from "@/components/home/home-stage";
+import { GameBackdrop, PlatformScene, RankPodium } from "@/components/visual";
 
 export default function LeaderboardsPage() {
   const store = useStore();
@@ -55,9 +53,8 @@ export default function LeaderboardsPage() {
     <div>
       <GameBackdrop slug={game.slug} className="min-h-[48vh]" dim={0.28} priority>
         <div className="flex min-h-[48vh] flex-col justify-end px-5 pb-8 pt-20 md:px-10">
-          <p className="meta text-white/50">Competition</p>
-          <h1 className="display mt-2 text-[44px] text-white md:text-[64px]">Leaderboards</h1>
-          <p className="mt-2 max-w-xl text-[15px] text-white/65">Verified when the run looks human. Flagged stays off the board.</p>
+          <h1 className="display text-[44px] text-white md:text-[64px]">Leaderboards</h1>
+          <p className="mt-3 max-w-xl text-[15px] text-white/65">Verified when the run looks human. Flagged stays off the board.</p>
         </div>
       </GameBackdrop>
 
@@ -65,29 +62,27 @@ export default function LeaderboardsPage() {
         <div
           role="tablist"
           aria-label="Game"
-          className="flex gap-2 overflow-x-auto scrollbar-none"
+          className="flex gap-3 overflow-x-auto scrollbar-none"
         >
           {GAME_MANIFESTS.map((g) => {
             const selected = g.id === game.id;
-            const dir = homeStage(g.slug);
             return (
               <button
                 key={g.id}
                 type="button"
                 role="tab"
                 aria-selected={selected}
-                className={`relative h-16 w-28 shrink-0 overflow-hidden ${selected ? "gw-frame" : "opacity-55"}`}
+                className={`gw-game-tile ${selected ? "is-on" : ""}`}
                 onClick={() => selectGame(g.id)}
               >
-                <GameArt slug={g.slug} variant="tile" position={dir.tile} className="h-full w-full" />
-                <span className="sr-only">{g.title}</span>
+                <PlatformScene slug={g.slug} className="h-full w-full" />
+                <span className="gw-game-tile-name">{g.title}</span>
               </button>
             );
           })}
         </div>
-        <p className="mt-3 text-[13px] text-white/55">{game.title}</p>
 
-        <div className="mt-6 flex flex-wrap gap-8">
+        <div className="mt-7 flex flex-wrap gap-8">
           <GameModeSelector label="Mode" options={modes} value={mode} onChange={setMode} />
           <GameModeSelector
             label="Board"
@@ -116,7 +111,7 @@ export default function LeaderboardsPage() {
             <EmptyState
               title="No friends on the board"
               body="Invite someone. Friend ranks only show when they actually have a score here."
-              action={<QuickAction href="/friends">Invite</QuickAction>}
+              action={<QuickAction href="/friends" tone="platform">Invite</QuickAction>}
             />
           </div>
         ) : scope === "rivals" && !arcade.rivals.length ? (
@@ -135,10 +130,7 @@ export default function LeaderboardsPage() {
           <>
             {podium.length ? (
               <section className="mt-10">
-                <p className="meta text-white/40">Podium</p>
-                <div className="mt-4">
-                  <RankPodium rows={podium} />
-                </div>
+                <RankPodium rows={podium} />
               </section>
             ) : null}
             <ol className="mt-10 max-w-2xl">

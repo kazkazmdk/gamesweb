@@ -4,25 +4,28 @@ export function ProgressWidget({
   label,
   caption,
   size = "md",
+  showValue = true,
 }: {
   value: number;
   max: number;
   label?: string;
   caption?: string;
   size?: "sm" | "md";
+  showValue?: boolean;
 }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
     <div>
-      {label ? (
-        <p className="stat text-[28px] md:text-[32px]">
-          {value}
-          <span className="ml-1 text-[13px] font-normal text-[var(--text-faint)]">/ {max}</span>
-        </p>
+      {showValue ? (
+      <p className="stat text-[28px] md:text-[32px]">
+        {value.toLocaleString("en-US")}
+        <span className="ml-1 text-[13px] font-normal text-[var(--text-faint)]">/ {max.toLocaleString("en-US")}</span>
+      </p>
       ) : null}
-      {caption ? <p className="meta mt-1">{caption}</p> : null}
+      {label ? <p className="mt-1 text-[13px] text-[var(--text-dim)]">{label}</p> : null}
+      {caption ? <p className="mt-1 text-[12px] text-white/45">{caption}</p> : null}
       <div
-        className={`progress-track mt-2 ${size === "sm" ? "h-[3px]" : "h-1"}`}
+        className={`progress-track mt-2 ${size === "sm" ? "h-[3px]" : "h-1.5"}`}
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={max}

@@ -1121,10 +1121,32 @@ export class SwarmPlayScene extends Phaser.Scene {
         g.fillRect(s.x, s.y, s.w, s.h);
       }
     }
+    g.lineStyle(2, 0xf07a3a, 0.14);
+    g.strokeCircle(ARENA / 2, ARENA / 2, 180);
+    g.strokeCircle(ARENA / 2, ARENA / 2, 320);
+    g.fillStyle(0x1a1014, 0.22);
+    for (let i = -3; i <= 3; i += 1) {
+      for (let j = -2; j <= 2; j += 1) {
+        g.fillRect(ARENA / 2 + i * 86 - 34, ARENA / 2 + j * 86 - 34, 68, 68);
+      }
+    }
     if (!fracture) {
+      g.fillStyle(0x1a1014, 0.55);
+      g.fillRect(0, ARENA * 0.72, ARENA, ARENA * 0.28);
       g.fillStyle(0x2a1620, 0.28);
       g.fillRect(40, 40, ARENA - 80, 18);
       g.fillRect(40, ARENA - 58, ARENA - 80, 18);
+      g.fillStyle(0xf07a3a, 0.06);
+      for (let i = 0; i < 6; i += 1) g.fillCircle(120 + i * 150, ARENA * 0.82, 28);
+      g.fillStyle(0x2a1620, 0.5);
+      g.fillRect(ARENA / 2 - 260, ARENA / 2 - 210, 40, 180);
+      g.fillRect(ARENA / 2 + 220, ARENA / 2 - 240, 48, 220);
+      g.fillStyle(0xffc18a, 0.18);
+      g.fillRect(ARENA / 2 - 248, ARENA / 2 - 190, 12, 12);
+      g.fillRect(ARENA / 2 + 234, ARENA / 2 - 210, 12, 12);
+    } else {
+      g.fillStyle(0x100806, 0.4);
+      g.fillRect(0, ARENA * 0.78, ARENA, ARENA * 0.22);
     }
   }
 
@@ -1166,8 +1188,10 @@ export class SwarmPlayScene extends Phaser.Scene {
 
     for (const t of this.trails) {
       if (t.life <= 0) continue;
-      g.fillStyle(0xf07a3a, t.life * 0.45);
-      g.fillCircle(t.x, t.y, t.r);
+      g.fillStyle(0xf07a3a, t.life * 0.55);
+      g.fillCircle(t.x, t.y, t.r * 1.15);
+      g.fillStyle(0xffe0c0, t.life * 0.28);
+      g.fillCircle(t.x, t.y, t.r * 0.45);
     }
     for (const o of this.orbs) {
       if (!o.active) continue;

@@ -54,9 +54,7 @@ export default function SettingsPage() {
               key={c.id}
               type="button"
               onClick={() => setCat(c.id)}
-              className={`min-h-11 shrink-0 px-3 text-left text-[13px] ${
-                cat === c.id ? "text-[var(--text)] shadow-[inset_0_-2px_0_var(--accent)] md:shadow-[inset_2px_0_0_var(--accent)]" : "text-[var(--text-dim)]"
-              }`}
+              className={`gw-chip shrink-0 text-left ${cat === c.id ? "is-on" : ""}`}
             >
               {c.label}
             </button>

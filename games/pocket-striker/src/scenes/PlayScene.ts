@@ -11,6 +11,7 @@ import {
   drawParticles,
   drawShinyBall,
   fillBackdrop,
+  mixColor,
   type GameKeyboard,
 } from "@gamesweb/game-core";
 import { pocketStrikerManifest, readRunContext, type PlatformSDK } from "@gamesweb/game-sdk";
@@ -193,6 +194,11 @@ export class PocketScene extends Phaser.Scene {
       g.fillRect(40, 430, 80, 8);
       g.fillRect(600, 430, 80, 8);
     }
+    g.fillStyle(0x000000, 0.22);
+    for (let i = 0; i < 9; i += 1) {
+      g.fillCircle(48 + i * 72, 8, 3.2);
+      g.fillCircle(48 + i * 72, this.layout.h - 8, 3.2);
+    }
   }
 
   private bounce() {
@@ -304,10 +310,16 @@ export class PocketScene extends Phaser.Scene {
     });
     g.save();
     g.scaleCanvas(this.scaleX, this.scaleY);
+    g.fillStyle(0x000000, 0.35);
+    g.fillRoundedRect(14, 16, this.layout.w - 12, this.layout.h - 12, 18);
     g.fillStyle(rail, 1);
     g.fillRoundedRect(6, 6, this.layout.w - 12, this.layout.h - 12, 18);
+    g.fillStyle(mixColor(felt, 0x000000, 0.18), 1);
+    g.fillRoundedRect(20, 20, this.layout.w - 40, this.layout.h - 40, 13);
     g.fillStyle(felt, 1);
-    g.fillRoundedRect(22, 22, this.layout.w - 44, this.layout.h - 44, 12);
+    g.fillRoundedRect(24, 24, this.layout.w - 48, this.layout.h - 48, 11);
+    g.fillStyle(0xffffff, 0.05);
+    g.fillRoundedRect(28, 28, this.layout.w - 80, 18, 6);
     g.fillStyle(0x7a5230, 1);
     g.fillRect(10, 10, this.layout.w - 20, 12);
     g.fillRect(10, this.layout.h - 22, this.layout.w - 20, 12);

@@ -501,15 +501,18 @@ export class VelocityPlayScene extends Phaser.Scene {
       },
       { x: this.camX, y: this.camY },
     );
-    g.fillStyle(mixColor(th.sky, 0x000000, 0.35), 1);
+    g.fillStyle(mixColor(th.sky, 0x000000, 0.22), 1);
     for (let i = 0; i < 16; i += 1) {
       const x = i * 280 + this.camX * 0.58;
-      const bh = 160 + (i % 4) * 50;
-      g.fillRect(x, this.course.height - bh - 40, 70 + (i % 3) * 18, bh);
-      g.fillStyle(th.accent, 0.06);
-      g.fillRect(x + 10, this.course.height - bh + 20, 8, 14);
-      g.fillStyle(mixColor(th.sky, 0x000000, 0.35), 1);
+      const bh = 210 + (i % 4) * 70;
+      g.fillRect(x, this.course.height - bh - 40, 86 + (i % 3) * 22, bh);
+      g.fillStyle(th.accent, 0.14);
+      g.fillRect(x + 12, this.course.height - bh + 24, 12, 16);
+      g.fillRect(x + 12, this.course.height - bh + 52, 12, 16);
+      g.fillStyle(mixColor(th.sky, 0x000000, 0.22), 1);
     }
+    g.fillStyle(th.accent, 0.1);
+    g.fillRect(0, this.course.height * 0.18, this.course.width, 8);
     g.fillStyle(th.accent, 0.04);
     for (let x = 0; x < this.course.width; x += 96) g.fillRect(x, 0, 2, this.course.height);
     g.fillStyle(0xf3f1ec, 0.9);
@@ -521,24 +524,35 @@ export class VelocityPlayScene extends Phaser.Scene {
     }
 
     if (this.course.world === "training") {
-      g.fillStyle(mixColor(th.sky, 0x000000, 0.28), 1);
-      for (let i = 0; i < 14; i += 1) {
-        const x = i * 260 + this.camX * 0.5;
-        g.fillRect(x, this.course.height - 220 - (i % 4) * 40, 46, 180);
-        g.fillStyle(th.accent, 0.1);
-        g.fillRect(x + 8, this.course.height - 200, 18, 6);
-        g.fillStyle(mixColor(th.sky, 0x000000, 0.28), 1);
+      g.fillStyle(mixColor(th.sky, 0x000000, 0.32), 1);
+      for (let i = 0; i < 16; i += 1) {
+        const x = i * 240 + this.camX * 0.46;
+        g.fillRect(x, this.course.height - 280 - (i % 4) * 50, 54, 230);
+        g.fillStyle(th.accent, 0.12);
+        g.fillRect(x + 10, this.course.height - 240, 16, 8);
+        g.fillRect(x + 10, this.course.height - 200, 16, 8);
+        g.fillStyle(mixColor(th.sky, 0x000000, 0.32), 1);
       }
+      g.fillStyle(0x0a1218, 0.55);
+      g.fillRect(0, this.course.height - 48, this.course.width, 16);
     } else if (this.course.world === "transit") {
       g.fillStyle(th.danger, 0.08 + Math.sin(this.time.now / 180) * 0.04);
       for (let x = 0; x < this.course.width; x += 220) g.fillRect(x, 40, 8, this.course.height);
-      g.fillStyle(0x1a2430, 0.45);
-      for (let i = 0; i < 10; i += 1) g.fillCircle(180 + i * 240, 80, 22);
+      g.fillStyle(0x1a2430, 0.55);
+      for (let i = 0; i < 12; i += 1) {
+        g.fillCircle(140 + i * 220, 70, 26);
+        g.fillRect(140 + i * 220 - 4, 70, 8, this.course.height);
+      }
+      g.fillStyle(mixColor(th.sky, 0x000000, 0.4), 1);
+      g.fillRect(0, 0, this.course.width, 36);
+      g.fillRect(0, this.course.height - 28, this.course.width, 28);
     } else {
-      g.fillStyle(0xffffff, 0.04);
-      for (let i = 0; i < 8; i += 1) g.fillTriangle(i * 520, this.course.height, i * 520 + 180, this.course.height - 260, i * 520 + 380, this.course.height);
-      g.fillStyle(th.accent, 0.12);
-      for (let i = 0; i < 6; i += 1) g.fillRect(i * 420 + 80, 30, 6, 90);
+      g.fillStyle(0xffffff, 0.045);
+      for (let i = 0; i < 10; i += 1) g.fillTriangle(i * 480, this.course.height, i * 480 + 200, this.course.height - 320, i * 480 + 400, this.course.height);
+      g.fillStyle(th.accent, 0.14);
+      for (let i = 0; i < 8; i += 1) g.fillRect(i * 400 + 60, 20, 8, 140);
+      g.fillStyle(0x8ff3ff, 0.08);
+      g.fillRect(0, this.course.height * 0.22, this.course.width, 10);
     }
     for (const s of this.course.solids) {
       const live = this.liveHazard(s);

@@ -22,8 +22,7 @@ export default function ChallengesPage() {
     <div>
       <GameBackdrop slug={currentView?.slug ?? "neon-drift"} className="min-h-[56vh]" dim={0.22} priority>
         <div className="flex min-h-[56vh] flex-col justify-end px-5 pb-10 pt-20 md:px-10">
-          <p className="meta text-white/50">Daily missions</p>
-          <h1 className="display mt-2 text-[44px] text-white md:text-[64px]">Daily Challenges</h1>
+          <h1 className="display text-[44px] text-white md:text-[64px]">Daily Challenges</h1>
           <div className="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-[13px] text-white/65">
             <p>
               <span className="stat mr-2 text-[22px] text-white">{label}</span>

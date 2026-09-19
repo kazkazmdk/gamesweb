@@ -61,22 +61,33 @@ export function AchievementIcon({
   id,
   gameId,
   unlocked,
+  size = "md",
 }: {
   id: string;
   key?: string;
   gameId: string;
   unlocked: boolean;
+  size?: "md" | "xl";
 }) {
   const key = id.split(":")[1] ?? id;
+  const gid = `${key}-${gameId}`.replace(/[^a-z0-9-]/gi, "");
   const accent = accentFor(gameId);
   const glyph = glyphFor(key);
-  const stroke = unlocked ? accent : "rgba(243,241,236,0.62)";
-  const fill = unlocked ? `${accent}28` : "rgba(255,255,255,0.04)";
+  const stroke = unlocked ? accent : "rgba(243,241,236,0.38)";
+  const fill = unlocked ? `${accent}32` : "rgba(255,255,255,0.03)";
+  const cls = size === "xl" ? "h-24 w-24 shrink-0 md:h-28 md:w-28" : "h-12 w-12 shrink-0";
   return (
-    <svg viewBox="0 0 48 48" className="h-12 w-12 shrink-0" aria-hidden>
-      <polygon points="6,2 42,2 46,6 46,42 42,46 6,46 2,42 2,6" fill={fill} stroke={stroke} strokeWidth="1.4" />
+    <svg viewBox="0 0 48 48" className={cls} aria-hidden>
+      <defs>
+        <linearGradient id={`t-${gid}`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={unlocked ? accent : "#f3f1ec"} stopOpacity={unlocked ? 0.55 : 0.12} />
+          <stop offset="1" stopColor="#0c0c0d" stopOpacity="0.2" />
+        </linearGradient>
+      </defs>
+      <polygon points="6,2 42,2 46,6 46,42 42,46 6,46 2,42 2,6" fill={`url(#t-${gid})`} stroke={stroke} strokeWidth="1.6" />
+      <polygon points="8,5 40,5 43,8 43,40 40,43 8,43 5,40 5,8" fill={fill} stroke="rgba(255,255,255,0.08)" strokeWidth="0.8" />
       {glyph.paths?.map((d) => (
-        <path key={d} d={d} fill="none" stroke={stroke} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        <path key={d} d={d} fill="none" stroke={stroke} strokeWidth="2.1" strokeLinejoin="miter" strokeLinecap="square" />
       ))}
       {glyph.circles?.map((c) => (
         <circle key={`${c.cx}-${c.cy}`} cx={c.cx} cy={c.cy} r={c.r} fill="none" stroke={stroke} strokeWidth="2" />
