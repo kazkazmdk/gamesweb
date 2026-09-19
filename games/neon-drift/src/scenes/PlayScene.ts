@@ -86,7 +86,7 @@ export class DriftPlayScene extends Phaser.Scene {
   private signaledReady = false;
   private longFrames = 0;
   private onGrass = false;
-  private testDrive: { throttle: number; steer: number } | null = null;
+  private testDrive: { throttle: number; steer: number; handbrake?: boolean } | null = null;
   private boardMode = "foundation";
   private nativeKeys: GameKeyboard | null = null;
 
@@ -349,7 +349,7 @@ export class DriftPlayScene extends Phaser.Scene {
     }
     this.car.steer = this.testDrive?.steer ?? drive.steer;
     this.car.throttle = this.testDrive?.throttle ?? drive.throttle;
-    this.car.handbrake = this.testDrive ? false : drive.handbrake;
+    this.car.handbrake = this.testDrive ? Boolean(this.testDrive.handbrake) : drive.handbrake;
     this.car.assist = drive.touch && !this.testDrive ? VEHICLE.touchSteerAssist : 0;
 
     if (this.car.throttle !== 0 || this.car.steer !== 0 || this.car.handbrake) {
@@ -676,9 +676,9 @@ export class DriftPlayScene extends Phaser.Scene {
       },
       {
         finishRun: () => this.finish("finish"),
-        setDrive: (throttle: number, steer: number) => {
+        setDrive: (throttle: number, steer: number, handbrake = false) => {
           this.paused = false;
-          this.testDrive = { throttle, steer };
+          this.testDrive = { throttle, steer, handbrake: Boolean(handbrake) };
         },
         hideHud: () => {
           this.hud.setVisible(false);

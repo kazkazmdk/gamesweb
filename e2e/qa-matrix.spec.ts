@@ -118,6 +118,20 @@ test("eight games visual matrix", async ({ page }) => {
     await waitGame(page, slug);
     await page.waitForTimeout(350);
     await save(page, `${slug}-open-1440`);
+    if (slug === "neon-drift") {
+      await cmd(page, "setDrive", 1, 1, true);
+      await page.waitForTimeout(1600);
+      await save(page, "neon-drift-hold-1440");
+      await page.waitForTimeout(1400);
+      await save(page, "neon-drift-combo-1440");
+      await cmd(page, "setDrive", 1, 0, false);
+      await page.waitForTimeout(450);
+      await save(page, "neon-drift-bank-1440");
+      await cmd(page, "setDrive", 1, -1, false);
+      await page.waitForTimeout(900);
+      await save(page, "neon-drift-break-1440");
+      await cmd(page, "setDrive", 0, 0, false);
+    }
     if (slug === "crowd-control") await cmd(page, "setPack", 28);
     await page.waitForTimeout(800);
     await save(page, `${slug}-mid-1440`);
