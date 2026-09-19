@@ -4,7 +4,7 @@
 
 - Branch: `cursor/art-direction-polish-c08e`
 - Base: `cursor/platform-visual-closeout-c08e` @ `327e7865d6ce1466515dea7d6d4fd96f3e967a01`
-- SHA: `0aa593dba613b94717dc4443f81a84153e5d0bf8`
+- SHA: `090e8557de1680db20d0742cda41e9f4fb4c376f`
 - PR: https://github.com/kazkazmdk/gamesweb/pull/15
 
 Aucun merge. Home n’a pas été redesigné. Pas de nouvelle marque, pas de nouveau design system.
@@ -104,6 +104,9 @@ Avant closeout visuel: Home 8.46/157, play 9.12/154, shared 102. Pas de PNG lour
 | Playwright fonctionnel | 48/48 |
 | Playwright visual | 13/13 (baselines Arcade / Profile / Achievements revues) |
 | QA_MATRIX | 4/4 → `docs/qa-art-direction-polish/` (+ `before/` utile) |
+| GitHub CI `check` | pass on `090e855` — [run 35444406923](https://github.com/kazkazmdk/gamesweb/actions/runs/35444406923) |
+| GitHub CI `database` | pass |
+| Vercel preview | Ready — `dpl_2AynSExJWowQKGR9WryFRrUfhcoH` |
 
 ## Remaining issues
 
