@@ -21,6 +21,9 @@ import { usePlayer, useStore } from "@/lib/player";
 import { boardModeFromPlayIndex, resolvePlayIndex } from "@/lib/platform/modes";
 import { formatScore } from "@/lib/player-store";
 import { arcadeStore } from "@/lib/social/arcade-store";
+import { PauseOverlay } from "@/components/game/PauseOverlay";
+import { GameArt } from "@/components/game/GameArt";
+import { ChamferButton } from "@/components/visual/ChamferButton";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import type Phaser from "phaser";
 
@@ -390,42 +393,7 @@ export function GameView({ slug }: { slug: string }) {
         </button>
       </div>
 
-      {paused && !result ? (
-        <div
-          className="absolute inset-0 z-40 grid place-items-center bg-black/55 backdrop-blur-sm"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) resume();
-          }}
-        >
-          <div className="w-[min(360px,90vw)] rounded-2xl border border-white/10 bg-[#121214] p-6">
-            <p className="display text-[32px]">Paused</p>
-            <div className="mt-5 flex flex-col gap-2 text-[14px]">
-              <button type="button" className="rounded-full bg-[var(--accent)] py-3 text-[#140d12]" onClick={resume}>
-                Resume
-              </button>
-              <button type="button" className="rounded-full border border-white/15 py-3" onClick={retry}>
-                Restart
-              </button>
-              <details className="rounded-xl bg-white/5 px-3 py-2">
-                <summary>Controls</summary>
-                <ul className="mt-2 space-y-1 text-[12px] text-white/70">
-                  {game.controls.map((c) => (
-                    <li key={c.input}>
-                      {c.input} — {c.action}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-              <Link href="/settings" className="py-2 text-center text-white/70">
-                Audio
-              </Link>
-              <Link href={`/games/${game.slug}`} className="py-2 text-center text-white/70">
-                Exit game
-              </Link>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {paused && !result ? <PauseOverlay game={game} onResume={resume} onRestart={retry} /> : null}
 
       {result ? (
         <Results
@@ -620,61 +588,97 @@ function Results({
     return () => window.removeEventListener("keydown", onKey);
   }, [onRetry]);
 
+  const game = getManifest(gameId);
+  const pbTone =
+    pbDelta === null
+      ? ""
+      : lowerIsBetter(gameId)
+        ? pbDelta <= 0
+          ? "text-emerald-300"
+          : "text-rose-300"
+        : pbDelta >= 0
+          ? "text-emerald-300"
+          : "text-rose-300";
+  const pbLabel =
+    pbDelta === null
+      ? null
+      : lowerIsBetter(gameId)
+        ? pbDelta <= 0
+          ? `PB ${(pbDelta / 1000).toFixed(3)}s`
+          : `PB +${(pbDelta / 1000).toFixed(3)}s`
+        : pbDelta >= 0
+          ? `PB +${Math.round(pbDelta).toLocaleString()}`
+          : `${Math.abs(Math.round(pbDelta)).toLocaleString()} off PB`;
+
+  const primary = continueEndless ? (
+    <ChamferButton onClick={() => onContinueEndless?.()}>Continue Endless</ChamferButton>
+  ) : wonChallenge ? (
+    <ChamferButton
+      onClick={() => {
+        analytics.track("meaningful_action_after_result", { gameId, type: "rematch" });
+        makeChallenge();
+      }}
+    >
+      {copied ? "Rematch link copied" : "Send rematch"}
+    </ChamferButton>
+  ) : action.href.startsWith("/play/") && (action.type === "retry_pb" || action.type === "challenge_friend" || action.type === "beat_friend") ? (
+    <ChamferButton
+      onClick={() => {
+        analytics.track("meaningful_action_after_result", { gameId, type: action.type });
+        if (action.type === "challenge_friend") makeChallenge();
+        else onRetry();
+      }}
+    >
+      {action.type === "challenge_friend" ? (copied ? "Link copied" : action.label) : action.label}
+    </ChamferButton>
+  ) : (
+    <ChamferButton href={action.href} onClick={() => analytics.track("meaningful_action_after_result", { gameId, type: action.type })}>
+      {action.label}
+    </ChamferButton>
+  );
+
   return (
-    <div className="absolute inset-0 z-40 grid place-items-center bg-black/55">
-      <div className="w-[min(420px,92vw)] px-6 py-8">
-        <p className="meta text-white/45">{result}</p>
-        <p className="display mt-3 text-[64px]">{formatScore(gameId, score)}</p>
+    <div className="absolute inset-0 z-40 overflow-auto bg-black/50">
+      {game ? (
+        <div className="pointer-events-none absolute inset-0">
+          <GameArt slug={game.slug} variant="backdrop" className="h-full w-full opacity-45" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/25" />
+        </div>
+      ) : null}
+      <div className="relative mx-auto flex min-h-full w-[min(560px,94vw)] flex-col justify-end px-5 py-10 md:px-8">
+        <p className="meta text-white/50">{result}</p>
+        <p className="display mt-3 text-[72px] leading-none text-white md:text-[96px]">{formatScore(gameId, score)}</p>
         {challengeOutcome ? (
-          <p className="mt-2 text-[15px] text-emerald-300">
+          <p className="mt-3 text-[16px] text-emerald-300">
             {challengeOutcome === "win" ? "You won" : challengeOutcome === "draw" ? "Draw" : "They still lead"}
           </p>
         ) : null}
-        {pbDelta !== null ? (
-          <p
-            className={`mt-1 text-[14px] ${
-              lowerIsBetter(gameId)
-                ? pbDelta <= 0
-                  ? "text-emerald-300"
-                  : "text-rose-300"
-                : pbDelta >= 0
-                  ? "text-emerald-300"
-                  : "text-rose-300"
-            }`}
-          >
-            {lowerIsBetter(gameId)
-              ? pbDelta <= 0
-                ? `PB ${(pbDelta / 1000).toFixed(3)}s`
-                : `PB +${(pbDelta / 1000).toFixed(3)}s`
-              : pbDelta >= 0
-                ? `PB +${Math.round(pbDelta).toLocaleString()}`
-                : `${Math.abs(Math.round(pbDelta)).toLocaleString()} off PB`}
-          </p>
-        ) : null}
-        {retryHint ? <p className="mt-2 text-[14px] text-white/80">{retryHint}</p> : null}
-        <div className="mt-3 space-y-1 text-[13px] text-white/55">
-          {bestCombo !== null ? <p>Best combo {bestCombo}x</p> : null}
-          {bestDrift !== null ? <p>Best drift {Math.round(bestDrift).toLocaleString()}</p> : null}
-          {cleanSectors !== null ? <p>Clean sectors {cleanSectors}</p> : null}
+
+        <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-2 text-[13px] text-white/60">
+          {pbLabel ? <p className={pbTone}>{pbLabel}</p> : null}
           {medal ? (
             <p>
               {medal}
               {nextMedal && medalGap !== null ? ` · ${nextMedal} in ${(medalGap / 1000).toFixed(3)}s` : ""}
             </p>
           ) : null}
+          {bestCombo !== null ? <p>Combo {bestCombo}x</p> : null}
+          {bestDrift !== null ? <p>Best drift {Math.round(bestDrift).toLocaleString()}</p> : null}
+          {cleanSectors !== null ? <p>Clean sectors {cleanSectors}</p> : null}
           {kills !== null ? (
             <p>
               {kills} kills · lv {level ?? 1}
               {boss ? " · boss down" : ""}
             </p>
           ) : null}
-          {buildHint ? <p>{buildHint}</p> : null}
-          <p>
-            {Math.round(durationMs / 1000)}s · Lv {store.view().level}
-          </p>
-          <p>{done}/3 challenges today</p>
         </div>
-        <p className="mt-2 text-[12px] text-white/45">
+        {retryHint ? <p className="mt-3 text-[14px] text-white/75">{retryHint}</p> : null}
+        {buildHint ? <p className="mt-1 text-[13px] text-white/55">{buildHint}</p> : null}
+
+        <p className="mt-5 text-[13px] text-white/50">
+          +run · Lv {store.view().level} · {done}/3 dailies
+        </p>
+        <p className="mt-1 text-[12px] text-white/40">
           {player.syncStatus === "saving"
             ? "Saving…"
             : player.syncStatus === "offline"
@@ -685,68 +689,30 @@ function Results({
                   ? "Saved"
                   : null}
         </p>
-        <div className="mt-6 flex flex-col gap-2">
-          {continueEndless ? (
-            <button
-              type="button"
-              className="rounded-full bg-[var(--accent)] py-3 text-[14px] text-[#140d12]"
-              onClick={() => onContinueEndless?.()}
-            >
-              Continue Endless
-            </button>
-          ) : wonChallenge ? (
-            <button
-              type="button"
-              className="rounded-full bg-[var(--accent)] py-3 text-[14px] text-[#140d12]"
-              onClick={() => {
-                analytics.track("meaningful_action_after_result", { gameId, type: "rematch" });
-                makeChallenge();
-              }}
-            >
-              {copied ? "Rematch link copied" : "Send rematch"}
-            </button>
-          ) : action.href.startsWith("/play/") && (action.type === "retry_pb" || action.type === "challenge_friend" || action.type === "beat_friend") ? (
-            <button
-              type="button"
-              className="rounded-full bg-[var(--accent)] py-3 text-[14px] text-[#140d12]"
-              onClick={() => {
-                analytics.track("meaningful_action_after_result", { gameId, type: action.type });
-                if (action.type === "challenge_friend") makeChallenge();
-                else onRetry();
-              }}
-            >
-              {action.type === "challenge_friend" ? (copied ? "Link copied" : action.label) : action.label}
-            </button>
-          ) : (
-            <Link
-              href={action.href}
-              className="rounded-full bg-[var(--accent)] py-3 text-center text-[14px] text-[#140d12]"
-              onClick={() => analytics.track("meaningful_action_after_result", { gameId, type: action.type })}
-            >
-              {action.label}
-            </Link>
-          )}
-          {copied ? <p className="text-center text-[12px] text-white/50">Challenge link copied</p> : null}
+
+        <div className="mt-8 flex flex-col items-start gap-3">
+          {primary}
+          {copied ? <p className="text-[12px] text-white/50">Challenge link copied</p> : null}
           {action.type !== "retry_pb" && !continueEndless ? (
-            <button type="button" className="rounded-full border border-white/15 py-3 text-[14px]" onClick={onRetry}>
-              Retry
-            </button>
+            <ChamferButton tone="ghost" cue={false} onClick={onRetry}>
+              Play again
+            </ChamferButton>
           ) : null}
           {action.type !== "challenge_friend" && !wonChallenge ? (
-            <button type="button" className="rounded-full border border-white/15 py-3 text-[14px]" onClick={makeChallenge}>
-              Challenge a friend
-            </button>
+            <ChamferButton tone="quiet" cue={false} onClick={makeChallenge}>
+              Share challenge
+            </ChamferButton>
           ) : nextSlug ? (
             <Link
               href={`/play/${nextSlug}`}
               onClick={() => analytics.track("recommendation_clicked", { from: gameId, to: nextSlug })}
-              className="rounded-full border border-white/15 py-3 text-center text-[14px]"
+              className="home-secondary"
             >
-              Try another game{nextTitle ? ` — ${nextTitle}` : ""}
+              Try {nextTitle ?? "another game"} ›
             </Link>
           ) : null}
         </div>
-        <p className="mt-4 text-center text-[11px] text-white/35">R or Space retries</p>
+        <p className="mt-5 text-[11px] text-white/35">R or Space retries</p>
       </div>
     </div>
   );

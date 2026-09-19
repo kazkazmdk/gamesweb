@@ -46,7 +46,7 @@ export function RankWidget({
   }
 
   return (
-    <div className="gw-float p-5">
+    <div className="gw-stage gw-sheet p-5">
       <p className="meta">Global</p>
       <p className="stat mt-2 text-[64px] leading-none">{formatRank(rank ?? null)}</p>
       <p className="mt-2 text-[15px] text-[var(--text-dim)]">{scoreLabel ? `${scoreLabel}` : "Unranked"}</p>

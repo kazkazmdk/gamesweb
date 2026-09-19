@@ -58,6 +58,8 @@ export class CrowdScene extends Phaser.Scene {
   private payoff = 0;
   private banners: Array<{ text: string; t: number }> = [];
   private levelIndex = 0;
+  private viewZoom = 1.22;
+  private viewCy = 0.82;
 
   constructor() {
     super("crowd-play");
@@ -328,10 +330,23 @@ export class CrowdScene extends Phaser.Scene {
     t.setPosition(x, y).setText(text).setColor(color).setVisible(true).setAlpha(1);
   }
 
+  private framing() {
+    let zoom = this.pack < 16 ? 1.28 : this.pack < 32 ? 1.12 : this.pack < 56 ? 0.96 : this.pack < 80 ? 0.84 : 0.74;
+    const near = this.segs.find((s) => Math.abs(s.z - this.z) < 90 && (s.type === "gate" || s.type === "boss" || s.type === "enemy" || s.type === "finish"));
+    if (near) zoom *= 0.9;
+    if (this.clash) zoom *= 0.88;
+    if (this.payoff > 0) zoom = 1.2;
+    this.viewZoom += (zoom - this.viewZoom) * 0.07;
+    this.viewCy += ((this.payoff > 0 ? 0.84 : 0.7 + this.viewZoom * 0.08) - this.viewCy) * 0.08;
+    return { zoom: this.viewZoom, cy: this.viewCy };
+  }
+
   private draw() {
     const g = this.gfx;
     const w = this.scale.width;
     const h = this.scale.height;
+    const view = this.framing();
+    const depth = 0.48 + view.zoom * 0.22;
     g.clear();
     fillBackdrop(
       g,
@@ -365,7 +380,7 @@ export class CrowdScene extends Phaser.Scene {
     let labelN = 0;
     for (const t of this.labels) t.setVisible(false);
     for (const s of this.segs) {
-      const y = h * 0.75 - (s.z - this.z) * 0.7;
+      const y = h * (0.62 + view.zoom * 0.1) - (s.z - this.z) * depth;
       if (y < -50 || y > h + 50) continue;
       if (s.type === "gate" || s.type === "finish") {
         const leftC = s.left?.kind === "mul" || s.left?.kind === "add" ? 0x2f6a3a : 0x6a2a28;
@@ -425,16 +440,19 @@ export class CrowdScene extends Phaser.Scene {
       g.fillCircle(w * 0.2 + ghost.x * w * 0.6, h * 0.72, 10);
     }
     const cx = w * 0.2 + this.x * w * 0.6;
-    const cy = h * 0.78;
+    const cy = h * view.cy;
     const shown = this.qualityMembers();
+    const person = 0.82 + view.zoom * 0.38;
+    g.fillStyle(0xff8a62, 0.1 + Math.min(0.28, this.pack * 0.003));
+    g.fillEllipse(cx, cy + 12, 36 + this.pack * 0.85 * view.zoom, 14 + this.pack * 0.22);
     for (const m of shown) {
-      const mx = Phaser.Math.Clamp(cx + m.ox * w * 0.6, w * 0.2, w * 0.8);
-      const my = cy + m.oy * 0.35;
-      drawMiniPerson(g, mx, my, 0xff8a62, this.time.now / 140 + m.phase, this.pack > 50 ? 0.85 : 1);
+      const mx = Phaser.Math.Clamp(cx + m.ox * w * 0.55 * view.zoom, w * 0.2, w * 0.8);
+      const my = cy + m.oy * 0.28 * view.zoom;
+      drawMiniPerson(g, mx, my, 0xff8a62, this.time.now / 140 + m.phase, person);
     }
     if (this.pack > shown.length) {
-      g.fillStyle(0xff8a62, 0.18);
-      g.fillCircle(cx, cy + 8, 18 + Math.min(40, (this.pack - shown.length) * 0.35));
+      g.fillStyle(0xff8a62, 0.2);
+      g.fillCircle(cx, cy + 8, 22 + Math.min(56, (this.pack - shown.length) * 0.45));
     }
     drawParticles(g, this.parts);
     fillVignette(g, w, h, 0.28);

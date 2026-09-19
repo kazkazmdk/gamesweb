@@ -314,6 +314,11 @@ export class PocketScene extends Phaser.Scene {
     g.fillRect(10, 10, 12, this.layout.h - 20);
     g.fillRect(this.layout.w - 22, 10, 12, this.layout.h - 20);
     this.drawFurniture(g, theme);
+    g.fillStyle(theme === "arcade" ? 0xff6ad5 : 0xc4b48a, 0.28);
+    for (let i = 0; i < 10; i += 1) {
+      g.fillCircle(28 + i * 70, 18, 3);
+      g.fillCircle(28 + i * 70, this.layout.h - 18, 3);
+    }
     g.fillStyle(theme === "workshop" ? 0x2a1c12 : theme === "arcade" ? 0x1a1028 : 0x0f2418, 1);
     for (const w of this.layout.walls) {
       if (w.x === 0 || w.y === 0 || w.w >= this.layout.w - 2 || w.h >= this.layout.h - 2) continue;

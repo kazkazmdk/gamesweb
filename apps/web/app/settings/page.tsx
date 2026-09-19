@@ -63,7 +63,7 @@ export default function SettingsPage() {
           ))}
         </nav>
 
-        <form className="max-w-xl space-y-8" onSubmit={(e) => e.preventDefault()}>
+        <form className="gw-stage max-w-xl space-y-8 p-5 md:p-6" onSubmit={(e) => e.preventDefault()}>
           {cat === "account" ? (
             <section>
               <h2 className="meta">Account</h2>

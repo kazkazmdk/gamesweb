@@ -92,10 +92,20 @@ export function drawWorld(
   }
 
   if (quality !== "low") {
-    for (let i = 0; i < samples.length; i += 10) {
+    for (let i = 0; i < samples.length; i += 4) {
       const s = samples[i];
-      const side = s.width * 0.5 + 16;
-      drawLamp(g, s.x + s.nx * (side + 8), s.y + s.ny * (side + 8), 28, theme.pole);
+      const n = samples[(i + 3) % samples.length];
+      const turn = Math.abs(s.tx * n.ty - s.ty * n.tx);
+      const side = s.width * 0.5 + 10;
+      if (i % 8 === 0) drawLamp(g, s.x + s.nx * (side + 8), s.y + s.ny * (side + 8), 28, theme.pole);
+      g.fillStyle(theme.barrier, 0.95);
+      g.fillRect(s.x + s.nx * (side + 2) - 3, s.y + s.ny * (side + 2) - 8, 6, 16);
+      if (turn > 0.18) {
+        g.fillStyle(theme.accent, 0.8);
+        const hx = s.x + s.nx * (s.width * 0.42);
+        const hy = s.y + s.ny * (s.width * 0.42);
+        g.fillTriangle(hx, hy, hx + s.tx * 16, hy + s.ty * 16, hx + s.nx * 8, hy + s.ny * 8);
+      }
       const px = s.x - s.nx * (side + 18);
       const py = s.y - s.ny * (side + 18);
       if (def.id === "foundation") {
@@ -247,18 +257,30 @@ export function drawHudChrome(
   h: number,
   touch: boolean,
   flash: number,
+  meters?: { drift: number; combo: number; live: number },
 ) {
   overlay.clear();
   if (flash > 0) {
     overlay.fillStyle(0xffffff, flash);
     overlay.fillRect(0, 0, w, h);
   }
+  if (meters) {
+    const drift = Math.min(1, meters.drift);
+    overlay.fillStyle(0xffffff, 0.1);
+    overlay.fillRect(24, 118, 132, 3);
+    overlay.fillStyle(0xe35aa0, 0.9);
+    overlay.fillRect(24, 118, 132 * drift, 3);
+    if (meters.live > 8) {
+      overlay.fillStyle(0x8dffc1, 0.85);
+      overlay.fillRect(24, 124, Math.min(132, meters.live / 40), 2);
+    }
+  }
   if (!touch) return;
   overlay.fillStyle(0xffffff, 0.05);
-  overlay.fillRoundedRect(18, h * 0.22, w * 0.28, h * 0.46, 18);
-  overlay.fillRoundedRect(w - 18 - w * 0.28, h * 0.22, w * 0.28, h * 0.46, 18);
+  overlay.fillRect(18, h * 0.22, w * 0.28, h * 0.46);
+  overlay.fillRect(w - 18 - w * 0.28, h * 0.22, w * 0.28, h * 0.46);
   overlay.fillStyle(0xe35aa0, 0.2);
-  overlay.fillRoundedRect(w / 2 - 70, h - 88, 140, 58, 16);
+  overlay.fillRect(w / 2 - 70, h - 88, 140, 58);
 }
 
 export function drawCountdown(overlay: Phaser.GameObjects.Graphics, w: number, h: number, remain: number) {

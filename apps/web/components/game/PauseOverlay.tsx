@@ -1,0 +1,97 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import type { GameManifest } from "@gamesweb/game-sdk";
+
+export function PauseOverlay({
+  game,
+  onResume,
+  onRestart,
+}: {
+  game: GameManifest;
+  onResume: () => void;
+  onRestart: () => void;
+}) {
+  const [sel, setSel] = useState(0);
+  const [help, setHelp] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+        e.preventDefault();
+        setSel((n) => (n + 1) % 3);
+      }
+      if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        setSel((n) => (n - 1 + 3) % 3);
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (sel === 0) onResume();
+        else if (sel === 1) onRestart();
+        else window.location.assign(`/games/${game.slug}`);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [game.slug, onRestart, onResume, sel]);
+
+  return (
+    <div
+      className="absolute inset-0 z-40 bg-black/45"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onResume();
+      }}
+    >
+      <div className="absolute inset-y-0 left-0 flex w-[min(380px,92vw)] flex-col justify-center bg-black/35 px-5 py-8 md:px-8">
+        <p className="meta text-white/45">{game.title}</p>
+        <p className="display mt-2 text-[44px] text-white">Paused</p>
+        <div className="mt-8 flex flex-col gap-2" role="menu" aria-label="Pause">
+          <button
+            type="button"
+            role="menuitem"
+            data-selected={sel === 0}
+            className="gw-pause-item"
+            onMouseEnter={() => setSel(0)}
+            onClick={onResume}
+          >
+            Resume
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            data-selected={sel === 1}
+            className="gw-pause-item"
+            onMouseEnter={() => setSel(1)}
+            onClick={onRestart}
+          >
+            Restart
+          </button>
+          <Link
+            href={`/games/${game.slug}`}
+            role="menuitem"
+            data-selected={sel === 2}
+            data-priority="low"
+            className="gw-pause-item"
+            onMouseEnter={() => setSel(2)}
+          >
+            Exit
+          </Link>
+        </div>
+        <button type="button" className="home-secondary mt-6 text-left" onClick={() => setHelp((v) => !v)}>
+          Controls
+        </button>
+        {help ? (
+          <ul className="mt-3 space-y-1 text-[12px] text-white/60">
+            {game.controls.map((c) => (
+              <li key={c.input}>
+                {c.input} — {c.action}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    </div>
+  );
+}

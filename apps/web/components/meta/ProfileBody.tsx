@@ -4,7 +4,6 @@ import { GAME_MANIFESTS, allAchievements, getManifest } from "@gamesweb/game-sdk
 import { levelFromXp } from "@gamesweb/config";
 import { useEffect, useState } from "react";
 import {
-  AchievementStrip,
   ActivityFeed,
   EmptyState,
   ProgressWidget,
@@ -13,8 +12,8 @@ import {
   SectionHeader,
   StatsWidget,
 } from "@/components/platform";
-import { Avatar, useAccent } from "@/components/shell/AppShell";
-import { GameArt } from "@/components/game/GameArt";
+import { useAccent } from "@/components/shell/AppShell";
+import { PlayerIdentity, TrophyShelf } from "@/components/visual";
 import { usePlayer } from "@/lib/player";
 import {
   activityFromHistory,
@@ -23,7 +22,7 @@ import {
   latestUnlocks,
   playerStatsFromSnapshot,
 } from "@/lib/platform/adapters";
-import { formatLevel, formatPlayScore, formatRelativeTime } from "@/lib/platform/format";
+import { formatPlayScore, formatRelativeTime } from "@/lib/platform/format";
 import { playerApi } from "@/lib/player-api";
 import type { PublicProfileView } from "@/lib/platform/focus";
 
@@ -47,34 +46,22 @@ function SelfProfile() {
   const friends = player.friends.filter((f) => f.status === "accepted").length;
 
   return (
-    <div className="relative overflow-hidden px-5 py-8 md:px-10">
-      {favoriteGame ? (
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[42vh] overflow-hidden opacity-40">
-          <GameArt slug={favoriteGame.slug} variant="backdrop" className="h-full w-full" />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[var(--bg)]" />
-        </div>
-      ) : null}
-      <div className="relative">
-        <div className="flex flex-wrap items-end gap-6">
-          <Avatar id={player.avatar} size={96} />
-          <div>
-            <p className="meta">Player</p>
-            <h1 className="display mt-2 text-[48px] md:text-[72px]">{player.displayName}</h1>
-            <p className="mt-2 text-[14px] text-[var(--text-dim)]">
-              @{player.username} · {formatLevel(lv.level)}
-              {player.streak > 0 ? ` · ${player.streak} day streak` : ""}
-            </p>
-            {favorite && favoriteGame ? (
-              <p className="mt-2 text-[13px] text-[var(--text-dim)]">Main game · {favoriteGame.title}</p>
-            ) : null}
-          </div>
-        </div>
-        <div className="mt-4">
+    <div>
+      <PlayerIdentity
+        name={player.displayName}
+        username={player.username}
+        avatar={player.avatar}
+        level={lv.level}
+        stat={player.streak > 0 ? `${player.streak} day streak` : favoriteGame ? `Main · ${favoriteGame.title}` : undefined}
+        slug={favoriteGame?.slug}
+        action={
           <QuickAction href="/settings" tone="quiet">
             Settings
           </QuickAction>
-        </div>
-        <div className="mt-8 max-w-md">
+        }
+      />
+      <div className="px-5 py-8 md:px-10">
+        <div className="max-w-md">
           <ProgressWidget value={lv.intoLevel} max={Math.max(1, lv.needed)} caption="Level progress" />
         </div>
 
@@ -93,21 +80,19 @@ function SelfProfile() {
         <RecordsBlock />
 
         <section className="mt-12">
-          <SectionHeader title="Latest unlocks" action={<QuickAction href="/achievements" tone="quiet">All</QuickAction>} />
+          <SectionHeader title="Trophy shelf" action={<QuickAction href="/achievements" tone="quiet">All</QuickAction>} />
           <div className="mt-4">
             {showcase.length ? (
-              <AchievementStrip
-                unlocked={stats.achievements}
-                total={allAchievements().length}
+              <TrophyShelf
+                featured
                 items={showcase.map((a) => ({
-                  key: a.key,
+                  id: a.key,
                   name: a.name,
                   description: a.description,
                   unlocked: true,
                   gameId: a.gameId ?? "platform",
                   xp: a.xp,
                 }))}
-                showcase
               />
             ) : (
               <EmptyState title="No unlocks yet" body="Finish a run to start a showcase." action={<QuickAction href="/">Play</QuickAction>} />
@@ -209,41 +194,37 @@ function PublicProfile({ username }: { username: string }) {
         }));
 
   return (
-    <div className="px-5 py-8 md:px-10">
-      <div className="flex flex-wrap items-end gap-6">
-        <Avatar id={data.avatar} size={96} />
-        <div>
-          <h1 className="display text-[48px] md:text-[72px]">{data.displayName}</h1>
-          <p className="mt-2 text-[14px] text-[var(--text-dim)]">
-            @{data.username} · {formatLevel(data.level)}
-          </p>
-          {favorite ? <p className="mt-2 text-[13px] text-[var(--text-dim)]">Main game · {favorite.title}</p> : null}
-        </div>
-      </div>
-      {friend?.presence === "playing" && friend.gameId ? (
-        <div className="mt-6">
-          <QuickAction href={`/play/${getManifest(friend.gameId)?.slug ?? ""}`}>Join</QuickAction>
-        </div>
-      ) : null}
-
+    <div>
+      <PlayerIdentity
+        name={data.displayName}
+        username={data.username}
+        avatar={data.avatar}
+        level={data.level}
+        stat={favorite ? `Main · ${favorite.title}` : undefined}
+        slug={favorite?.slug}
+        action={
+          friend?.presence === "playing" && friend.gameId ? (
+            <QuickAction href={`/play/${getManifest(friend.gameId)?.slug ?? ""}`}>Play this game</QuickAction>
+          ) : undefined
+        }
+      />
+      <div className="px-5 py-8 md:px-10">
       <RecordsBlock scores={data.records} />
 
       <section className="mt-12">
         <SectionHeader title="Achievements" />
         <div className="mt-4">
           {unlocked.length ? (
-            <AchievementStrip
-              unlocked={unlocked.length}
-              total={allAchievements().length}
+            <TrophyShelf
+              featured
               items={unlocked.slice(0, 3).map((a) => ({
-                key: a.key,
+                id: a.key,
                 name: a.name,
                 description: a.description,
                 unlocked: true,
                 gameId: a.gameId ?? "platform",
                 xp: a.xp,
               }))}
-              showcase
             />
           ) : (
             <EmptyState title="No public trophies yet" />
@@ -261,6 +242,7 @@ function PublicProfile({ username }: { username: string }) {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }

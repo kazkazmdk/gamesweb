@@ -33,6 +33,7 @@ test("arcade hub is the widget surface", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Arcade" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Daily challenges" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Player" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Enter today|Open Daily Arcade|Protect streak|Answer|Play this game/ }).first()).toBeVisible();
 });
 
 test("achievements is a real destination", async ({ page }) => {
@@ -106,7 +107,8 @@ test("mobile navigation uses five destinations", async ({ page }) => {
 
 test("game hub leads with your run", async ({ page }) => {
   await page.goto("/games/neon-drift");
-  await expect(page.getByRole("heading", { name: "Your run" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Neon Drift" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Play|Continue/ }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "The game" })).toBeVisible();
   await page.getByRole("tab", { name: "Hairpin District" }).click();
   await expect(page.getByRole("tab", { name: "Hairpin District" })).toHaveAttribute("aria-selected", "true");

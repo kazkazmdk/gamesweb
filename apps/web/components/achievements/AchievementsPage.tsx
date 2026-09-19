@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { GAME_MANIFESTS, allAchievements } from "@gamesweb/game-sdk";
 import { EmptyState, ProgressWidget, StatusPill } from "@/components/platform";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
+import { TrophyShelf } from "@/components/visual";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer } from "@/lib/player";
 import { achievementCatalog } from "@/lib/platform/focus";
@@ -80,6 +81,25 @@ export function AchievementsPage() {
         <ProgressWidget value={unlocked} max={catalog.length || 1} />
       </div>
 
+      {recent ? (
+        <section className="mt-10">
+          <p className="meta text-white/40">Recently unlocked</p>
+          <div className="mt-4">
+            <TrophyShelf
+              featured
+              items={[recent].map((a) => ({
+                id: a.id,
+                name: a.name,
+                description: a.description,
+                unlocked: true,
+                gameId: a.gameId ?? "platform",
+                xp: a.xp,
+              }))}
+            />
+          </div>
+        </section>
+      ) : null}
+
       <div className="mt-8 flex flex-wrap gap-6">
         <div role="tablist" aria-label="Achievement filters">
           {FILTERS.map((f) => (
@@ -128,7 +148,7 @@ export function AchievementsPage() {
                   type="button"
                   onClick={() => setOpen(expanded ? null : a.id)}
                   className={`flex w-full items-start gap-4 px-4 py-4 text-left ${
-                    a.unlocked ? "gw-selected" : "gw-float"
+                    a.unlocked ? "gw-frame gw-stage" : "gw-stage opacity-60"
                   }`}
                 >
                   <AchievementIcon id={a.id} gameId={a.gameId} unlocked={a.unlocked} />

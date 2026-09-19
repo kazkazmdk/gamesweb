@@ -1,10 +1,13 @@
 "use client";
 
 import { InviteWidget, FriendPresence, SectionHeader } from "@/components/platform";
+import { EmptyStateStage, PlayerVersus } from "@/components/visual";
+import { ChamferButton } from "@/components/visual/ChamferButton";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
 import { useArcade } from "@/lib/social/use-arcade";
-import Link from "next/link";
+import { formatPlayScore } from "@/lib/platform/format";
+import { getManifest } from "@gamesweb/game-sdk";
 
 export default function FriendsPage() {
   useAccent();
@@ -16,72 +19,105 @@ export default function FriendsPage() {
   const offline = accepted.filter((f) => f.presence === "offline");
   const requests = player.friends.filter((f) => f.status === "pending-in" || f.status === "pending-out");
   const arcade = useArcade();
-  const recent = arcade.recentPlayers;
+  const openChallenges = arcade.challenges.filter((c) => c.status === "open" || c.status === "accepted");
   const rivals = arcade.rivals;
 
   return (
-    <div className="px-5 py-8 md:px-10">
-      <h1 className="display text-[44px] md:text-[64px]">Friends</h1>
-      <p className="mt-2 max-w-lg text-[15px] text-[var(--text-dim)]">
-        Presence is real when someone is actually here. Join opens the same game — rooms come later.
-      </p>
-      <div className="mt-8 max-w-xl">
-        <InviteWidget />
-      </div>
-
-      {rivals.length ? (
-        <section className="mt-10 max-w-xl">
-          <SectionHeader title="Rivals" />
-          <ul className="mt-2 divide-y divide-[var(--line)]">
-            {rivals.map((r) => (
-              <li key={r.otherId} className="flex items-center justify-between py-3">
-                <span>
-                  {r.otherName} {r.winsA}–{r.winsB}
-                </span>
-                <Link href="/inbox" className="text-[13px] text-[var(--accent)]">
-                  Rematch
-                </Link>
-              </li>
-            ))}
-          </ul>
+    <div className="pb-16">
+      {playing[0] && playing[0].gameId ? (
+        <section className="relative min-h-[42vh] overflow-hidden">
+          <FriendPresence friend={playing[0]} />
         </section>
       ) : null}
 
-      {recent.length ? (
-        <section className="mt-10 max-w-xl">
-          <SectionHeader title="Recent players" />
-          <ul className="mt-2 divide-y divide-[var(--line)]">
-            {recent.map((p) => (
-              <li key={p.id} className="flex items-center justify-between py-3">
-                <span>{p.name}</span>
-                <span className="text-[12px] text-[var(--text-dim)]">Add friend from their profile</span>
-              </li>
+      <div className="px-5 pt-8 md:px-10">
+        <p className="meta text-white/45">Social</p>
+        <h1 className="display mt-2 text-[44px] md:text-[64px]">Friends</h1>
+      </div>
+
+      {playing.length ? (
+        <section className="mt-8 px-5 md:px-10">
+          <SectionHeader title="Playing now" />
+          <div className="mt-4 grid gap-3">
+            {playing.map((f) => (
+              <FriendPresence key={f.id} friend={f} />
             ))}
-          </ul>
+          </div>
+        </section>
+      ) : null}
+
+      {openChallenges.length ? (
+        <section className="mt-10 px-5 md:px-10">
+          <SectionHeader title="Challenges" />
+          <div className="mt-4 grid gap-4">
+            {openChallenges.slice(0, 4).map((c) => {
+              const game = getManifest(c.gameId);
+              return (
+                <PlayerVersus
+                  key={c.id}
+                  left={{ name: c.challengerName, score: formatPlayScore(c.gameId, c.challengerScore) ?? undefined }}
+                  right={{ name: c.targetName ?? "Open", score: c.targetScore != null ? formatPlayScore(c.gameId, c.targetScore) ?? undefined : undefined }}
+                  gameId={c.gameId}
+                  stake={game?.title}
+                  expires={c.status}
+                  href={`/c/${c.publicCode}`}
+                  cta={c.challengerId === player.id ? "Open" : "Answer"}
+                />
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {rivals.length ? (
+        <section className="mt-10 px-5 md:px-10">
+          <SectionHeader title="Rivals" />
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {rivals.map((r) => (
+              <PlayerVersus
+                key={r.otherId}
+                left={{ name: player.displayName, score: String(r.winsA) }}
+                right={{ name: r.otherName, score: String(r.winsB) }}
+                stake={`${r.totalMatches} matches`}
+                href="/inbox"
+                cta="Rematch"
+              />
+            ))}
+          </div>
         </section>
       ) : null}
 
       {player.pendingInvite && !player.friends.some((f) => f.username === player.pendingInvite) ? (
-        <div className="mt-8 max-w-xl border-t border-[var(--line)] pt-4">
+        <section className="mt-10 px-5 md:px-10">
           <p className="text-[15px]">{player.pendingInvite} invited you.</p>
           {player.isGuest ? (
             <p className="mt-1 text-[13px] text-[var(--text-dim)]">Save progress to add them as a friend.</p>
           ) : (
-            <button type="button" className="mt-3 min-h-11 text-[13px] underline" onClick={() => void store.addPendingFriend()}>
+            <ChamferButton className="mt-3" onClick={() => void store.addPendingFriend()}>
               Add friend
-            </button>
+            </ChamferButton>
           )}
-        </div>
+        </section>
       ) : null}
 
       {player.friends.length === 0 ? (
-        <p className="mt-8 text-[15px] text-[var(--text-dim)]">No friends yet. Invite someone to chase your Neon score.</p>
+        <div className="mt-8 px-5 md:px-10">
+          <EmptyStateStage
+            slug="neon-drift"
+            kicker="Floor"
+            title="No friends yet"
+            body="Invite someone to chase a score. Presence only appears when they are actually here."
+            action={<InviteWidget />}
+          />
+        </div>
       ) : (
-        <div className="mt-10 max-w-xl space-y-10">
-          <Group title="Playing now" empty="No friends playing. Invite someone to chase a score." friends={playing} store={store} />
+        <div className="mt-12 space-y-10 px-5 md:px-10">
           <Group title="Online" empty="No one idle-online." friends={online} store={store} />
           <Group title="Requests" empty="No pending invites." friends={requests} store={store} />
-          <Group title="Offline" empty="Offline friends stay quiet until they return." friends={offline} store={store} />
+          <Group title="Everyone" empty="Offline friends stay quiet until they return." friends={offline} store={store} />
+          <div className="max-w-xl">
+            <InviteWidget />
+          </div>
         </div>
       )}
     </div>
@@ -99,24 +135,29 @@ function Group({
   friends: ReturnType<typeof usePlayer>["friends"];
   store: ReturnType<typeof useStore>;
 }) {
+  if (!friends.length && title !== "Everyone") {
+    return (
+      <section>
+        <SectionHeader title={title} />
+        <p className="mt-3 text-[13px] text-[var(--text-faint)]">{empty}</p>
+      </section>
+    );
+  }
+  if (!friends.length) return null;
   return (
     <section>
       <SectionHeader title={title} />
-      {friends.length ? (
-        <div className="mt-2 divide-y divide-[var(--line)]">
-          {friends.map((f) => (
-            <FriendPresence
-              key={f.id}
-              friend={f}
-              onRemove={f.status === "accepted" ? () => store.removeFriend(f.id) : undefined}
-              onAccept={f.status === "pending-in" ? () => store.acceptFriend(f.id) : undefined}
-              onDecline={f.status === "pending-in" ? () => store.declineFriend(f.id) : undefined}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="mt-3 text-[13px] text-[var(--text-faint)]">{empty}</p>
-      )}
+      <div className="mt-3 space-y-2">
+        {friends.map((f) => (
+          <FriendPresence
+            key={f.id}
+            friend={f}
+            onRemove={f.status === "accepted" ? () => store.removeFriend(f.id) : undefined}
+            onAccept={f.status === "pending-in" ? () => store.acceptFriend(f.id) : undefined}
+            onDecline={f.status === "pending-in" ? () => store.declineFriend(f.id) : undefined}
+          />
+        ))}
+      </div>
     </section>
   );
 }

@@ -445,7 +445,7 @@ export class SwarmPlayScene extends Phaser.Scene {
       this.synth.tone(140, 0.16, "sawtooth", 0.05, 0.1);
     }
     const a = simRand() * Math.PI * 2;
-    const dist = 540 + simRand() * 160;
+    const dist = elapsed < 8 ? 300 + simRand() * 90 : 540 + simRand() * 160;
     const scale = 1 + Math.min(1.4, elapsed / 240);
     spawnEnemy(slot, kind, this.px + Math.cos(a) * dist, this.py + Math.sin(a) * dist, scale);
     slot.x = clamp(slot.x, 30, ARENA - 30);

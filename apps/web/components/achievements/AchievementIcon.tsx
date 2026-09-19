@@ -74,7 +74,7 @@ export function AchievementIcon({
   const fill = unlocked ? `${accent}28` : "rgba(255,255,255,0.04)";
   return (
     <svg viewBox="0 0 48 48" className="h-12 w-12 shrink-0" aria-hidden>
-      <rect x="3" y="3" width="42" height="42" rx="4" fill={fill} stroke={stroke} strokeWidth="1.4" />
+      <polygon points="6,2 42,2 46,6 46,42 42,46 6,46 2,42 2,6" fill={fill} stroke={stroke} strokeWidth="1.4" />
       {glyph.paths?.map((d) => (
         <path key={d} d={d} fill="none" stroke={stroke} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
       ))}

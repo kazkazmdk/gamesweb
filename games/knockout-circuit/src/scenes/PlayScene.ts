@@ -312,6 +312,8 @@ export class KnockoutScene extends Phaser.Scene {
       }
       g.fillStyle(0x2a2218, 0.45);
       g.fillRect(0, this.map.height - 40, this.map.width, 40);
+      g.fillStyle(th.accent, 0.16);
+      for (let i = 0; i < 5; i += 1) g.fillRect(i * 520 + this.camX * 0.12, this.map.height * 0.18, 140, 8);
     } else if (env === "skyworks") {
       g.fillStyle(mixColor(th.sky, 0xffffff, 0.06), 1);
       g.fillCircle(this.map.width * 0.7, 90, 50);
