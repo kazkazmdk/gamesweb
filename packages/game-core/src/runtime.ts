@@ -44,6 +44,7 @@ export type GwDebugCommands = {
   setDrive?: (throttle: number, steer: number) => void;
   jump?: () => void;
   hideHud?: () => void;
+  setPack?: (n: number) => void;
 };
 
 type GwDebugWindow = Window & {
