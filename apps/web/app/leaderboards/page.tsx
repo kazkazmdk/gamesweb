@@ -25,14 +25,14 @@ export default function LeaderboardsPage() {
   const modes = boardModeOptions(game.id);
   const allRows = store.leaderboard(game.id, mode);
   const personal = store.personalRank(game.id, mode);
-  const rivalNames = new Set(arcade.rivals.map((r) => r.otherName.toLowerCase()));
   const rows = useMemo(() => {
     if (scope === "friends") return friendsBoard(allRows, player.friends);
     if (scope === "rivals") {
+      const rivalNames = new Set(arcade.rivals.map((r) => r.otherName.toLowerCase()));
       return allRows.filter((r) => r.isYou || (r.name && rivalNames.has(r.name.toLowerCase())));
     }
     return allRows;
-  }, [allRows, player.friends, rivalNames, scope]);
+  }, [allRows, arcade.rivals, player.friends, scope]);
   const rank = rankViewModel(rows, game.id, scope === "global" ? personal : null);
   const youOffTop = rank.rank !== null && rank.rank > 10;
   const podium = rank.top3.map((r) => ({

@@ -484,6 +484,10 @@ export class CrowdScene extends Phaser.Scene {
       },
       {
         finishRun: () => this.finish(),
+        setPack: (n: number) => {
+          this.pack = Math.max(1, Math.min(96, n));
+          this.syncPack(true);
+        },
         hideHud: () => {
           this.hud.setVisible(false);
           this.labels.forEach((t) => t.setVisible(false));

@@ -512,6 +512,13 @@ export class VelocityPlayScene extends Phaser.Scene {
     }
     g.fillStyle(th.accent, 0.04);
     for (let x = 0; x < this.course.width; x += 96) g.fillRect(x, 0, 2, this.course.height);
+    g.fillStyle(0xf3f1ec, 0.9);
+    g.fillRect(36, this.course.height - 90, 10, 54);
+    g.fillRect(86, this.course.height - 90, 10, 54);
+    for (let i = 0; i < 6; i += 1) {
+      g.fillStyle(i % 2 ? 0x111113 : 0xf3f1ec, 1);
+      g.fillRect(36 + i * 10, this.course.height - 96, 10, 8);
+    }
 
     if (this.course.world === "training") {
       g.fillStyle(mixColor(th.sky, 0x000000, 0.28), 1);

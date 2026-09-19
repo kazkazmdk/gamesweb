@@ -379,8 +379,10 @@ export class SkyStackScene extends Phaser.Scene {
     }
     const top = this.stack[this.stack.length - 1];
     if (this.halo > 0.02 && top) {
-      g.lineStyle(3, 0xffffff, this.halo * 0.85);
-      g.strokeRoundedRect(top.x - 6, top.y + this.camY + ox - 6, top.w + 12, SLAB_H + 4, 10);
+      g.lineStyle(4, 0xffffff, this.halo * 0.95);
+      g.strokeRoundedRect(top.x - 8, top.y + this.camY + ox - 8, top.w + 16, SLAB_H + 8, 10);
+      g.fillStyle(0xffffff, this.halo * 0.08);
+      g.fillRoundedRect(top.x - 4, top.y + this.camY + ox - 4, top.w + 8, SLAB_H, 8);
     }
     for (const s of this.scraps) {
       g.save();
