@@ -4,6 +4,7 @@ test("games home is focus-driven", async ({ page }) => {
   await page.goto("/");
     await expect(page.getByRole("heading", { level: 1, name: "Neon Drift" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Play|Continue/ }).first()).toBeVisible();
+  await page.getByRole("heading", { level: 1, name: "Neon Drift" }).click();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("heading", { level: 1, name: "Velocity Run" })).toBeVisible();
   await page.keyboard.press("ArrowRight");
