@@ -516,12 +516,15 @@ export class VelocityPlayScene extends Phaser.Scene {
     g.fillRect(0, this.course.height - 28, this.course.width, 28);
     g.fillStyle(th.accent, 0.04);
     for (let x = 0; x < this.course.width; x += 96) g.fillRect(x, 0, 2, this.course.height);
-    drawGateArch(g, 28, this.course.height - 168, 88, 140, 0xf3f1ec, th.accent);
-    drawLamp(g, 148, this.course.height - 90, 54, th.accent, 0x1a2430);
+    const startPad = this.course.solids.find((s) => s.kind === "start");
+    if (startPad) {
+      drawGateArch(g, startPad.x - 24, startPad.y - 92, 88, 132, 0xf3f1ec, th.accent);
+      drawLamp(g, startPad.x + 110, startPad.y + 80, 58, th.accent, 0x1a2430);
+    }
     g.fillStyle(mixColor(th.sky, 0xffffff, 0.08), 1);
-    g.fillRect(220, this.course.height - 210, 18, 180);
-    g.fillStyle(th.accent, 0.22);
-    g.fillRect(216, this.course.height - 218, 26, 10);
+    g.fillRect(240, 490, 22, 210);
+    g.fillStyle(th.accent, 0.28);
+    g.fillRect(236, 482, 30, 12);
 
     if (this.course.world === "training") {
       g.fillStyle(mixColor(th.sky, 0x000000, 0.28), 1);

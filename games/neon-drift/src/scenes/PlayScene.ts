@@ -137,7 +137,7 @@ export class DriftPlayScene extends Phaser.Scene {
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hud = this.add
-      .text(24, 88, "", { fontFamily: "ui-sans-serif, system-ui, sans-serif", fontSize: "18px", color: "#f3f1ec" })
+      .text(24, 148, "", { fontFamily: "ui-sans-serif, system-ui, sans-serif", fontSize: "18px", color: "#f3f1ec" })
       .setScrollFactor(0)
       .setDepth(21);
     this.deltaTxt = this.add
@@ -163,9 +163,10 @@ export class DriftPlayScene extends Phaser.Scene {
     this.hint = this.add
       .text(this.scale.width / 2, this.scale.height * 0.7, this.hintCopy(), {
         fontFamily: "ui-sans-serif, system-ui, sans-serif",
-        fontSize: "28px",
+        fontSize: "26px",
         color: "#f3f1ec",
         align: "center",
+        lineSpacing: 10,
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
@@ -233,9 +234,12 @@ export class DriftPlayScene extends Phaser.Scene {
   }
 
   private hintCopy() {
-    if (this.tutorialStep === "hold") return "HOLD DRIFT";
-    if (this.tutorialStep === "combo") return `COMBO  ×${Math.max(1, this.score.combo).toFixed(1)}`;
-    if (this.tutorialStep === "bank") return "BANK IT";
+    const live = Math.max(0, Math.floor(this.score.currentDrift));
+    const banked = Math.max(0, Math.floor(this.score.display - this.score.currentDrift));
+    const combo = Math.max(1, this.score.combo);
+    if (this.tutorialStep === "hold") return `HOLD DRIFT\nLIVE +${live}   BANKED ${banked}`;
+    if (this.tutorialStep === "combo") return `COMBO  ×${combo.toFixed(1)}\nLIVE +${live}   BANKED ${banked}`;
+    if (this.tutorialStep === "bank") return `BANK IT\nLIVE +${live} → BANKED`;
     return "";
   }
 

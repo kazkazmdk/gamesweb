@@ -292,11 +292,11 @@ export function drawHudChrome(
   if (meters) {
     const drift = Math.min(1, meters.drift);
     overlay.fillStyle(0xffffff, 0.1);
-    overlay.fillRect(24, 168, 168, 4);
+    overlay.fillRect(24, 236, 168, 4);
     overlay.fillStyle(0xe35aa0, 0.92);
-    overlay.fillRect(24, 168, 168 * drift, 4);
+    overlay.fillRect(24, 236, 168 * drift, 4);
     overlay.fillStyle(0x8dffc1, meters.live > 8 ? 0.9 : 0.22);
-    overlay.fillRect(24, 176, Math.min(168, Math.max(8, meters.live / 28)), 3);
+    overlay.fillRect(24, 244, Math.min(168, Math.max(8, meters.live / 28)), 3);
   }
   if (!touch) return;
   overlay.fillStyle(0xffffff, 0.05);
