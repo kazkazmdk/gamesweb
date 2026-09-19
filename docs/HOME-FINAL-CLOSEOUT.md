@@ -64,11 +64,11 @@ Home visual snapshots are updated only after reviewing Playwright `actual` frame
 
 ## CI
 
-Local (this machine), after visual review of Swarm + activities actuals:
+Local re-run on `ce3a7abd8b559851d6e89d7aa5c99e6a0f6743a9` (no `--update-snapshots`):
 
 ```text
 pnpm --filter @gamesweb/web typecheck   # pass
-pnpm --filter @gamesweb/web lint        # pass (existing GameArt img warning)
+pnpm --filter @gamesweb/web lint        # pass (existing GameArt <img> warning)
 pnpm test                               # 99 passed
 pnpm build                              # pass
 pnpm exec playwright test               # 61 passed / 0 failed
@@ -76,14 +76,26 @@ pnpm exec playwright test               # 61 passed / 0 failed
 
 Visual: 6 home snapshots were red on `639fa8f`. After this pass, Neon/Velocity/390/1920 already matched the closeout baselines; Swarm 1440 and Neon activities were reviewed and replaced. Re-run without `--update-snapshots` is green.
 
-GitHub Actions (`check`, `database`) and Vercel are recorded on the final pushed SHA — not from this local run alone.
+GitHub Actions on the same SHA (`https://github.com/kazkazmdk/gamesweb/actions/runs/35401027856`):
+
+- `check` = success
+- `database` = success
+
+PR: https://github.com/kazkazmdk/gamesweb/pull/13
 
 ## Vercel
 
-Must match the final head SHA. Pending until that deployment is READY and `/` returns 200.
+Deployment for `ce3a7abd8b559851d6e89d7aa5c99e6a0f6743a9`:
+
+- id: `dpl_2znEJQttDvpaq6DV8CpxaVUbpC1b`
+- url: https://gamesweb-kjqz4sfln-loan-s-projects2z.vercel.app/
+- inspector: https://vercel.com/loan-s-projects2z/gamesweb/2znEJQttDvpaq6DV8CpxaVUbpC1b
+- state: READY
+- `GET /` → HTTP 200
+- HTML confirms GameRail full titles, cup route `R1 → R2 → R3 → R4 → Final` with full names, double-chevron avatar glyph 0
 
 ## Remaining
 
-- **P0:** do not write `none` until GitHub `check` + `database` are success and Vercel is READY on the final SHA.
-- **P1:** Swarm mobile hero is quieter than desktop (tile carries the swarm). Crowd pack stays tiny because of the camera. Neon car is track-led on 390.
-- **P2:** Daily chain still uses first-word split (out of scope). GP tile labels wrap to two lines on purpose.
+- **P0:** none (GitHub `check` + `database` success, Vercel READY + HTTP 200 on this SHA, Velocity/Swarm/GP gates pass).
+- **P1:** Swarm mobile hero is quieter than desktop (tile carries the swarm). Crowd pack stays tiny because of the camera. Velocity 390 hero is weaker than desktop (tile carries runner + spike). Neon car is track-led on 390.
+- **P2:** Daily chain still uses first-word split (Daily was out of redesign scope). GP tile labels wrap to two lines on purpose.
