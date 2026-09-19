@@ -184,7 +184,7 @@ export function drawWorld(
 
 function drawTrackside(g: Phaser.GameObjects.Graphics, def: TrackDef, samples: TrackSample[], quality: string) {
   const theme = def.theme;
-  const apron = def.id === "foundation" ? 0x0c1822 : def.id === "velocity" ? 0x10161e : 0x14161c;
+  const apron = def.id === "foundation" ? 0x1a3040 : def.id === "velocity" ? 0x182432 : 0x1c2028;
   for (let i = 0; i < samples.length; i += 1) {
     const s = samples[i];
     const n = samples[(i + 1) % samples.length];
@@ -197,9 +197,9 @@ function drawTrackside(g: Phaser.GameObjects.Graphics, def: TrackDef, samples: T
     const dist = s.width * 0.5 + 78;
     const x = s.x + s.nx * dist;
     const y = s.y + s.ny * dist;
-    const bw = 42 + (i % 3) * 18;
-    const bh = 64 + (i % 5) * 28;
-    g.fillStyle(theme.building, 0.96);
+    const bw = 56 + (i % 3) * 22;
+    const bh = 88 + (i % 5) * 36;
+    g.fillStyle(def.id === "foundation" ? 0x2a2230 : theme.building, 0.98);
     g.fillRect(x - bw / 2, y - bh / 2, bw, bh);
     g.fillStyle(theme.accent, 0.16 + (i % 4 === 0 ? 0.12 : 0));
     g.fillRect(x - bw / 2 + 8, y - bh / 2 + 10, 8, 8);

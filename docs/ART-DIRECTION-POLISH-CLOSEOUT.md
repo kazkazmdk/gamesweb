@@ -5,100 +5,124 @@
 - Branch: `cursor/art-direction-polish-c08e`
 - Base: `cursor/platform-visual-closeout-c08e` @ `327e7865d6ce1466515dea7d6d4fd96f3e967a01`
 - SHA: *(stamped after the matrix commit)*
+- PR: https://github.com/kazkazmdk/gamesweb/pull/15
 
 Aucun merge. Home n’a pas été redesigné. Pas de nouvelle marque, pas de nouveau design system.
 
-## CTA semantics
-
-Trois familles seulement. Pas cinq couleurs.
-
-| Famille | Traitement | Exemples |
-| --- | --- | --- |
-| **Platform** | Crème `#f3f1ec`, forme chanfreinée, contraste élevé | Invite, Copy link, Create party, Find a rival, Share challenge |
-| **Game** | `--accent` du jeu actif | Play / Continue, Retry, Play again, Continue Endless |
-| **Event / competitive** | `--accent` de l’événement ou du jeu courant | Enter today, Enter stage, Race this round, Answer, Rematch |
-
-`ChamferButton` `tone="platform"` = crème. `tone="primary"` = accent courant (jeu ou event via `useAccent`). Ghost / quiet restent secondaires.
-
 ## Screens changed
 
-Profile, Friends, Leaderboards, Achievements, Arcade, Daily, Grand Prix, Hub, Crew, Inbox, Party, Challenges, Results, Pause, Settings (nav only). Huit mondes de jeu. Home inchangé (mêmes JPG / même layout).
+Profile, Friends, Leaderboards, Achievements, Arcade, Daily, Grand Prix, Hub, Crew, Inbox, Party, Challenges, Results, Pause, Settings (focus / nav only). Huit mondes de jeu. Home inchangé (mêmes JPG / même layout).
+
+Les fonds plateforme (Arcade, Hub, Daily, GP, Profile, LB, Crew) utilisent `PlatformScene` (SVG auteur). Home continue d’utiliser `GameArt` JPG.
 
 ## Exact design errors fixed
 
 ### Profile
 
-- `SETTINGS` orphelin → bouton icône géométrique attaché à la carte (`aria-label="Settings"`).
-- `LEVEL PROGRESS` vide → barre réelle dans la carte: `Lv n`, XP current / next, marqueur next level.
-- Demi-écran mort compressé (`min-h` 200/240 au lieu de 280/360).
-- Carte: cadre avatar, profondeur de backdrop, hiérarchie chiffre > label.
+- `SETTINGS` orphelin → bouton icône géométrique attaché en haut à droite (`aria-label="Settings"`).
+- `LEVEL PROGRESS` vide → barre réelle dans la carte: `Lv n`, `n / m XP`, marqueur `Next · Lv n`.
+- Demi-écran mort compressé (`min-h` 200/240).
+- Carte: cadre avatar, scène Neon auteur, hiérarchie chiffre > label.
 
 ### Friends
 
 - Empty state n’est plus un rectangle géant + titre doublon.
-- Objet social: identité + siège vide + VS + ce que l’amitié ouvre (Challenge / Compare / Rival / Activity) + invite. Aucune donnée fake.
+- Objet social compact: identité + siège vide + VS + Challenge / Compare / Rival / Activity + invite crème.
+- Aucune donnée fake.
 
 ### Leaderboards
 
-- Sélecteur jeu: tiles 10.5×6.5rem + nom visible + frame de sélection.
-- Mode / board: chips géométriques, plus des underlines.
+- Sélecteur jeu: tiles 12.75×7.75rem (10rem mobile) + nom + scène auteur + frame de sélection.
+- Mode / board: chips géométriques.
 - 1 score réel: podium honnête « Set the pace. » Pas de joueurs inventés.
-- ≥3: podium avec échelle de rang.
 
 ### Achievements
 
-- Featured Beacon n’est plus un bloc texte dans un vide 3-col.
-- Hero trophy + plinthe + motif, puis étagère à slots, filtres secondaires.
-- Grille: rangées trophée, pas des cartes catalogue.
+- Featured Beacon ancré à gauche: plinthe, icône matériau, silhouette trophée, rail d’étagère.
+- Plus un bloc texte dans un vide 3 colonnes.
+- Filtres en chips secondaires. Grille en rangées trophée.
+
+## CTA semantics
+
+Trois familles seulement.
+
+| Famille | Traitement | Exemples |
+| --- | --- | --- |
+| **Platform** | Crème `#f3f1ec`, chanfrein | Invite, Copy link, Create party, Find a rival, Share challenge, Play (profile empty) |
+| **Game** | `--accent` du jeu actif | Play / Continue, Retry, Play again, Continue Endless |
+| **Event / competitive** | `--accent` événement / jeu courant | Enter today, Enter stage, Race this round, Answer, Rematch |
+
+Score 0: état `Attempt`, CTA dominant = Retry (jeu), secondaire = Share challenge (platform). Pas de célébration.
 
 ## Art direction improvements
 
 | Surface | Polish |
 | --- | --- |
-| Arcade | Atmosphere / grain / vignette / enrichissement de scène sur le hero existant. Label Progression retiré. |
-| Hub | Layout intact. Genre en texte discret. Même traitement matériel sur l’art. |
-| Daily / GP | Route plus contrastée (done / current / locked). Kickers meta retirés. |
-| Results | Count-up, état 0 silencieux (`Attempt`), CTA jeu + share platform. |
-| Pause | Rail matériel, hint clavier, divider. Resume toujours sélectionné. |
-| Crew | Emblème plus grand, strip membres, zone activité en arène (pas de faux feed). |
+| Arcade | Scène Swarm auteur (arène, tours, vaisseau) à la place de la capture gameplay. Grain / haze / inner edge. |
+| Hub | Layout intact. Route + skyline + eau + lampes, plus une route vide. |
+| Daily / GP | Mêmes routes; tuiles = scènes auteur; current spotlight conservé. |
+| Results | Count-up, Attempt silencieux, Retry / Share. |
+| Pause | Rail, hint Enter / ↑↓ / Esc, jeu visible. |
+| Crew | Emblème, scène territoire, arène d’activité (pas de faux feed). |
 | Inbox / Party | Labels réduits. CTA platform. |
 
-Matérialité: inner edge, grain, haze lié à l’accent, pas de glassmorphism global.
+Matérialité: inner edge, grain, haze d’accent. Pas de glassmorphism global.
 
 ## Games
 
 | Jeu | World | Clarity |
 | --- | --- | --- |
-| Neon Drift | Bordures, panneaux, overpass, skyline plus dense, lampes / chevrons conservés | HOLD → COMBO → BANK intact |
-| Velocity Run | Shaft / corridor / ascent distincts, foreground silhouettes | Contraste player / hazard inchangé |
-| Knockout | Usine: pipes, vents, warning, plateformes ancrées | Obstacles lisibles |
-| Territory | Fill + lueur de bord + sweep de capture | Grille toujours lisible |
-| Swarm | Sol, structures lointaines, trails plus nets | Joueur jamais perdu |
-| Crowd | Masse + ombre de contact plus large | Camera pack-aware intacte |
-| Pocket | Cadre / feutre / profondeur / spectateurs discrets | Playfield libre |
-| Sky Stack | Halo / ombre de dalle / ciel | Simplicité conservée |
+| Neon Drift | Tablier visible, buildings trackside dans le cadre caméra, zoom un peu plus large, lampes / gate / HOLD DRIFT | HOLD → COMBO → BANK intact |
+| Velocity Run | Shaft / immeubles plus contrastés, bande énergie | Player / hazard inchangés |
+| Knockout | Usine lisible: colonnes, pipes, lumières, sol | Obstacles ancrés |
+| Territory | Plateau cadré, damier de lecture, glow de capture | Grille toujours lisible |
+| Swarm | Anneaux + dalles + tours près du joueur | Joueur jamais perdu |
+| Crowd | Masse + ombre de contact | Camera pack-aware intacte |
+| Pocket | Cadre / feutre / profondeur | Playfield libre |
+| Sky Stack | Halo / ombre / ciel | Simplicité conservée |
 
 ## Performance
 
-Mesuré au `next build` de cette passe (à tamponner). Pas de PNG lourds, pas de lib 3D, pas de vidéo. CSS + SVG overlay + draw Phaser existant.
+`next build` après polish:
+
+| Route | Size | First Load |
+| --- | --- | --- |
+| Home `/` | 8.46 kB | 157 kB |
+| Play slug | 9.14 kB | 155 kB |
+| Shared | 102 kB | |
+
+Avant closeout visuel: Home 8.46/157, play 9.12/154, shared 102. Pas de PNG lourds, pas de lib 3D, pas de vidéo. SVG inline + draw Phaser.
 
 ## QA
 
-Tamponné après exécution.
+| Check | Result |
+| --- | --- |
+| typecheck | pass |
+| lint | pass (warning `GameArt` `<img>` préexistant) |
+| unit | 99/99 |
+| build | pass |
+| Playwright fonctionnel | 48/48 |
+| Playwright visual | 13/13 (baselines Arcade / Profile / Achievements revues) |
+| QA_MATRIX | 4/4 → `docs/qa-art-direction-polish/` (+ `before/` utile) |
 
 ## Remaining issues
 
 ### P0
 
-Vide (critères A–L).
+Vide (critères A–L traités).
 
 ### P1
 
-- Les JPG hero restent des captures gameplay: plus riches après le monde, mais ce n’est pas de l’illustration peinte.
-- Home utilise toujours ces JPG (voulu).
+- Les scènes SVG restent géométriques: plus des captures gameplay, pas de peinture.
+- Neon in-game: buildings / tablier visibles, le vide n’est plus accidentel, mais la densité Trackmania n’est pas là.
+- Velocity reste un platformer lisible plus que des landmarks mémorables.
+- Territory: plateau plus assumé, encore une grille (voulu pour la lecture).
+- Achievements: le featured est un cabinet; la liste basse reste un catalogue honnête.
+- Home utilise toujours les JPG gameplay (voulu).
 - Settings reste utilitaire.
 
 ### P2
 
-- Parallax souris non ajouté (drift CSS seulement, `prefers-reduced-motion` respecté).
-- Recapture hero JPG optionnelle si on veut aligner Home sur les nouveaux mondes.
+- Parallax souris non ajouté (drift CSS, `prefers-reduced-motion` respecté).
+- Recapture JPG Home si on veut aligner Home sur les nouveaux mondes.
+- Icônes trophées encore simples (langage géométrique unique, pas un set peint).
