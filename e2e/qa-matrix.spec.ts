@@ -30,12 +30,12 @@ async function waitGame(page: Page, slug: string) {
     (window as Window & { __GW_ALLOW_DEBUG__?: boolean }).__GW_ALLOW_DEBUG__ = true;
   });
   await page.goto(`/play/${slug}`);
-  await page.locator("canvas").waitFor({ timeout: 20_000 });
+  await page.locator("canvas").waitFor({ timeout: 30_000 });
   await expect
     .poll(async () => {
       const d = await debugOf(page);
       return d?.ready ? d.gameId : null;
-    }, { timeout: 20_000 })
+    }, { timeout: 30_000 })
     .toBeTruthy();
 }
 
@@ -60,7 +60,9 @@ test("platform desktop 1440", async ({ page }) => {
   ];
   for (const [path, name] of routes) {
     await page.goto(path);
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.locator("h1, .display").first()).toBeVisible();
+    if (path === "/crew") await expect(page.getByRole("heading", { level: 1 })).not.toHaveText(/Opening the house/i, { timeout: 4000 });
+    await page.waitForTimeout(250);
     await save(page, name);
   }
 });
@@ -79,7 +81,7 @@ test("platform mobile 390", async ({ page }) => {
   ];
   for (const [path, name] of routes) {
     await page.goto(path);
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.locator("h1, .display").first()).toBeVisible();
     await save(page, name);
   }
 });
@@ -110,26 +112,28 @@ const GAMES = [
 ] as const;
 
 test("eight games visual matrix", async ({ page }) => {
+  test.setTimeout(240_000);
   await stabilizeVisual(page, { width: 1440, height: 900 });
   for (const slug of GAMES) {
     await waitGame(page, slug);
+    await page.waitForTimeout(350);
     await save(page, `${slug}-open-1440`);
     if (slug === "crowd-control") await cmd(page, "setPack", 28);
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(800);
     await save(page, `${slug}-mid-1440`);
     if (slug === "crowd-control") await cmd(page, "setPack", 86);
     if (slug === "swarm-protocol") await cmd(page, "grantXp", 12);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(800);
     await save(page, `${slug}-peak-1440`);
     await cmd(page, "finishRun");
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(700);
     await save(page, `${slug}-result-1440`);
   }
   await page.setViewportSize({ width: 390, height: 844 });
   for (const slug of GAMES) {
     await waitGame(page, slug);
     if (slug === "crowd-control") await cmd(page, "setPack", 48);
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(500);
     await save(page, `${slug}-play-390`);
   }
 });

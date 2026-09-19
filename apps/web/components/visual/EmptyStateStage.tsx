@@ -7,17 +7,20 @@ export function EmptyStateStage({
   body,
   action,
   slug,
+  heading = "h1",
 }: {
   kicker?: string;
   title: string;
   body?: string;
   action?: ReactNode;
   slug?: string;
+  heading?: "h1" | "p";
 }) {
+  const Title = heading;
   const copy = (
-    <div className="flex min-h-[240px] flex-col justify-end px-5 py-8 md:min-h-[320px] md:px-8">
+    <div className="flex min-h-[320px] flex-col justify-end px-5 py-8 md:min-h-[420px] md:px-8">
       {kicker ? <p className="meta text-white/45">{kicker}</p> : null}
-      <p className="display mt-2 max-w-[16ch] text-[36px] text-white md:text-[52px]">{title}</p>
+      <Title className="display mt-2 max-w-[16ch] text-[36px] text-white md:text-[52px]">{title}</Title>
       {body ? <p className="mt-3 max-w-md text-[15px] text-white/65">{body}</p> : null}
       {action ? <div className="mt-6">{action}</div> : null}
     </div>

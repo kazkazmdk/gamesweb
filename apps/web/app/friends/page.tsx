@@ -103,6 +103,7 @@ export default function FriendsPage() {
       {player.friends.length === 0 ? (
         <div className="mt-8 px-5 md:px-10">
           <EmptyStateStage
+            heading="p"
             slug="neon-drift"
             kicker="Floor"
             title="No friends yet"

@@ -47,10 +47,9 @@ export function PauseOverlay({
       <div className="absolute inset-y-0 left-0 flex w-[min(380px,92vw)] flex-col justify-center bg-black/35 px-5 py-8 md:px-8">
         <p className="meta text-white/45">{game.title}</p>
         <p className="display mt-2 text-[44px] text-white">Paused</p>
-        <div className="mt-8 flex flex-col gap-2" role="menu" aria-label="Pause">
+        <div className="mt-8 flex flex-col gap-2" role="group" aria-label="Pause">
           <button
             type="button"
-            role="menuitem"
             data-selected={sel === 0}
             className="gw-pause-item"
             onMouseEnter={() => setSel(0)}
@@ -60,7 +59,6 @@ export function PauseOverlay({
           </button>
           <button
             type="button"
-            role="menuitem"
             data-selected={sel === 1}
             className="gw-pause-item"
             onMouseEnter={() => setSel(1)}
@@ -70,7 +68,6 @@ export function PauseOverlay({
           </button>
           <Link
             href={`/games/${game.slug}`}
-            role="menuitem"
             data-selected={sel === 2}
             data-priority="low"
             className="gw-pause-item"

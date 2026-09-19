@@ -58,9 +58,14 @@ export default function ChallengesPage() {
       </GameBackdrop>
 
       <div className="grid gap-4 px-5 py-10 md:px-10 lg:grid-cols-3">
-        {quests.map((q) => (
-          <ChallengeWidget key={q.id} view={challengeViewModel(player, q)} variant="full" />
-        ))}
+        {quests.map((q) => {
+          const featured = q.id === current?.id;
+          return (
+            <div key={q.id} className={featured ? "lg:col-span-2" : ""}>
+              <ChallengeWidget view={challengeViewModel(player, q)} variant={featured ? "full" : "compact"} />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

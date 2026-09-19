@@ -647,7 +647,7 @@ function Results({
       ) : null}
       <div className="relative mx-auto flex min-h-full w-[min(560px,94vw)] flex-col justify-end px-5 py-10 md:px-8">
         <p className="meta text-white/50">{result}</p>
-        <p className="display mt-3 text-[72px] leading-none text-white md:text-[96px]">{formatScore(gameId, score)}</p>
+        <p className="display mt-3 text-[88px] leading-none text-white md:text-[128px]">{formatScore(gameId, score)}</p>
         {challengeOutcome ? (
           <p className="mt-3 text-[16px] text-emerald-300">
             {challengeOutcome === "win" ? "You won" : challengeOutcome === "draw" ? "Draw" : "They still lead"}

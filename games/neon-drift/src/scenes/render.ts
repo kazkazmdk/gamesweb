@@ -97,14 +97,21 @@ export function drawWorld(
       const n = samples[(i + 3) % samples.length];
       const turn = Math.abs(s.tx * n.ty - s.ty * n.tx);
       const side = s.width * 0.5 + 10;
-      if (i % 8 === 0) drawLamp(g, s.x + s.nx * (side + 8), s.y + s.ny * (side + 8), 28, theme.pole);
+      if (i % 6 === 0) {
+        drawLamp(g, s.x + s.nx * (side + 8), s.y + s.ny * (side + 8), 28, theme.pole);
+        drawLamp(g, s.x - s.nx * (side + 8), s.y - s.ny * (side + 8), 28, theme.pole);
+      }
       g.fillStyle(theme.barrier, 0.95);
       g.fillRect(s.x + s.nx * (side + 2) - 3, s.y + s.ny * (side + 2) - 8, 6, 16);
-      if (turn > 0.18) {
-        g.fillStyle(theme.accent, 0.8);
-        const hx = s.x + s.nx * (s.width * 0.42);
-        const hy = s.y + s.ny * (s.width * 0.42);
-        g.fillTriangle(hx, hy, hx + s.tx * 16, hy + s.ty * 16, hx + s.nx * 8, hy + s.ny * 8);
+      g.fillRect(s.x - s.nx * (side + 2) - 3, s.y - s.ny * (side + 2) - 8, 6, 16);
+      if (turn > 0.1) {
+        g.fillStyle(theme.accent, 0.85);
+        const hx = s.x + s.nx * (s.width * 0.32);
+        const hy = s.y + s.ny * (s.width * 0.32);
+        g.fillTriangle(hx, hy, hx + s.tx * 18, hy + s.ty * 18, hx + s.nx * 9, hy + s.ny * 9);
+        const hx2 = s.x - s.nx * (s.width * 0.32);
+        const hy2 = s.y - s.ny * (s.width * 0.32);
+        g.fillTriangle(hx2, hy2, hx2 + s.tx * 18, hy2 + s.ty * 18, hx2 - s.nx * 9, hy2 - s.ny * 9);
       }
       const px = s.x - s.nx * (side + 18);
       const py = s.y - s.ny * (side + 18);

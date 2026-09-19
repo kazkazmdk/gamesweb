@@ -403,8 +403,10 @@ export class TerritoryScene extends Phaser.Scene {
       }
     }
     if (this.captureWave > 0) {
-      g.fillStyle(0xffffff, this.captureWave * 0.12);
+      g.fillStyle(0xffffff, this.captureWave * 0.1);
       g.fillRect(0, 0, COLS * c, ROWS * c);
+      g.fillStyle(colors[1], this.captureWave * 0.16);
+      g.fillCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, 28 + (1 - this.captureWave) * 70);
     }
     drawRibbon(g, ribbonPoints(this.trail, c), this.shield > 0 ? 0x8fe8ff : 0xffffff, this.trail.length > 8 ? 1.15 : 1);
     for (const b of this.bots) drawRibbon(g, ribbonPoints(b.trail, c), colors[b.id], 0.85);

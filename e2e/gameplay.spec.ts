@@ -262,7 +262,7 @@ test("a finished run opens the result screen and the score reaches the server", 
   expect(res.status()).toBe(200);
   expect(body.alreadyApplied).toBe(false);
   expect(body.verification?.status).toBeTruthy();
-  await expect(page.getByRole("button", { name: "Challenge a friend" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Share challenge|Challenge a friend/i })).toBeVisible();
   await expect(page.getByText(/^Saved$|Score under review/)).toBeVisible({ timeout: 5_000 });
 
   await page.waitForTimeout(600);

@@ -94,8 +94,8 @@ export function ArcadeHub() {
 
   return (
     <div>
-      <GameBackdrop slug={hero.slug} className="min-h-[68vh] md:min-h-[78vh]" dim={0.18} priority>
-        <div className="flex min-h-[68vh] flex-col justify-end px-5 pb-10 pt-20 md:min-h-[78vh] md:px-10 md:pb-14">
+      <GameBackdrop slug={hero.slug} className="min-h-[100svh]" dim={0.18} priority>
+        <div className="flex min-h-[40vh] flex-col justify-end px-5 pb-6 pt-20 md:min-h-[42vh] md:px-10">
           <p className="meta text-white/50">{hero.kicker}</p>
           <h1 className="display mt-2 text-[48px] text-white md:text-[80px]">Arcade</h1>
           <p className="display mt-3 max-w-[16ch] text-[28px] text-white/90 md:text-[40px]">{hero.title}</p>
@@ -104,18 +104,17 @@ export function ArcadeHub() {
             <ChamferButton href={hero.href}>{hero.cta}</ChamferButton>
           </div>
         </div>
+        <section className="px-5 pb-10 md:px-10">
+          <h2 className="sr-only">Player</h2>
+          <ProgressionStrip
+            level={lv.level}
+            into={lv.intoLevel}
+            needed={Math.max(1, lv.needed)}
+            streak={player.streak}
+            trophies={`${ach.unlocked}/${ach.total}`}
+          />
+        </section>
       </GameBackdrop>
-
-      <section className="px-5 py-10 md:px-10">
-        <h2 className="sr-only">Player</h2>
-        <ProgressionStrip
-          level={lv.level}
-          into={lv.intoLevel}
-          needed={Math.max(1, lv.needed)}
-          streak={player.streak}
-          trophies={`${ach.unlocked}/${ach.total}`}
-        />
-      </section>
 
       {friendsNow.length ? (
         <section className="px-5 md:px-10">

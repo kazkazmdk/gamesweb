@@ -20,8 +20,8 @@ export default function GrandPrixPage() {
 
   return (
     <div data-testid="grand-prix">
-      <GameBackdrop slug={current?.game?.slug ?? "sky-stack"} className="min-h-[72vh] md:min-h-[82vh]" dim={0.2} priority>
-        <div className="flex min-h-[72vh] flex-col justify-end px-5 pb-10 pt-20 md:min-h-[82vh] md:px-10 md:pb-14">
+      <GameBackdrop slug={current?.game?.slug ?? "sky-stack"} className="min-h-[100svh]" dim={0.2} priority>
+        <div className="flex min-h-[38vh] flex-col justify-end px-5 pb-6 pt-20 md:min-h-[40vh] md:px-10">
           <p className="meta text-white/50">Arcade Grand Prix</p>
           <h1 className="display mt-3 max-w-[14ch] text-[48px] text-white md:text-[76px]">
             {cleared ? "Cup complete" : `Round ${currentIdx + 1}`}
@@ -42,29 +42,28 @@ export default function GrandPrixPage() {
             </div>
           ) : null}
         </div>
+        <section className="px-5 pb-10 md:px-10">
+          <p className="meta text-white/40">Cup route</p>
+          <div className="mt-4">
+            <EventRoute
+              cols={5}
+              steps={rounds.map((r) => {
+                const locked = !r.scored && r.index > currentIdx;
+                return {
+                  key: `${r.round.gameId}-${r.index}`,
+                  index: r.index,
+                  slug: r.game?.slug ?? r.round.gameId,
+                  title: r.game?.title ?? r.round.gameId,
+                  kicker: r.index === rounds.length - 1 ? "Final" : `R${r.index + 1}`,
+                  meta: r.scored ? `${r.points} pts` : r.round.mode.replace(/-/g, " "),
+                  status: r.scored ? "done" : r === current ? "current" : locked ? "locked" : "open",
+                  href: r.game ? `/play/${r.game.slug}?gp=${gp.id ?? "daily"}&seed=gp-${r.index}` : undefined,
+                };
+              })}
+            />
+          </div>
+        </section>
       </GameBackdrop>
-
-      <section className="px-5 py-10 md:px-10">
-        <p className="meta text-white/40">Cup route</p>
-        <div className="mt-5">
-          <EventRoute
-            cols={5}
-            steps={rounds.map((r) => {
-              const locked = !r.scored && r.index > currentIdx;
-              return {
-                key: `${r.round.gameId}-${r.index}`,
-                index: r.index,
-                slug: r.game?.slug ?? r.round.gameId,
-                title: r.game?.title ?? r.round.gameId,
-                kicker: r.index === rounds.length - 1 ? "Final" : `R${r.index + 1}`,
-                meta: r.scored ? `${r.points} pts` : r.round.mode.replace(/-/g, " "),
-                status: r.scored ? "done" : r === current ? "current" : locked ? "locked" : "open",
-                href: r.game ? `/play/${r.game.slug}?gp=${gp.id ?? "daily"}&seed=gp-${r.index}` : undefined,
-              };
-            })}
-          />
-        </div>
-      </section>
     </div>
   );
 }

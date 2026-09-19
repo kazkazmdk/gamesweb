@@ -22,7 +22,7 @@ import {
   latestUnlocks,
   playerStatsFromSnapshot,
 } from "@/lib/platform/adapters";
-import { formatPlayScore, formatRelativeTime } from "@/lib/platform/format";
+import { formatPlayScore, formatRelativeTime, hasRecord } from "@/lib/platform/format";
 import { playerApi } from "@/lib/player-api";
 import type { PublicProfileView } from "@/lib/platform/focus";
 
@@ -113,18 +113,23 @@ function SelfProfile() {
 
 function RecordsBlock({ scores }: { scores?: PublicProfileView["records"] }) {
   const player = usePlayer();
+  const rows = GAME_MANIFESTS.map((g) => {
+    const rec = scores ? scores.find((s) => s.gameId === g.id) : gameRecordFor(player, g.id);
+    const score = rec && "score" in rec ? rec.score : 0;
+    return { g, rec, score };
+  }).filter((row) => hasRecord(row.score));
   return (
     <section className="mt-12">
-      <SectionHeader title="Records" />
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        {GAME_MANIFESTS.map((g) => {
-          const rec = scores
-            ? scores.find((s) => s.gameId === g.id)
-            : gameRecordFor(player, g.id);
-          const score = rec && "score" in rec ? rec.score : 0;
-          return <RecordWidget key={g.id} game={g} score={score} modeLabel={rec && "mode" in rec ? rec.mode : undefined} />;
-        })}
-      </div>
+      <SectionHeader title="Games" />
+      {rows.length ? (
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          {rows.map(({ g, rec, score }) => (
+            <RecordWidget key={g.id} game={g} score={score} modeLabel={rec && "mode" in rec ? rec.mode : undefined} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="No records yet" body="Finish a run to pin a game here." action={<QuickAction href="/">Play</QuickAction>} />
+      )}
     </section>
   );
 }

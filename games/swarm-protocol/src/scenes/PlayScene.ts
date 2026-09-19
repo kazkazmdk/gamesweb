@@ -241,6 +241,16 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.game.events.on("platform-resume", () => (this.paused = false));
     this.game.events.on("continue-endless", () => this.continueEndless());
     this.started = this.time.now;
+    this.seedOpening();
+  }
+
+  private seedOpening() {
+    for (let i = 0; i < 6; i += 1) {
+      const slot = this.enemies.find((e) => !e.active);
+      if (!slot) return;
+      const a = (i / 6) * Math.PI * 2;
+      spawnEnemy(slot, i % 2 ? "dart" : "chaser", this.px + Math.cos(a) * 210, this.py + Math.sin(a) * 210, 1);
+    }
   }
 
   private resetRun() {
@@ -436,7 +446,7 @@ export class SwarmPlayScene extends Phaser.Scene {
       }
     }
     if (live >= want) return;
-    if (simRand() > dt * (2.2 + elapsed * 0.01)) return;
+    if (simRand() > dt * (elapsed < 8 ? 7.2 : 2.2 + elapsed * 0.01)) return;
     const slot = this.enemies.find((e) => !e.active);
     if (!slot) return;
     const kind = pickKind(elapsed, elapsed > 90);
@@ -445,7 +455,7 @@ export class SwarmPlayScene extends Phaser.Scene {
       this.synth.tone(140, 0.16, "sawtooth", 0.05, 0.1);
     }
     const a = simRand() * Math.PI * 2;
-    const dist = elapsed < 8 ? 300 + simRand() * 90 : 540 + simRand() * 160;
+    const dist = elapsed < 8 ? 190 + simRand() * 70 : 540 + simRand() * 160;
     const scale = 1 + Math.min(1.4, elapsed / 240);
     spawnEnemy(slot, kind, this.px + Math.cos(a) * dist, this.py + Math.sin(a) * dist, scale);
     slot.x = clamp(slot.x, 30, ARENA - 30);

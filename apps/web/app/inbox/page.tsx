@@ -31,6 +31,7 @@ export default function InboxPage() {
       {items.length === 0 ? (
         <div className="mt-8 px-5 md:px-10">
           <EmptyStateStage
+            heading="p"
             slug="knockout-circuit"
             kicker="Quiet"
             title="Nothing waiting"

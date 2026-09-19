@@ -25,11 +25,14 @@ export function GameBackdrop({
           slug={slug}
           variant={variant}
           priority={priority}
-          className="h-full w-full"
+          className="gw-backdrop-art h-full w-full"
           style={
             {
               objectPosition: dir.crop.desktop,
               filter: dir.contrast,
+              ["--gw-crop-desktop" as string]: dir.crop.desktop,
+              ["--gw-crop-laptop" as string]: dir.crop.laptop,
+              ["--gw-crop-mobile" as string]: dir.crop.mobile,
             } as CSSProperties
           }
         />

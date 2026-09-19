@@ -29,8 +29,8 @@ export default function DailyArcadePage() {
 
   return (
     <div data-testid="daily-arcade">
-      <GameBackdrop slug={current?.game?.slug ?? "neon-drift"} className="min-h-[72vh] md:min-h-[82vh]" dim={0.18} priority>
-        <div className="flex min-h-[72vh] flex-col justify-end px-5 pb-10 pt-20 md:min-h-[82vh] md:px-10 md:pb-14">
+      <GameBackdrop slug={current?.game?.slug ?? "neon-drift"} className="min-h-[100svh]" dim={0.18} priority>
+        <div className="flex min-h-[40vh] flex-col justify-end px-5 pb-6 pt-20 md:min-h-[42vh] md:px-10">
           <p className="meta text-white/50">Today&apos;s Arcade</p>
           <h1 className="display mt-3 max-w-[12ch] text-[52px] text-white md:text-[84px]">
             {cleared ? "Cleared" : current?.game?.title ?? "Daily Arcade"}
@@ -45,25 +45,24 @@ export default function DailyArcadePage() {
             </div>
           ) : null}
         </div>
+        <section className="px-5 pb-10 md:px-10">
+          <p className="meta text-white/40">Route</p>
+          <div className="mt-4">
+            <EventRoute
+              steps={steps.map((s, i) => ({
+                key: `${s.event.gameId}:${s.event.mode}`,
+                index: i,
+                slug: s.game?.slug ?? s.event.gameId,
+                title: s.game?.title ?? s.event.label,
+                kicker: s.done ? "Cleared" : s === current && !cleared ? "Now" : `Stage ${i + 1}`,
+                meta: s.event.mode.replace(/-/g, " "),
+                status: s.done ? "done" : s === current ? "current" : "open",
+                href: s.href,
+              }))}
+            />
+          </div>
+        </section>
       </GameBackdrop>
-
-      <section className="px-5 py-10 md:px-10">
-        <p className="meta text-white/40">Route</p>
-        <div className="mt-5">
-          <EventRoute
-            steps={steps.map((s, i) => ({
-              key: `${s.event.gameId}:${s.event.mode}`,
-              index: i,
-              slug: s.game?.slug ?? s.event.gameId,
-              title: s.game?.title ?? s.event.label,
-              kicker: s.done ? "Cleared" : s === current && !cleared ? "Now" : `Stage ${i + 1}`,
-              meta: s.event.mode.replace(/-/g, " "),
-              status: s.done ? "done" : s === current ? "current" : "open",
-              href: s.href,
-            }))}
-          />
-        </div>
-      </section>
     </div>
   );
 }
