@@ -92,10 +92,45 @@ export function drawWorld(
   }
 
   if (quality !== "low") {
-    for (let i = 0; i < samples.length; i += 10) {
+    for (let i = 0; i < samples.length; i += 4) {
       const s = samples[i];
-      const side = s.width * 0.5 + 16;
-      drawLamp(g, s.x + s.nx * (side + 8), s.y + s.ny * (side + 8), 28, theme.pole);
+      const n = samples[(i + 3) % samples.length];
+      const turn = Math.abs(s.tx * n.ty - s.ty * n.tx);
+      const side = s.width * 0.5 + 10;
+      if (i % 5 === 0) {
+        drawLamp(g, s.x + s.nx * (side + 8), s.y + s.ny * (side + 8), 28, theme.pole);
+        drawLamp(g, s.x - s.nx * (side + 8), s.y - s.ny * (side + 8), 28, theme.pole);
+      }
+      if (i % 8 === 0) {
+        const far = side + 52 + (i % 12);
+        const fx = s.x + s.nx * far;
+        const fy = s.y + s.ny * far;
+        g.fillStyle(0x16141a, 1);
+        g.fillRect(fx - 16, fy - 44, 32, 58);
+        g.fillStyle(theme.accent, 0.14);
+        g.fillRect(fx - 8, fy - 32, 7, 9);
+        g.fillRect(fx + 2, fy - 20, 7, 9);
+      }
+      if (i % 11 === 0) {
+        const sx = s.x - s.nx * (side + 26);
+        const sy = s.y - s.ny * (side + 26);
+        g.fillStyle(0x2a2430, 1);
+        g.fillRect(sx - 3, sy - 22, 6, 28);
+        g.fillStyle(theme.accent, 0.88);
+        g.fillTriangle(sx, sy - 34, sx + 16, sy - 24, sx, sy - 14);
+      }
+      g.fillStyle(theme.barrier, 0.95);
+      g.fillRect(s.x + s.nx * (side + 2) - 3, s.y + s.ny * (side + 2) - 8, 6, 16);
+      g.fillRect(s.x - s.nx * (side + 2) - 3, s.y - s.ny * (side + 2) - 8, 6, 16);
+      if (turn > 0.1) {
+        g.fillStyle(theme.accent, 0.85);
+        const hx = s.x + s.nx * (s.width * 0.32);
+        const hy = s.y + s.ny * (s.width * 0.32);
+        g.fillTriangle(hx, hy, hx + s.tx * 18, hy + s.ty * 18, hx + s.nx * 9, hy + s.ny * 9);
+        const hx2 = s.x - s.nx * (s.width * 0.32);
+        const hy2 = s.y - s.ny * (s.width * 0.32);
+        g.fillTriangle(hx2, hy2, hx2 + s.tx * 18, hy2 + s.ty * 18, hx2 - s.nx * 9, hy2 - s.ny * 9);
+      }
       const px = s.x - s.nx * (side + 18);
       const py = s.y - s.ny * (side + 18);
       if (def.id === "foundation") {
@@ -247,18 +282,28 @@ export function drawHudChrome(
   h: number,
   touch: boolean,
   flash: number,
+  meters?: { drift: number; combo: number; live: number },
 ) {
   overlay.clear();
   if (flash > 0) {
     overlay.fillStyle(0xffffff, flash);
     overlay.fillRect(0, 0, w, h);
   }
+  if (meters) {
+    const drift = Math.min(1, meters.drift);
+    overlay.fillStyle(0xffffff, 0.1);
+    overlay.fillRect(24, 236, 168, 4);
+    overlay.fillStyle(0xe35aa0, 0.92);
+    overlay.fillRect(24, 236, 168 * drift, 4);
+    overlay.fillStyle(0x8dffc1, meters.live > 8 ? 0.9 : 0.22);
+    overlay.fillRect(24, 244, Math.min(168, Math.max(8, meters.live / 28)), 3);
+  }
   if (!touch) return;
   overlay.fillStyle(0xffffff, 0.05);
-  overlay.fillRoundedRect(18, h * 0.22, w * 0.28, h * 0.46, 18);
-  overlay.fillRoundedRect(w - 18 - w * 0.28, h * 0.22, w * 0.28, h * 0.46, 18);
+  overlay.fillRect(18, h * 0.22, w * 0.28, h * 0.46);
+  overlay.fillRect(w - 18 - w * 0.28, h * 0.22, w * 0.28, h * 0.46);
   overlay.fillStyle(0xe35aa0, 0.2);
-  overlay.fillRoundedRect(w / 2 - 70, h - 88, 140, 58, 16);
+  overlay.fillRect(w / 2 - 70, h - 88, 140, 58);
 }
 
 export function drawCountdown(overlay: Phaser.GameObjects.Graphics, w: number, h: number, remain: number) {

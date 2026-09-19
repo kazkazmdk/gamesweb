@@ -2,35 +2,80 @@
 
 import { arcadeStore } from "@/lib/social/arcade-store";
 import { useArcade } from "@/lib/social/use-arcade";
-import Link from "next/link";
+import { EmptyStateStage } from "@/components/visual";
+import { ChamferButton } from "@/components/visual/ChamferButton";
+import { useAccent } from "@/components/shell/AppShell";
+
+const KIND: Record<string, string> = {
+  challenge: "Challenge",
+  friend: "Friend",
+  rival: "Rival",
+  party: "Party",
+  crew: "Crew",
+  leaderboard: "Board",
+};
 
 export default function InboxPage() {
+  useAccent();
   const items = useArcade().inbox;
+  const live = items.filter((i) => !i.read);
+  const older = items.filter((i) => i.read);
 
   return (
-    <div className="mx-auto max-w-2xl px-5 py-10" data-testid="inbox">
-      <p className="meta text-white/45">Inbox</p>
-      <h1 className="display mt-2 text-4xl">What needs a reply</h1>
+    <div className="pb-16" data-testid="inbox">
+      <div className="px-5 pt-8 md:px-10">
+        <p className="meta text-white/45">Inbox</p>
+        <h1 className="display mt-2 text-[44px] md:text-[64px]">Action queue</h1>
+      </div>
+
       {items.length === 0 ? (
-        <p className="mt-6 text-white/55">No messages yet. Challenges, rival updates, and party invites land here.</p>
+        <div className="mt-8 px-5 md:px-10">
+          <EmptyStateStage
+            heading="p"
+            slug="knockout-circuit"
+            kicker="Quiet"
+            title="Nothing waiting"
+            body="Challenges, crew notes, and party codes land here when someone actually sends one."
+            action={<ChamferButton href="/friends">Find a rival</ChamferButton>}
+          />
+        </div>
       ) : (
-        <ul className="mt-8 space-y-3">
-          {items.map((item) => (
-            <li key={item.id} className="rounded-2xl border border-white/10 p-4">
-              <p className="text-[12px] text-white/40">{item.type}</p>
-              <p className="mt-1 text-lg">{item.title}</p>
-              <p className="text-white/60">{item.body}</p>
-              <Link
-                href={item.href}
-                className="mt-3 inline-block text-[var(--accent)]"
-                onClick={() => arcadeStore.markRead(item.id)}
-              >
-                Open
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-8 space-y-10 px-5 md:px-10">
+          <Queue title="Needs a reply" items={live} />
+          {older.length ? <Queue title="Earlier" items={older} quiet /> : null}
+        </div>
       )}
     </div>
+  );
+}
+
+function Queue({
+  title,
+  items,
+  quiet,
+}: {
+  title: string;
+  items: ReturnType<typeof useArcade>["inbox"];
+  quiet?: boolean;
+}) {
+  if (!items.length) return null;
+  return (
+    <section>
+      <p className="meta text-white/40">{title}</p>
+      <ul className="mt-4 space-y-3">
+        {items.map((item) => (
+          <li key={item.id} className={`gw-stage ${quiet ? "opacity-70" : "gw-frame"} p-4 md:p-5`}>
+            <p className="meta text-white/45">{KIND[item.type] ?? item.type}</p>
+            <p className="mt-2 text-[22px] tracking-[-0.03em] text-white">{item.title}</p>
+            <p className="mt-1 text-[14px] text-white/60">{item.body}</p>
+            <div className="mt-4">
+              <ChamferButton href={item.href} onClick={() => arcadeStore.markRead(item.id)}>
+                Open
+              </ChamferButton>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

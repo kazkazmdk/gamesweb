@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { GAME_MANIFESTS, allAchievements } from "@gamesweb/game-sdk";
-import { EmptyState, ProgressWidget, StatusPill } from "@/components/platform";
-import { AchievementIcon } from "@/components/achievements/AchievementIcon";
+import { EmptyState, ProgressWidget } from "@/components/platform";
+import { TrophyShelf } from "@/components/visual";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer } from "@/lib/player";
 import { achievementCatalog } from "@/lib/platform/focus";
@@ -30,7 +30,6 @@ export function AchievementsPage() {
   const player = usePlayer();
   const [filter, setFilter] = useState("all");
   const [sort, setSort] = useState<(typeof SORTS)[number]["id"]>("catalog");
-  const [open, setOpen] = useState<string | null>(null);
   const catalog = useMemo(() => achievementCatalog(player), [player]);
   const totalXp = allAchievements()
     .filter((a) => player.achievements.includes(`${a.gameId ?? "platform"}:${a.key}`))
@@ -80,8 +79,27 @@ export function AchievementsPage() {
         <ProgressWidget value={unlocked} max={catalog.length || 1} />
       </div>
 
-      <div className="mt-8 flex flex-wrap gap-6">
-        <div role="tablist" aria-label="Achievement filters">
+      {recent ? (
+        <section className="mt-10">
+          <p className="meta text-white/40">Recently unlocked</p>
+          <div className="mt-4">
+            <TrophyShelf
+              featured
+              items={[recent].map((a) => ({
+                id: a.id,
+                name: a.name,
+                description: a.description,
+                unlocked: true,
+                gameId: a.gameId ?? "platform",
+                xp: a.xp,
+              }))}
+            />
+          </div>
+        </section>
+      ) : null}
+
+      <div className="mt-8 flex flex-wrap items-end gap-6">
+        <div role="tablist" aria-label="Achievement filters" className="max-w-full overflow-x-auto scrollbar-none">
           {FILTERS.map((f) => (
             <button
               key={f.id}
@@ -89,8 +107,8 @@ export function AchievementsPage() {
               role="tab"
               aria-selected={filter === f.id}
               onClick={() => setFilter(f.id)}
-              className={`mr-1 min-h-11 px-3 text-[13px] ${
-                filter === f.id ? "text-[var(--text)] shadow-[inset_0_-2px_0_var(--accent)]" : "text-[var(--text-dim)]"
+              className={`mr-1 min-h-9 px-2 text-[12px] ${
+                filter === f.id ? "text-[var(--text)] shadow-[inset_0_-2px_0_var(--accent)]" : "text-[var(--text-faint)]"
               }`}
             >
               {f.label}
@@ -105,8 +123,8 @@ export function AchievementsPage() {
               role="tab"
               aria-selected={sort === s.id}
               onClick={() => setSort(s.id)}
-              className={`mr-1 min-h-11 px-3 text-[13px] ${
-                sort === s.id ? "text-[var(--text)] shadow-[inset_0_-2px_0_var(--accent)]" : "text-[var(--text-dim)]"
+              className={`mr-1 min-h-9 px-2 text-[12px] ${
+                sort === s.id ? "text-[var(--text)] shadow-[inset_0_-2px_0_var(--accent)]" : "text-[var(--text-faint)]"
               }`}
             >
               {s.label}
@@ -118,43 +136,21 @@ export function AchievementsPage() {
       {filtered.length === 0 ? (
         <EmptyState title="Nothing in this filter" body="Switch games — trophies live with the run that earned them." />
       ) : (
-        <ul className="mt-8 grid gap-3 md:grid-cols-2">
-          {filtered.map((a) => {
-            const expanded = open === a.id;
-            const date = a.unlocked ? formatUnlock(a.unlockedAt) : null;
-            return (
-              <li key={a.id}>
-                <button
-                  type="button"
-                  onClick={() => setOpen(expanded ? null : a.id)}
-                  className={`flex w-full items-start gap-4 px-4 py-4 text-left ${
-                    a.unlocked ? "gw-selected" : "gw-float"
-                  }`}
-                >
-                  <AchievementIcon id={a.id} gameId={a.gameId} unlocked={a.unlocked} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="meta">
-                          {a.gameTitle} · {a.xp} XP
-                        </p>
-                        <p className={`mt-1 text-[16px] ${a.unlocked ? "text-[var(--text)]" : "text-[var(--text)]"}`}>{a.name}</p>
-                        <p className="mt-1 text-[13px] text-[var(--text-dim)]">{a.description}</p>
-                        {date ? <p className="mt-1 text-[12px] text-[var(--text-faint)]">Unlocked {date}</p> : null}
-                      </div>
-                      <StatusPill kind={a.unlocked ? "complete" : "locked"} />
-                    </div>
-                    {expanded ? (
-                      <p className="mt-3 text-[12px] text-[var(--text-faint)]">
-                        {a.how} · {a.gameTitle}
-                      </p>
-                    ) : null}
-                  </div>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="mt-8">
+          <p className="meta text-white/40">Shelf</p>
+          <div className="mt-4">
+            <TrophyShelf
+              items={filtered.map((a) => ({
+                id: a.id,
+                name: a.name,
+                description: a.description,
+                unlocked: a.unlocked,
+                gameId: a.gameId ?? "platform",
+                xp: a.xp,
+              }))}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

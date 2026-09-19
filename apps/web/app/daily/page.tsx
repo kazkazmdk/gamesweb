@@ -2,39 +2,67 @@
 
 import { dailyArcadeEvents, getManifest, utcDayKey } from "@gamesweb/game-sdk";
 import { useArcade } from "@/lib/social/use-arcade";
-import Link from "next/link";
+import { EventRoute, GameBackdrop, useUtcCountdown } from "@/components/visual";
+import { ChamferButton } from "@/components/visual/ChamferButton";
+import { useAccent } from "@/components/shell/AppShell";
 
 export default function DailyArcadePage() {
   const day = utcDayKey();
   const events = dailyArcadeEvents(day);
   const arcade = useArcade();
   const progress = arcade.daily.day === day ? arcade.daily : { completed: [], score: 0, day };
+  const { label: countdown } = useUtcCountdown();
+  const steps = events.map((e) => {
+    const game = getManifest(e.gameId);
+    const done = progress.completed.includes(`${e.gameId}:${e.mode}`);
+    return {
+      event: e,
+      game,
+      done,
+      href: `/play/${e.gameId}?daily=1&seed=${encodeURIComponent(e.seed)}`,
+    };
+  });
+  const current = steps.find((s) => !s.done) ?? steps[steps.length - 1];
+  const doneCount = steps.filter((s) => s.done).length;
+  const cleared = doneCount === steps.length && steps.length > 0;
+  useAccent(current?.game?.accent);
 
   return (
-    <div className="mx-auto max-w-3xl px-5 py-10" data-testid="daily-arcade">
-      <p className="meta text-white/45">Daily Arcade</p>
-      <h1 className="display mt-2 text-4xl">Same seeds. Everyone.</h1>
-      <p className="mt-3 text-white/60">Normalized score across different units. Friends and rivals boards share this rotation.</p>
-      <p className="mt-4 text-[13px] text-white/45">Today {progress.score} pts · {progress.completed.length}/{events.length} done</p>
-      <ul className="mt-8 space-y-3">
-        {events.map((e) => {
-          const game = getManifest(e.gameId);
-          const done = progress.completed.includes(`${e.gameId}:${e.mode}`);
-          return (
-            <li key={`${e.gameId}:${e.mode}`} className="rounded-2xl border border-white/10 p-4">
-              <p className="text-[13px] text-white/45">Event {e.index + 1}</p>
-              <p className="mt-1 text-xl">{game?.title}</p>
-              <p className="text-white/55">{e.mode} · seed {e.seed.slice(-8)}</p>
-              <Link
-                href={`/play/${e.gameId}?daily=1&seed=${encodeURIComponent(e.seed)}`}
-                className="mt-3 inline-block rounded-full bg-[var(--accent)] px-4 py-2 text-[#140d12]"
-              >
-                {done ? "Replay" : "Play"}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+    <div data-testid="daily-arcade">
+      <GameBackdrop slug={current?.game?.slug ?? "neon-drift"} className="min-h-[100svh]" dim={0.18} priority>
+        <div className="flex min-h-[40vh] flex-col justify-end px-5 pb-6 pt-20 md:min-h-[42vh] md:px-10">
+          <p className="meta text-white/50">Today&apos;s Arcade</p>
+          <h1 className="display mt-3 max-w-[12ch] text-[52px] text-white md:text-[84px]">
+            {cleared ? "Cleared" : current?.game?.title ?? "Daily Arcade"}
+          </h1>
+          <p className="mt-4 max-w-md text-[15px] text-white/70">
+            Same run for everyone today. {doneCount}/{steps.length} stages · {countdown} to reset
+          </p>
+          {progress.score > 0 ? <p className="metric mt-3 text-[28px] text-white/90">{progress.score} pts</p> : null}
+          {current?.game ? (
+            <div className="mt-7">
+              <ChamferButton href={current.href}>{cleared ? "Replay stage" : doneCount ? "Continue" : "Enter stage"}</ChamferButton>
+            </div>
+          ) : null}
+        </div>
+        <section className="px-5 pb-10 md:px-10">
+          <p className="meta text-white/40">Route</p>
+          <div className="mt-4">
+            <EventRoute
+              steps={steps.map((s, i) => ({
+                key: `${s.event.gameId}:${s.event.mode}`,
+                index: i,
+                slug: s.game?.slug ?? s.event.gameId,
+                title: s.game?.title ?? s.event.label,
+                kicker: s.done ? "Cleared" : s === current && !cleared ? "Now" : `Stage ${i + 1}`,
+                meta: s.event.mode.replace(/-/g, " "),
+                status: s.done ? "done" : s === current ? "current" : "open",
+                href: s.href,
+              }))}
+            />
+          </div>
+        </section>
+      </GameBackdrop>
     </div>
   );
 }

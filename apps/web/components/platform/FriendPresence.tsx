@@ -77,7 +77,9 @@ export function FriendPresence({
             <QuickAction tone="quiet" onClick={onDecline}>Decline</QuickAction>
           ) : null}
           {playing ? (
-            <QuickAction href={`/play/${game.slug}`} tone="primary">Join</QuickAction>
+            <QuickAction href={`/play/${game.slug}`} tone="primary">
+              Play this game
+            </QuickAction>
           ) : null}
           {onRemove ? (
             <details className="relative">

@@ -14,6 +14,8 @@ import {
   fillVignette,
   mixColor,
   drawRunner,
+  drawLamp,
+  drawContainer,
   type GameKeyboard,
 } from "@gamesweb/game-core";
 import { knockoutCircuitManifest, readRunContext, type PlatformSDK } from "@gamesweb/game-sdk";
@@ -310,8 +312,25 @@ export class KnockoutScene extends Phaser.Scene {
         g.fillRect(x + 12, this.map.height * 0.4, 10, 12);
         g.fillStyle(mixColor(th.sky, 0x000000, 0.25), 1);
       }
-      g.fillStyle(0x2a2218, 0.45);
-      g.fillRect(0, this.map.height - 40, this.map.width, 40);
+      g.fillStyle(0x2a2218, 0.55);
+      g.fillRect(0, this.map.height - 48, this.map.width, 48);
+      g.fillStyle(th.danger, 0.55);
+      for (let i = 0; i < this.map.width; i += 28) {
+        g.fillTriangle(i, this.map.height - 48, i + 14, this.map.height - 48, i + 14, this.map.height - 34);
+      }
+      g.fillStyle(th.accent, 0.16);
+      for (let i = 0; i < 5; i += 1) g.fillRect(i * 520 + this.camX * 0.12, this.map.height * 0.18, 140, 8);
+      for (let i = 0; i < 7; i += 1) {
+        const x = 90 + i * 380;
+        drawLamp(g, x, this.map.height * 0.42, 70, th.accent, 0x2a2218);
+        if (i % 2 === 0) drawContainer(g, x + 40, this.map.height - 92, 44, 28, i % 4 === 0 ? 0xc45c3a : 0x3a6a88);
+      }
+      g.fillStyle(0x3a3224, 0.7);
+      for (let i = 0; i < 6; i += 1) {
+        const x = 220 + i * 440;
+        g.fillRect(x, this.map.height * 0.22, 10, this.map.height * 0.4);
+        g.fillRect(x - 40, this.map.height * 0.22, 90, 8);
+      }
     } else if (env === "skyworks") {
       g.fillStyle(mixColor(th.sky, 0xffffff, 0.06), 1);
       g.fillCircle(this.map.width * 0.7, 90, 50);
@@ -359,13 +378,17 @@ export class KnockoutScene extends Phaser.Scene {
         const cx = live.x + live.w / 2;
         const cy = live.y + live.h / 2;
         g.fillStyle(0x2a2218, 1);
-        g.fillRect(cx - 6, cy + 18, 12, 28);
+        g.fillRect(cx - 8, cy + 16, 16, 36);
+        g.fillStyle(0x3a3224, 1);
+        g.fillCircle(cx, cy, 16);
         g.save();
         g.translateCanvas(cx, cy);
         g.rotateCanvas(a);
         g.fillStyle(th.danger, 0.95);
         g.fillRect(-52, -6, 104, 12);
         g.fillRect(-6, -52, 12, 104);
+        g.fillStyle(0xffe08a, 0.35);
+        g.fillRect(-48, -3, 18, 6);
         g.fillStyle(0xc4b48a, 1);
         g.fillCircle(0, 0, 10);
         g.fillStyle(0xffffff, 0.85);

@@ -24,6 +24,7 @@ test.describe("visual regression", () => {
     await stabilizeVisual(page, { width: 1440, height: 900 });
     await page.goto("/");
     await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("heading", { level: 1, name: "Velocity Run" })).toBeVisible();
     await page.keyboard.press("ArrowRight");
     await expect(page.getByRole("heading", { level: 1, name: "Swarm Protocol" })).toBeVisible();
     await page.screenshot({ path: "test-results/visual-home-swarm-1440.png", fullPage: false });

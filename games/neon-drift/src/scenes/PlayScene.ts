@@ -60,6 +60,10 @@ export class DriftPlayScene extends Phaser.Scene {
   private wallHits = 0;
   private cleanLap = true;
   private shownHint = true;
+  private tutorialStep: "hold" | "combo" | "bank" | "done" = "done";
+  private wasDrifting = false;
+  private bankFlash = 0;
+  private comboBreakFlash = 0;
   private nearArmed = true;
   private audioReady = false;
   private showGhost = true;
@@ -82,7 +86,7 @@ export class DriftPlayScene extends Phaser.Scene {
   private signaledReady = false;
   private longFrames = 0;
   private onGrass = false;
-  private testDrive: { throttle: number; steer: number } | null = null;
+  private testDrive: { throttle: number; steer: number; handbrake?: boolean } | null = null;
   private boardMode = "foundation";
   private nativeKeys: GameKeyboard | null = null;
 
@@ -133,7 +137,7 @@ export class DriftPlayScene extends Phaser.Scene {
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hud = this.add
-      .text(24, 52, "", { fontFamily: "ui-sans-serif, system-ui, sans-serif", fontSize: "17px", color: "#f3f1ec" })
+      .text(24, 148, "", { fontFamily: "ui-sans-serif, system-ui, sans-serif", fontSize: "18px", color: "#f3f1ec" })
       .setScrollFactor(0)
       .setDepth(21);
     this.deltaTxt = this.add
@@ -157,17 +161,22 @@ export class DriftPlayScene extends Phaser.Scene {
       .setDepth(24)
       .setAlpha(0);
     this.hint = this.add
-      .text(this.scale.width / 2, this.scale.height - 78, this.hintCopy(), {
+      .text(this.scale.width / 2, this.scale.height * 0.7, this.hintCopy(), {
         fontFamily: "ui-sans-serif, system-ui, sans-serif",
-        fontSize: "14px",
+        fontSize: "26px",
         color: "#f3f1ec",
         align: "center",
+        lineSpacing: 10,
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(21)
-      .setAlpha(this.shouldTutorial() ? 0.9 : 0);
+      .setAlpha(this.shouldTutorial() ? 0.94 : 0);
     this.shownHint = this.shouldTutorial();
+    this.tutorialStep = this.shouldTutorial() ? "hold" : "done";
+    this.wasDrifting = false;
+    this.bankFlash = 0;
+    this.comboBreakFlash = 0;
     this.floaterGfx = [];
     for (let i = 0; i < 10; i += 1) {
       this.floaterGfx.push(
@@ -216,7 +225,7 @@ export class DriftPlayScene extends Phaser.Scene {
     this.fitCam(this.scale.width, this.scale.height);
     this.scale.on("resize", (gs: Phaser.Structs.Size) => {
       this.fitCam(gs.width, gs.height);
-      this.hint.setPosition(this.scale.width / 2, this.scale.height - 78);
+      this.hint.setPosition(this.scale.width / 2, this.scale.height * 0.7);
       this.deltaTxt.setPosition(this.scale.width / 2, 86);
       this.countTxt.setPosition(this.scale.width / 2, this.scale.height / 2);
     });
@@ -225,8 +234,23 @@ export class DriftPlayScene extends Phaser.Scene {
   }
 
   private hintCopy() {
-    const touch = this.sys.game.device.input.touch;
-    return touch ? "STEER  ·  DRIFT" : "STEER  ·  DRIFT";
+    const live = Math.max(0, Math.floor(this.score.currentDrift));
+    const banked = Math.max(0, Math.floor(this.score.display - this.score.currentDrift));
+    const combo = Math.max(1, this.score.combo);
+    if (this.tutorialStep === "hold") return `HOLD DRIFT\nLIVE +${live}   BANKED ${banked}`;
+    if (this.tutorialStep === "combo") return `COMBO  ×${combo.toFixed(1)}\nLIVE +${live}   BANKED ${banked}`;
+    if (this.tutorialStep === "bank") return `BANK IT\nLIVE +${live} → BANKED`;
+    return "";
+  }
+
+  private completeTutorial() {
+    this.tutorialStep = "done";
+    this.shownHint = false;
+    try {
+      localStorage.setItem(NEON.tutorialKey, "1");
+    } catch {
+      /* noop */
+    }
   }
 
   private shouldTutorial() {
@@ -329,18 +353,10 @@ export class DriftPlayScene extends Phaser.Scene {
     }
     this.car.steer = this.testDrive?.steer ?? drive.steer;
     this.car.throttle = this.testDrive?.throttle ?? drive.throttle;
-    this.car.handbrake = this.testDrive ? false : drive.handbrake;
+    this.car.handbrake = this.testDrive ? Boolean(this.testDrive.handbrake) : drive.handbrake;
     this.car.assist = drive.touch && !this.testDrive ? VEHICLE.touchSteerAssist : 0;
 
     if (this.car.throttle !== 0 || this.car.steer !== 0 || this.car.handbrake) {
-      if (this.shownHint) {
-        this.shownHint = false;
-        try {
-          localStorage.setItem(NEON.tutorialKey, "1");
-        } catch {
-          /* noop */
-        }
-      }
       this.ensureAudio();
     }
 
@@ -361,6 +377,10 @@ export class DriftPlayScene extends Phaser.Scene {
       this.smash = 1;
       this.parts.burst(this.car.x, this.car.y, this.quality === "high" ? 16 : 8, 0xffd59a, 180, 240);
       this.parts.burst(this.car.x, this.car.y, this.quality === "low" ? 4 : 10, 0xff8a4a, 220, 180);
+      if (this.tutorialStep !== "done") {
+        this.comboBreakFlash = 1;
+        this.hint.setText("COMBO BROKE");
+      }
       if (this.car.speed > 390) {
         this.car.yawVel += 2.4;
         this.finish("crash");
@@ -405,6 +425,21 @@ export class DriftPlayScene extends Phaser.Scene {
       this.floaters.spawn(this.car.x, this.car.y - 36, `${comboFloor}x`, "#f3f1ec");
     }
     this.lastComboFloor = comboFloor;
+
+    if (this.tutorialStep === "hold" && this.car.drifting && this.score.currentDrift > 18) {
+      this.tutorialStep = "combo";
+    }
+    if (this.tutorialStep === "combo" && this.score.combo >= 2) {
+      this.tutorialStep = "bank";
+    }
+    if (this.tutorialStep === "bank" && this.wasDrifting && !this.car.drifting && this.score.bestDrift > 40) {
+      this.bankFlash = 1;
+      this.floaters.spawn(this.car.x, this.car.y - 42, "BANKED", "#8dffc1");
+      this.completeTutorial();
+    }
+    this.wasDrifting = this.car.drifting;
+    this.bankFlash = Math.max(0, this.bankFlash - dt * 1.8);
+    this.comboBreakFlash = Math.max(0, this.comboBreakFlash - dt * 1.6);
 
     if (this.car.driftAmount > 0.12 && this.car.speed > 110) {
       this.marks.push({
@@ -529,22 +564,31 @@ export class DriftPlayScene extends Phaser.Scene {
       label.setColor(t.color);
     });
 
-    const combo = Math.max(1, Math.floor(this.score.combo));
+    const combo = Math.max(1, this.score.combo);
+    const live = Math.max(0, Math.floor(this.score.currentDrift));
+    const banked = Math.max(0, Math.floor(this.score.display - this.score.currentDrift));
     const elapsed = ((this.time.now - this.runStart) / 1000).toFixed(1);
-    const live = this.score.currentDrift > 8 ? `   +${Math.floor(this.score.currentDrift)}` : "";
     const dbg = this.debug
       ? `\n${(1000 / Math.max(1, this.game.loop.actualFps)).toFixed?.(0) ?? ""} ${this.game.loop.actualFps | 0}fps  slip ${(this.car.slip * 57.3).toFixed(0)}°  ${this.car.driftAmount.toFixed(2)}`
       : "";
     this.hud.setText(
-      `${Math.floor(this.score.display).toLocaleString()}${live}\n${combo}x   lap ${this.lap}/${NEON.lapsToFinish}   ${elapsed}s\n${this.def.name}${dbg}`,
+      `BANKED  ${banked.toLocaleString()}\nLIVE    ${live > 0 ? `+${live}` : "—"}\nCOMBO   ×${combo.toFixed(1)}\n${this.def.name}   lap ${this.lap}/${NEON.lapsToFinish}   ${elapsed}s${dbg}`,
     );
-    this.hint.setAlpha(this.shownHint ? 0.88 : 0);
+    this.hud.setColor(this.car.drifting ? "#ffd6ea" : this.comboBreakFlash > 0 ? "#ff8aa0" : "#f3f1ec");
+    if (this.tutorialStep !== "done") this.hint.setText(this.hintCopy());
+    this.hint.setAlpha(this.shownHint || this.comboBreakFlash > 0 ? 0.92 : 0);
+    this.hint.setColor(this.comboBreakFlash > 0 ? "#ff8aa0" : this.bankFlash > 0 ? "#8dffc1" : "#f3f1ec");
     drawHudChrome(
       this.overlay,
       this.scale.width,
       this.scale.height,
       this.sys.game.device.input.touch,
       this.juice.flashAlpha(dt),
+      {
+        drift: this.car.driftAmount,
+        combo: this.score.combo,
+        live: this.score.currentDrift,
+      },
     );
     if (this.countdown > 0) {
       drawCountdown(this.overlay, this.scale.width, this.scale.height, this.countdown);
@@ -636,9 +680,9 @@ export class DriftPlayScene extends Phaser.Scene {
       },
       {
         finishRun: () => this.finish("finish"),
-        setDrive: (throttle: number, steer: number) => {
+        setDrive: (throttle: number, steer: number, handbrake = false) => {
           this.paused = false;
-          this.testDrive = { throttle, steer };
+          this.testDrive = { throttle, steer, handbrake: Boolean(handbrake) };
         },
         hideHud: () => {
           this.hud.setVisible(false);

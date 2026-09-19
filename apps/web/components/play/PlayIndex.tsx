@@ -64,8 +64,8 @@ export default function PlayIndex() {
         ) : null}
 
         <section className="mt-10" data-testid="play-three-ways">
-          <SectionHeader title="Three ways to play" />
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <SectionHeader title="All eight games" />
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {GAME_MANIFESTS.map((g) => (
               <GameTile
                 key={g.id}

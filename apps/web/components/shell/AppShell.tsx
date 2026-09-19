@@ -71,7 +71,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-dvh">
       <header
         className={`fixed inset-x-0 top-0 z-40 flex h-[var(--header-h)] items-center justify-between px-5 pt-[var(--safe-top)] md:px-8 ${
-          home ? "bg-gradient-to-b from-black/28 to-transparent" : "bg-[color-mix(in_srgb,var(--bg)_72%,transparent)] backdrop-blur-md"
+          home ? "bg-gradient-to-b from-black/28 to-transparent" : "bg-gradient-to-b from-black/70 via-black/35 to-transparent"
         }`}
       >
         <div className="flex items-center gap-7">
