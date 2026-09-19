@@ -385,6 +385,73 @@ html.reduce-motion .gw-interactive:focus-within {
   color: rgba(255, 255, 255, 0.34);
 }
 
+.home-gp-route {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  column-gap: 0.7rem;
+  align-items: start;
+}
+
+.home-gp-step {
+  position: relative;
+  min-width: 0;
+}
+
+.home-gp-step:not(:last-child)::after {
+  content: "→";
+  position: absolute;
+  top: 2.35rem;
+  right: -0.62rem;
+  width: 0.7rem;
+  color: rgba(255, 255, 255, 0.32);
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+}
+
+.home-gp-art {
+  height: 3.25rem;
+  width: 100%;
+}
+
+.home-gp-name {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+@media (min-width: 1280px) {
+  .home-gp-art {
+    height: 3.75rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .home-gp-route {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    column-gap: 0;
+    gap: 0.9rem;
+    padding-bottom: 2px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .home-gp-step {
+    flex: 0 0 5.4rem;
+    scroll-snap-align: start;
+  }
+
+  .home-gp-step:not(:last-child)::after {
+    right: -0.72rem;
+  }
+
+  .home-gp-art {
+    height: 3.5rem;
+  }
+}
+
 .home-progress {
   display: flex;
   gap: 4px;

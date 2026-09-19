@@ -2,10 +2,10 @@ import type { CSSProperties } from "react";
 
 const POSITION: Record<string, Record<string, string>> = {
   "neon-drift": { backdrop: "48% 38%", hero: "48% 40%", tile: "48% 40%" },
-  "velocity-run": { backdrop: "22% 68%", hero: "20% 70%", tile: "22% 70%" },
-  "swarm-protocol": { backdrop: "38% 28%", hero: "40% 30%", tile: "40% 30%" },
+  "velocity-run": { backdrop: "40% 32%", hero: "40% 30%", tile: "40% 42%" },
+  "swarm-protocol": { backdrop: "56% 46%", hero: "58% 46%", tile: "54% 46%" },
   "sky-stack": { backdrop: "50% 64%", hero: "50% 68%", tile: "50% 68%" },
-  "knockout-circuit": { backdrop: "22% 52%", hero: "20% 54%", tile: "20% 54%" },
+  "knockout-circuit": { backdrop: "40% 48%", hero: "42% 48%", tile: "36% 50%" },
   "pocket-striker": { backdrop: "32% 58%", hero: "30% 56%", tile: "30% 56%" },
   "territory-rush": { backdrop: "48% 48%", hero: "48% 50%", tile: "48% 50%" },
   "crowd-control": { backdrop: "30% 62%", hero: "32% 64%", tile: "32% 64%" },

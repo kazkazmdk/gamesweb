@@ -249,7 +249,7 @@ function avatarIndex(id: string) {
 }
 
 function AvatarGlyph({ n }: { n: number }) {
-  if (n === 0) return <path d="M12 8 L22 16 L12 24 Z" />;
+  if (n === 0) return <path d="M6 9 L13 16 L6 23 M14 9 L21 16 L14 23" />;
   if (n === 1) return <path d="M16 6 L26 16 L16 26 L6 16 Z" />;
   if (n === 2) return <path d="M7 7 H14 V25 H7 Z M18 7 H25 V25 H18 Z" />;
   if (n === 3) return <path d="M9 6 H6 V26 H9 M23 6 H26 V26 H23" />;
@@ -277,7 +277,7 @@ export function Avatar({ id, size = 32 }: { id: string; size?: number }) {
         <g
           stroke={`hsl(${hues[n]} 42% 78%)`}
           strokeWidth="1.7"
-          fill={n === 0 || n === 1 ? `hsl(${hues[n]} 38% 70%)` : "none"}
+          fill={n === 1 ? `hsl(${hues[n]} 38% 70%)` : "none"}
         >
           <AvatarGlyph n={n} />
         </g>
