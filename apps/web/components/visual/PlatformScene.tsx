@@ -184,16 +184,16 @@ function Swarm({ id }: { id: string }) {
       <rect width="1600" height="900" fill={`url(#${id}glow)`} />
       <g fill="#1a1012">
         <rect x="0" y="620" width="1600" height="280" />
-        <rect x="70" y="80" width="56" height="420" />
-        <rect x="148" y="160" width="40" height="380" />
-        <rect x="1320" y="40" width="86" height="460" />
-        <rect x="1430" y="90" width="54" height="400" />
+        <rect x="560" y="120" width="64" height="340" />
+        <rect x="640" y="190" width="42" height="300" />
+        <rect x="1180" y="80" width="90" height="400" />
+        <rect x="1288" y="140" width="52" height="340" />
       </g>
-      <g fill="#f07a3a" opacity=".35">
-        <rect x="86" y="118" width="14" height="14" />
-        <rect x="86" y="168" width="14" height="14" />
-        <rect x="1344" y="78" width="16" height="16" />
-        <rect x="1344" y="128" width="16" height="16" />
+      <g fill="#f07a3a" opacity=".4">
+        <rect x="576" y="156" width="14" height="14" />
+        <rect x="576" y="206" width="14" height="14" />
+        <rect x="1204" y="118" width="16" height="16" />
+        <rect x="1204" y="168" width="16" height="16" />
       </g>
       <ellipse cx="980" cy="430" rx="390" ry="240" fill="none" stroke="#f07a3a" strokeOpacity=".2" strokeWidth="3" />
       <ellipse cx="980" cy="430" rx="250" ry="154" fill="none" stroke="#ffc18a" strokeOpacity=".16" strokeWidth="2" />
