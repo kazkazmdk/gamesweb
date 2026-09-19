@@ -4,20 +4,24 @@ export function ProgressWidget({
   label,
   caption,
   size = "md",
+  showValue = true,
 }: {
   value: number;
   max: number;
   label?: string;
   caption?: string;
   size?: "sm" | "md";
+  showValue?: boolean;
 }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
     <div>
+      {showValue ? (
       <p className="stat text-[28px] md:text-[32px]">
         {value.toLocaleString("en-US")}
         <span className="ml-1 text-[13px] font-normal text-[var(--text-faint)]">/ {max.toLocaleString("en-US")}</span>
       </p>
+      ) : null}
       {label ? <p className="mt-1 text-[13px] text-[var(--text-dim)]">{label}</p> : null}
       {caption ? <p className="mt-1 text-[12px] text-white/45">{caption}</p> : null}
       <div

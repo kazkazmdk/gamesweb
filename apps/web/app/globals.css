@@ -727,14 +727,20 @@ html.reduce-motion .gw-art-drift {
   box-shadow: none;
 }
 
+.gw-platform-scene {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .gw-game-tile {
   position: relative;
-  height: 6.5rem;
-  width: 10.5rem;
+  height: 7.75rem;
+  width: 12.75rem;
   flex-shrink: 0;
   overflow: hidden;
-  opacity: 0.58;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  opacity: 0.62;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
 .gw-game-tile.is-on {
@@ -774,6 +780,23 @@ html.reduce-motion .gw-art-drift {
   box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
+.gw-friends-stage {
+  position: relative;
+  max-width: 46rem;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.gw-friends-stage::before {
+  content: "";
+  position: absolute;
+  inset: -1.5rem -1rem auto -1rem;
+  height: calc(100% + 2.5rem);
+  background:
+    radial-gradient(ellipse 70% 80% at 80% 20%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 55%);
+  pointer-events: none;
+}
+
 .gw-social-object {
   position: relative;
   overflow: hidden;
@@ -804,11 +827,32 @@ html.reduce-motion .gw-art-drift {
 }
 
 .gw-trophy-hero {
+  max-width: 52rem;
   background:
-    radial-gradient(ellipse 60% 70% at 18% 70%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 40%),
+    radial-gradient(ellipse 60% 70% at 18% 70%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 40%),
     #101012;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.gw-trophy-ghost {
+  position: absolute;
+  right: -1.5rem;
+  bottom: -2rem;
+  width: 16rem;
+  height: 16rem;
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+.gw-trophy-shelf-rail {
+  height: 10px;
+  margin-top: 1.25rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.35)),
+    #1a1a1c;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+  clip-path: polygon(0 0, 100% 0, 98% 100%, 2% 100%);
 }
 
 .gw-trophy-motif {
@@ -844,9 +888,12 @@ html.reduce-motion .gw-art-drift {
 }
 
 .gw-trophy-plinth-lg {
-  width: 7.5rem;
-  min-height: 7.5rem;
+  width: 10.5rem;
+  min-height: 10.5rem;
   flex-shrink: 0;
+  box-shadow:
+    inset 0 -14px 0 rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .gw-trophy-row {
@@ -1077,7 +1124,7 @@ html.reduce-motion .gw-art-drift {
   }
 
   .gw-game-tile {
-    height: 5.5rem;
-    width: 8.5rem;
+    height: 6.25rem;
+    width: 10rem;
   }
 }

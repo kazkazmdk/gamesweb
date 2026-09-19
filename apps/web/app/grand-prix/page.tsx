@@ -20,7 +20,7 @@ export default function GrandPrixPage() {
 
   return (
     <div data-testid="grand-prix">
-      <GameBackdrop slug={current?.game?.slug ?? "sky-stack"} className="min-h-[100svh]" dim={0.2} priority>
+      <GameBackdrop slug={current?.game?.slug ?? "sky-stack"} className="min-h-[100svh]" dim={0.12} priority>
         <div className="flex min-h-[38vh] flex-col justify-end px-5 pb-6 pt-20 md:min-h-[40vh] md:px-10">
           <h1 className="display mt-3 max-w-[14ch] text-[48px] text-white md:text-[76px]">
             {cleared ? "Cup complete" : `Round ${currentIdx + 1}`}

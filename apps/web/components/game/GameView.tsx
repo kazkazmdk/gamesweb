@@ -636,7 +636,9 @@ function Results({
 
   const quiet = score === 0 && !wonChallenge && !continueEndless;
   const shownScore = useCountUp(score);
-  const primary = continueEndless ? (
+  const primary = quiet ? (
+    <ChamferButton onClick={onRetry}>Retry</ChamferButton>
+  ) : continueEndless ? (
     <ChamferButton onClick={() => onContinueEndless?.()}>Continue Endless</ChamferButton>
   ) : wonChallenge ? (
     <ChamferButton
@@ -721,12 +723,12 @@ function Results({
         <div className="mt-8 flex flex-col items-start gap-3">
           {primary}
           {copied ? <p className="text-[12px] text-white/50">Challenge link copied</p> : null}
-          {action.type !== "retry_pb" && !continueEndless ? (
+          {action.type !== "retry_pb" && !continueEndless && !quiet ? (
             <ChamferButton tone="ghost" cue={false} onClick={onRetry}>
               Play again
             </ChamferButton>
           ) : null}
-          {action.type !== "challenge_friend" && !wonChallenge ? (
+          {(action.type !== "challenge_friend" || quiet) && !wonChallenge ? (
             <ChamferButton tone="platform" cue={false} onClick={makeChallenge}>
               Share challenge
             </ChamferButton>

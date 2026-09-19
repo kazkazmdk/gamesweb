@@ -501,15 +501,18 @@ export class VelocityPlayScene extends Phaser.Scene {
       },
       { x: this.camX, y: this.camY },
     );
-    g.fillStyle(mixColor(th.sky, 0x000000, 0.35), 1);
+    g.fillStyle(mixColor(th.sky, 0x000000, 0.22), 1);
     for (let i = 0; i < 16; i += 1) {
       const x = i * 280 + this.camX * 0.58;
-      const bh = 160 + (i % 4) * 50;
-      g.fillRect(x, this.course.height - bh - 40, 70 + (i % 3) * 18, bh);
-      g.fillStyle(th.accent, 0.06);
-      g.fillRect(x + 10, this.course.height - bh + 20, 8, 14);
-      g.fillStyle(mixColor(th.sky, 0x000000, 0.35), 1);
+      const bh = 210 + (i % 4) * 70;
+      g.fillRect(x, this.course.height - bh - 40, 86 + (i % 3) * 22, bh);
+      g.fillStyle(th.accent, 0.14);
+      g.fillRect(x + 12, this.course.height - bh + 24, 12, 16);
+      g.fillRect(x + 12, this.course.height - bh + 52, 12, 16);
+      g.fillStyle(mixColor(th.sky, 0x000000, 0.22), 1);
     }
+    g.fillStyle(th.accent, 0.1);
+    g.fillRect(0, this.course.height * 0.18, this.course.width, 8);
     g.fillStyle(th.accent, 0.04);
     for (let x = 0; x < this.course.width; x += 96) g.fillRect(x, 0, 2, this.course.height);
     g.fillStyle(0xf3f1ec, 0.9);

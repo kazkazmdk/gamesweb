@@ -101,7 +101,9 @@ export default function FriendsPage() {
 
       {player.friends.length === 0 ? (
         <div className="mt-6 px-5 md:px-10">
-          <FriendsFloor name={player.displayName} avatar={player.avatar} action={<InviteWidget />} />
+          <div className="gw-friends-stage">
+            <FriendsFloor name={player.displayName} avatar={player.avatar} action={<InviteWidget />} />
+          </div>
         </div>
       ) : (
         <div className="mt-12 space-y-10 px-5 md:px-10">

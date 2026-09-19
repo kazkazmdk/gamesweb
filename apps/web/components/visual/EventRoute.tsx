@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { GameArt } from "@/components/game/GameArt";
-import { homeGameLabel, homeStage } from "@/components/home/home-stage";
+import { homeGameLabel } from "@/components/home/home-stage";
+import { PlatformScene } from "./PlatformScene";
 
 export type EventRouteStep = {
   key: string;
@@ -23,7 +23,6 @@ export function EventRoute({
   return (
     <ol className="gw-route" style={{ ["--gw-route-cols" as string]: String(cols ?? steps.length) }} aria-label="Event route">
       {steps.map((step) => {
-        const dir = homeStage(step.slug);
         const current = step.status === "current";
         const done = step.status === "done";
         const locked = step.status === "locked";
@@ -33,7 +32,7 @@ export function EventRoute({
             <span
               className={`gw-route-art relative block overflow-hidden ${current ? "h-40 md:h-48" : "h-24 md:h-28"} ${done ? "is-done" : ""} ${locked ? "is-locked" : ""}`}
             >
-              <GameArt slug={step.slug} variant="tile" position={dir.tile} className="h-full w-full" />
+              <PlatformScene slug={step.slug} className="h-full w-full" />
               <span className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/10" aria-hidden />
               <span className={`${current ? "gw-frame" : "gw-ticks"} pointer-events-none absolute inset-0`} aria-hidden />
               {done ? <span className="gw-route-flag">Cleared</span> : null}

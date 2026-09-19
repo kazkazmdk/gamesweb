@@ -73,7 +73,7 @@ export function AchievementsPage() {
         </div>
       </div>
       <div className="mt-5 max-w-sm">
-        <ProgressWidget value={unlocked} max={catalog.length || 1} />
+        <ProgressWidget value={unlocked} max={catalog.length || 1} showValue={false} />
       </div>
 
       {recent ? (

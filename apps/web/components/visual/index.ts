@@ -4,6 +4,7 @@ export { EventRoute, type EventRouteStep } from "./EventRoute";
 export { FeaturedTrophy, TrophyShelf, type TrophyItem } from "./TrophyShelf";
 export { FriendsFloor } from "./FriendsFloor";
 export { GameBackdrop } from "./GameBackdrop";
+export { PlatformScene } from "./PlatformScene";
 export { PlayerIdentity } from "./PlayerIdentity";
 export { PlayerVersus } from "./PlayerVersus";
 export { ProgressionStrip } from "./ProgressionStrip";

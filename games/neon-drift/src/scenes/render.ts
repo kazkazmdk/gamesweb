@@ -21,6 +21,8 @@ export function drawWorld(
   else if (def.id === "technical") drawDistrictWorld(g, def, quality, t);
   else drawRidgeWorld(g, def, quality, t);
 
+  drawTrackside(g, def, samples, quality);
+
   // barriers + asphalt
   for (let i = 0; i < samples.length; i += 1) {
     const s = samples[i];
@@ -176,6 +178,37 @@ export function drawWorld(
           g.fillRect(px - 10, py - 90, 14, 90);
         }
       }
+    }
+  }
+}
+
+function drawTrackside(g: Phaser.GameObjects.Graphics, def: TrackDef, samples: TrackSample[], quality: string) {
+  const theme = def.theme;
+  const apron = def.id === "foundation" ? 0x0c1822 : def.id === "velocity" ? 0x10161e : 0x14161c;
+  for (let i = 0; i < samples.length; i += 1) {
+    const s = samples[i];
+    const n = samples[(i + 1) % samples.length];
+    g.fillStyle(apron, 1);
+    fillStrip(g, s.x, s.y, s.nx, s.ny, n.x, n.y, n.nx, n.ny, s.width * 0.5 + 92);
+  }
+  if (quality === "low") return;
+  for (let i = 0; i < samples.length; i += 6) {
+    const s = samples[i];
+    const dist = s.width * 0.5 + 78;
+    const x = s.x + s.nx * dist;
+    const y = s.y + s.ny * dist;
+    const bw = 42 + (i % 3) * 18;
+    const bh = 64 + (i % 5) * 28;
+    g.fillStyle(theme.building, 0.96);
+    g.fillRect(x - bw / 2, y - bh / 2, bw, bh);
+    g.fillStyle(theme.accent, 0.16 + (i % 4 === 0 ? 0.12 : 0));
+    g.fillRect(x - bw / 2 + 8, y - bh / 2 + 10, 8, 8);
+    g.fillRect(x - bw / 2 + 8, y - bh / 2 + 26, 8, 8);
+    if (i % 12 === 0) {
+      g.fillStyle(theme.barrier, 1);
+      g.fillRect(x + bw / 2 + 8, y - 18, 6, 50);
+      g.fillStyle(theme.pole, 0.85);
+      g.fillCircle(x + bw / 2 + 11, y - 22, 5);
     }
   }
 }

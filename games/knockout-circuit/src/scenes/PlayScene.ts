@@ -302,28 +302,31 @@ export class KnockoutScene extends Phaser.Scene {
   private drawPlace(g: Phaser.GameObjects.Graphics, th: MapDef["theme"]) {
     const env = this.map.env;
     if (env === "factory") {
-      g.fillStyle(mixColor(th.sky, 0x000000, 0.25), 1);
       for (let i = 0; i < 10; i += 1) {
         const x = i * 340 + this.camX * 0.28;
-        g.fillRect(x, this.map.height * 0.28, 84, this.map.height * 0.72);
-        g.fillStyle(th.accent, 0.1 + (Math.sin(this.time.now / 220 + i) > 0.3 ? 0.08 : 0));
-        g.fillRect(x + 14, this.map.height * 0.34, 12, 14);
-        g.fillRect(x + 40, this.map.height * 0.48, 12, 14);
-        g.fillStyle(mixColor(th.sky, 0x000000, 0.25), 1);
-        g.fillRect(x + 90, this.map.height * 0.12, 14, this.map.height * 0.4);
+        g.fillStyle(0x2a2218, 0.92);
+        g.fillRect(x, this.map.height * 0.22, 96, this.map.height * 0.78);
+        g.fillStyle(0xffb45a, 0.22 + (Math.sin(this.time.now / 220 + i) > 0.3 ? 0.16 : 0));
+        g.fillRect(x + 16, this.map.height * 0.3, 14, 16);
+        g.fillRect(x + 46, this.map.height * 0.44, 14, 16);
+        g.fillRect(x + 16, this.map.height * 0.58, 14, 16);
+        g.fillStyle(0x3a2e20, 0.95);
+        g.fillRect(x + 108, this.map.height * 0.08, 18, this.map.height * 0.46);
       }
-      g.fillStyle(0x3a2a18, 0.7);
+      g.fillStyle(0xc48a20, 0.85);
       for (let i = 0; i < 6; i += 1) {
         const x = i * 480 + this.camX * 0.1;
-        g.fillRect(x, this.map.height * 0.22, 220, 12);
-        g.fillRect(x + 200, this.map.height * 0.22, 10, 70);
+        g.fillRect(x, this.map.height * 0.18, 240, 14);
+        g.fillRect(x + 220, this.map.height * 0.18, 12, 80);
       }
-      g.fillStyle(0x2a2218, 0.5);
-      g.fillRect(0, this.map.height - 48, this.map.width, 48);
-      g.fillStyle(th.accent, 0.18);
-      for (let i = 0; i < 6; i += 1) g.fillRect(i * 480 + this.camX * 0.12, this.map.height * 0.16, 160, 8);
-      g.fillStyle(0xffb45a, 0.12);
-      for (let i = 0; i < 8; i += 1) g.fillCircle(i * 420 + 80, this.map.height * 0.2, 10);
+      g.fillStyle(0x1a1410, 0.75);
+      g.fillRect(0, this.map.height - 56, this.map.width, 56);
+      g.fillStyle(0x3a2a12, 0.55);
+      for (let i = 0; i < 24; i += 1) g.fillRect(i * 70, this.map.height - 52, 40, 8);
+      g.fillStyle(th.accent, 0.28);
+      for (let i = 0; i < 6; i += 1) g.fillRect(i * 480 + this.camX * 0.12, this.map.height * 0.12, 180, 10);
+      g.fillStyle(0xffb45a, 0.22);
+      for (let i = 0; i < 8; i += 1) g.fillCircle(i * 420 + 80, this.map.height * 0.16, 12);
     } else if (env === "skyworks") {
       g.fillStyle(mixColor(th.sky, 0xffffff, 0.06), 1);
       g.fillCircle(this.map.width * 0.7, 90, 50);

@@ -9,9 +9,7 @@ import { useArcade } from "@/lib/social/use-arcade";
 import { friendsBoard, rankViewModel } from "@/lib/platform/adapters";
 import { formatPlayScore, formatRank } from "@/lib/platform/format";
 import { boardModeOptions, defaultBoardMode } from "@/lib/platform/modes";
-import { GameBackdrop, RankPodium } from "@/components/visual";
-import { GameArt } from "@/components/game/GameArt";
-import { homeStage } from "@/components/home/home-stage";
+import { GameBackdrop, PlatformScene, RankPodium } from "@/components/visual";
 
 export default function LeaderboardsPage() {
   const store = useStore();
@@ -68,7 +66,6 @@ export default function LeaderboardsPage() {
         >
           {GAME_MANIFESTS.map((g) => {
             const selected = g.id === game.id;
-            const dir = homeStage(g.slug);
             return (
               <button
                 key={g.id}
@@ -78,7 +75,7 @@ export default function LeaderboardsPage() {
                 className={`gw-game-tile ${selected ? "is-on" : ""}`}
                 onClick={() => selectGame(g.id)}
               >
-                <GameArt slug={g.slug} variant="tile" position={dir.tile} className="h-full w-full" />
+                <PlatformScene slug={g.slug} className="h-full w-full" />
                 <span className="gw-game-tile-name">{g.title}</span>
               </button>
             );

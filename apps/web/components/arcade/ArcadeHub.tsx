@@ -94,7 +94,7 @@ export function ArcadeHub() {
 
   return (
     <div>
-      <GameBackdrop slug={hero.slug} className="min-h-[100svh]" dim={0.18} priority>
+      <GameBackdrop slug={hero.slug} className="min-h-[100svh]" dim={0.1} priority>
         <div className="flex min-h-[40vh] flex-col justify-end px-5 pb-6 pt-20 md:min-h-[42vh] md:px-10">
           <p className="meta text-white/50">{hero.kicker}</p>
           <h1 className="display mt-2 text-[48px] text-white md:text-[80px]">Arcade</h1>
