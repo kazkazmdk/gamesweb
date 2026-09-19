@@ -379,11 +379,14 @@ export class TerritoryScene extends Phaser.Scene {
       g.fillRoundedRect(x * c, y * c, c, c, this.arena === 0 ? 2 : 0);
     }
     for (let owner = 1; owner <= 4; owner += 1) {
-      g.fillStyle(colors[owner], 0.92);
+      g.fillStyle(colors[owner], owner === 1 ? 0.94 : 0.86);
       for (const span of contourSpans(this.grid, COLS, ROWS, owner)) {
         g.fillRoundedRect(span.x * c, span.y * c, span.w * c, c + 0.6, 3);
+        g.fillStyle(0xffffff, owner === 1 ? 0.08 : 0.04);
+        g.fillRect(span.x * c, span.y * c, span.w * c, 3);
+        g.fillStyle(colors[owner], owner === 1 ? 0.94 : 0.86);
       }
-      g.lineStyle(2.2, outlines[owner], 0.85);
+      g.lineStyle(2.6, outlines[owner], owner === 1 ? 0.95 : 0.7);
       for (let y = 0; y < ROWS; y += 1) {
         for (let x = 0; x < COLS; x += 1) {
           if (this.get(x, y) !== owner) continue;
@@ -403,10 +406,12 @@ export class TerritoryScene extends Phaser.Scene {
       }
     }
     if (this.captureWave > 0) {
-      g.fillStyle(0xffffff, this.captureWave * 0.1);
+      g.fillStyle(0xffffff, this.captureWave * 0.08);
       g.fillRect(0, 0, COLS * c, ROWS * c);
-      g.fillStyle(colors[1], this.captureWave * 0.16);
-      g.fillCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, 28 + (1 - this.captureWave) * 70);
+      g.fillStyle(colors[1], this.captureWave * 0.22);
+      g.fillCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, 22 + (1 - this.captureWave) * 90);
+      g.lineStyle(3, 0xffffff, this.captureWave * 0.45);
+      g.strokeCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, 18 + (1 - this.captureWave) * 70);
     }
     drawRibbon(g, ribbonPoints(this.trail, c), this.shield > 0 ? 0x8fe8ff : 0xffffff, this.trail.length > 8 ? 1.15 : 1);
     for (const b of this.bots) drawRibbon(g, ribbonPoints(b.trail, c), colors[b.id], 0.85);

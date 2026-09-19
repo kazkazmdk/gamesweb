@@ -12,8 +12,8 @@ export function SectionHeader({
   return (
     <div className="flex items-end justify-between gap-3">
       <div>
-        <h2 className="meta">{title}</h2>
-        {meta ? <p className="mt-1 text-[13px] text-[var(--text-dim)]">{meta}</p> : null}
+        <h2 className="text-[16px] tracking-[-0.02em] text-white/72">{title}</h2>
+        {meta ? <p className="stat mt-1 text-[18px] text-white">{meta}</p> : null}
       </div>
       {action}
     </div>

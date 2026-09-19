@@ -1,7 +1,7 @@
 "use client";
 
 import { InviteWidget, FriendPresence, SectionHeader } from "@/components/platform";
-import { EmptyStateStage, PlayerVersus } from "@/components/visual";
+import { FriendsFloor, PlayerVersus } from "@/components/visual";
 import { ChamferButton } from "@/components/visual/ChamferButton";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
@@ -31,8 +31,7 @@ export default function FriendsPage() {
       ) : null}
 
       <div className="px-5 pt-8 md:px-10">
-        <p className="meta text-white/45">Social</p>
-        <h1 className="display mt-2 text-[44px] md:text-[64px]">Friends</h1>
+        <h1 className="display text-[44px] md:text-[64px]">Friends</h1>
       </div>
 
       {playing.length ? (
@@ -101,15 +100,8 @@ export default function FriendsPage() {
       ) : null}
 
       {player.friends.length === 0 ? (
-        <div className="mt-8 px-5 md:px-10">
-          <EmptyStateStage
-            heading="p"
-            slug="neon-drift"
-            kicker="Floor"
-            title="No friends yet"
-            body="Invite someone to chase a score. Presence only appears when they are actually here."
-            action={<InviteWidget />}
-          />
+        <div className="mt-6 px-5 md:px-10">
+          <FriendsFloor name={player.displayName} avatar={player.avatar} action={<InviteWidget />} />
         </div>
       ) : (
         <div className="mt-12 space-y-10 px-5 md:px-10">

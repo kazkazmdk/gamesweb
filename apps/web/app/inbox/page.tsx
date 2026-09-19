@@ -24,8 +24,7 @@ export default function InboxPage() {
   return (
     <div className="pb-16" data-testid="inbox">
       <div className="px-5 pt-8 md:px-10">
-        <p className="meta text-white/45">Inbox</p>
-        <h1 className="display mt-2 text-[44px] md:text-[64px]">Action queue</h1>
+        <h1 className="display text-[44px] md:text-[64px]">Action queue</h1>
       </div>
 
       {items.length === 0 ? (
@@ -33,10 +32,9 @@ export default function InboxPage() {
           <EmptyStateStage
             heading="p"
             slug="knockout-circuit"
-            kicker="Quiet"
             title="Nothing waiting"
             body="Challenges, crew notes, and party codes land here when someone actually sends one."
-            action={<ChamferButton href="/friends">Find a rival</ChamferButton>}
+            action={<ChamferButton href="/friends" tone="platform">Find a rival</ChamferButton>}
           />
         </div>
       ) : (

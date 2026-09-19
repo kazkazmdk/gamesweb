@@ -135,7 +135,7 @@ export function ArcadeHub() {
       ) : null}
 
       <section className="px-5 py-10 md:px-10">
-        <h2 className="meta">Daily challenges</h2>
+        <h2 className="text-[16px] text-white/72">Daily challenges</h2>
         <div className="mt-5">
           <EventRoute
             steps={dailyEvents.map((e, i) => {

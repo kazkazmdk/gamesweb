@@ -6,15 +6,15 @@ import { useEffect, useState } from "react";
 import {
   ActivityFeed,
   EmptyState,
-  ProgressWidget,
   QuickAction,
   RecordWidget,
   SectionHeader,
   StatsWidget,
 } from "@/components/platform";
 import { useAccent } from "@/components/shell/AppShell";
-import { EmptyStateStage, PlayerIdentity, TrophyShelf } from "@/components/visual";
+import { EmptyStateStage, PlayerIdentity, SettingsIcon, TrophyShelf } from "@/components/visual";
 import { ChamferButton } from "@/components/visual/ChamferButton";
+import Link from "next/link";
 import { usePlayer } from "@/lib/player";
 import {
   activityFromHistory,
@@ -53,20 +53,18 @@ function SelfProfile() {
         username={player.username}
         avatar={player.avatar}
         level={lv.level}
+        into={lv.intoLevel}
+        needed={Math.max(1, lv.needed)}
         stat={player.streak > 0 ? `${player.streak} day streak` : favoriteGame ? `Main · ${favoriteGame.title}` : undefined}
         slug={favoriteGame?.slug}
         action={
-          <QuickAction href="/settings" tone="quiet">
-            Settings
-          </QuickAction>
+          <Link href="/settings" className="gw-icon-btn" aria-label="Settings">
+            <SettingsIcon />
+          </Link>
         }
       />
-      <div className="px-5 py-8 md:px-10">
-        <div className="max-w-md">
-          <ProgressWidget value={lv.intoLevel} max={Math.max(1, lv.needed)} caption="Level progress" />
-        </div>
-
-        <div className="mt-10">
+      <div className="px-5 py-7 md:px-10">
+        <div>
           <StatsWidget
             items={[
               { value: stats.runs, label: "Runs" },

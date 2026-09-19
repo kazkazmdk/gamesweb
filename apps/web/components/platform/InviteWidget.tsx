@@ -18,15 +18,10 @@ export function InviteWidget({ slug, compact }: { slug?: string; compact?: boole
   return (
     <div>
       {compact ? null : (
-        <>
-          <p className="meta">Invite a friend</p>
-          <p className="mt-2 max-w-md text-[14px] text-[var(--text-dim)]">
-            Send a link. They can play before creating an account.
-          </p>
-        </>
+        <p className="max-w-md text-[14px] text-white/55">Send a link. They can play before creating an account.</p>
       )}
       <div className={compact ? "" : "mt-4"}>
-        <QuickAction onClick={() => void copy()} tone={copied || compact ? "ghost" : "primary"}>
+        <QuickAction onClick={() => void copy()} tone={copied ? "ghost" : "platform"}>
           {copied ? "Copied" : compact ? "Invite" : "Copy link"}
         </QuickAction>
       </div>

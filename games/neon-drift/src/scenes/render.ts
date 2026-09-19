@@ -46,23 +46,30 @@ export function drawWorld(
       g.lineBetween(s.x + s.nx * edge, s.y + s.ny * edge, n.x + n.nx * edge, n.y + n.ny * edge);
       g.lineBetween(s.x - s.nx * edge, s.y - s.ny * edge, n.x - n.nx * edge, n.y - n.ny * edge);
     }
+    for (let i = 0; i < samples.length; i += 2) {
+      const s = samples[i];
+      const edge = s.width * 0.5 + 5;
+      g.fillStyle(i % 4 === 0 ? theme.accent : 0xf3f1ec, 0.95);
+      g.fillRect(s.x + s.nx * edge - 3, s.y + s.ny * edge - 5, 6, 10);
+      g.fillRect(s.x - s.nx * edge - 3, s.y - s.ny * edge - 5, 6, 10);
+    }
     g.lineStyle(2, theme.mark, 0.28);
     for (let i = 0; i < samples.length; i += 6) {
       const s = samples[i];
       const n = samples[(i + 2) % samples.length];
       g.lineBetween(s.x - s.tx * 4, s.y - s.ty * 4, n.x + n.tx * 6, n.y + n.ty * 6);
     }
-    for (let i = 0; i < samples.length; i += 22) {
+    for (let i = 0; i < samples.length; i += 18) {
       const s = samples[i];
-      g.fillStyle(0xffffff, 0.07);
-      g.fillCircle(s.x + s.nx * 12, s.y + s.ny * 8, 18);
+      g.fillStyle(0xffffff, 0.08);
+      g.fillCircle(s.x + s.nx * 12, s.y + s.ny * 8, 16);
     }
     for (let i = 0; i < samples.length; i += 3) {
       const s = samples[i];
-      g.fillStyle(0x1a1214, 0.28);
+      g.fillStyle(0x1a1214, 0.32);
       g.fillCircle(s.x + s.nx * s.width * 0.22, s.y + s.ny * s.width * 0.22, 4);
       if (i % 9 === 0) {
-        g.fillStyle(theme.accent, 0.35);
+        g.fillStyle(theme.accent, 0.4);
         g.fillCircle(s.x + s.nx * s.width * 0.46, s.y + s.ny * s.width * 0.46, 3);
       }
     }
@@ -113,6 +120,25 @@ export function drawWorld(
         const hy2 = s.y - s.ny * (s.width * 0.32);
         g.fillTriangle(hx2, hy2, hx2 + s.tx * 18, hy2 + s.ty * 18, hx2 - s.nx * 9, hy2 - s.ny * 9);
       }
+      if (i % 28 === 0) {
+        const sx = s.x + s.nx * (side + 22);
+        const sy = s.y + s.ny * (side + 22);
+        g.fillStyle(0x1a1618, 1);
+        g.fillRect(sx - 3, sy - 26, 6, 26);
+        g.fillStyle(0xf3f1ec, 0.92);
+        g.fillRect(sx - 10, sy - 40, 20, 16);
+        g.fillStyle(theme.accent, 0.9);
+        g.fillTriangle(sx, sy - 37, sx + 6, sy - 28, sx - 6, sy - 28);
+      }
+      if (i === 56 || i === 140) {
+        const ox = s.x;
+        const oy = s.y;
+        g.fillStyle(0x16141a, 0.95);
+        g.fillRect(ox - s.width * 0.7, oy - 18, s.width * 1.4, 14);
+        g.fillStyle(theme.barrier, 1);
+        g.fillRect(ox - s.width * 0.72, oy - 46, 10, 46);
+        g.fillRect(ox + s.width * 0.62, oy - 46, 10, 46);
+      }
       const px = s.x - s.nx * (side + 18);
       const py = s.y - s.ny * (side + 18);
       if (def.id === "foundation") {
@@ -156,55 +182,69 @@ export function drawWorld(
 
 function drawHarbourWorld(g: Phaser.GameObjects.Graphics, def: TrackDef, quality: string, t: number) {
   g.fillStyle(0x0a1624, 1);
-  g.fillRect(0, def.worldH * 0.62, def.worldW, def.worldH * 0.38);
+  g.fillRect(0, def.worldH * 0.58, def.worldW, def.worldH * 0.42);
   if (quality !== "low") {
     g.fillStyle(0x1a3a4a, 0.35 + Math.sin(t / 700) * 0.06);
-    for (let i = 0; i < 12; i += 1) g.fillRect(i * 300, def.worldH * 0.68 + Math.sin(t / 400 + i) * 6, 220, 8);
+    for (let i = 0; i < 14; i += 1) g.fillRect(i * 280, def.worldH * 0.66 + Math.sin(t / 400 + i) * 6, 220, 8);
+    g.fillStyle(0x7ad4ff, 0.05);
+    g.fillRect(0, def.worldH * 0.6, def.worldW, 10);
   }
-  drawSkyline(g, def.worldH * 0.58, def.worldW, 0x1a141c, 2, 0);
+  drawSkyline(g, def.worldH * 0.56, def.worldW, 0x1a141c, 2, 0);
+  drawSkyline(g, def.worldH * 0.6, def.worldW, 0x121018, 5, 40);
   if (quality === "high") {
     drawCrane(g, 420, def.worldH * 0.7, 220, 0x3a2430);
     drawCrane(g, 980, def.worldH * 0.72, 180, 0x2a1c28);
+    drawCrane(g, 1680, def.worldH * 0.68, 160, 0x2a2430);
     drawContainer(g, 260, def.worldH * 0.7 - 40, 70, 40, 0xc45c3a);
     drawContainer(g, 340, def.worldH * 0.7 - 40, 70, 40, 0x3a6a88);
     drawContainer(g, 300, def.worldH * 0.7 - 80, 70, 40, 0xe35aa0);
     drawContainer(g, 2100, def.worldH * 0.66, 80, 44, 0x2a6a7a);
     drawContainer(g, 2190, def.worldH * 0.66, 80, 44, 0xc4783a);
+    drawContainer(g, 2280, def.worldH * 0.66, 80, 44, 0x3a6a88);
   }
 }
 
 function drawDistrictWorld(g: Phaser.GameObjects.Graphics, def: TrackDef, quality: string, t: number) {
   g.fillStyle(0x0c0e16, 1);
   g.fillRect(0, 0, def.worldW, def.worldH);
-  drawSkyline(g, def.worldH * 0.72, def.worldW, 0x161820, 7, 0);
+  drawSkyline(g, def.worldH * 0.7, def.worldW, 0x12141c, 4, 0);
+  drawSkyline(g, def.worldH * 0.74, def.worldW, 0x1a1c26, 7, 30);
   if (quality !== "low") {
-    for (let i = 0; i < 10; i += 1) {
-      const x = 180 + i * 260;
-      const h = 90 + (i % 4) * 40;
+    for (let i = 0; i < 14; i += 1) {
+      const x = 120 + i * 240;
+      const h = 110 + (i % 5) * 48;
       g.fillStyle(0x1c2230, 1);
-      g.fillRect(x, def.worldH * 0.7 - h, 70, h);
-      g.fillStyle(0xffb45a, 0.08 + (Math.sin(t / 240 + i) > 0.4 ? 0.08 : 0));
+      g.fillRect(x, def.worldH * 0.7 - h, 78, h);
+      g.fillStyle(0xffb45a, 0.08 + (Math.sin(t / 240 + i) > 0.4 ? 0.1 : 0));
       g.fillRect(x + 10, def.worldH * 0.7 - h + 16, 12, 10);
       g.fillRect(x + 40, def.worldH * 0.7 - h + 28, 12, 10);
+      g.fillRect(x + 22, def.worldH * 0.7 - h + 48, 12, 10);
     }
     g.fillStyle(0xff6b3b, 0.22);
     g.fillRect(640, 420, 90, 28);
     g.fillRect(1680, 980, 70, 22);
+    g.fillStyle(0x10121a, 0.9);
+    g.fillRect(900, def.worldH * 0.42, 420, 18);
   }
 }
 
 function drawRidgeWorld(g: Phaser.GameObjects.Graphics, def: TrackDef, quality: string, t: number) {
   g.fillStyle(0x10141c, 1);
   g.fillRect(0, 0, def.worldW, def.worldH);
+  g.fillStyle(0x152030, 1);
+  g.fillTriangle(80, def.worldH * 0.82, 640, def.worldH * 0.34, 1180, def.worldH * 0.82);
   g.fillStyle(0x1a2434, 1);
   g.fillTriangle(200, def.worldH * 0.78, 700, def.worldH * 0.42, 1180, def.worldH * 0.78);
   g.fillTriangle(900, def.worldH * 0.8, 1600, def.worldH * 0.36, 2300, def.worldH * 0.8);
+  g.fillTriangle(1800, def.worldH * 0.84, 2500, def.worldH * 0.4, 3200, def.worldH * 0.84);
   drawSkyline(g, def.worldH * 0.74, def.worldW, 0x141820, 11, 0);
   if (quality !== "low") {
     g.fillStyle(0x7ad4ff, 0.12 + Math.sin(t / 500) * 0.04);
     g.fillRect(0, def.worldH * 0.3, def.worldW, 8);
-    g.fillStyle(0xe8f4ff, 0.08);
-    g.fillCircle(def.worldW * 0.72, def.worldH * 0.18, 80);
+    g.fillStyle(0xe8f4ff, 0.1);
+    g.fillCircle(def.worldW * 0.72, def.worldH * 0.16, 90);
+    g.fillStyle(0x0c1018, 0.55);
+    for (let i = 0; i < 8; i += 1) g.fillRect(i * 420 + 80, def.worldH * 0.7, 14, 90);
   }
 }
 

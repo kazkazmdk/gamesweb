@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { GAME_MANIFESTS, allAchievements } from "@gamesweb/game-sdk";
 import { EmptyState, ProgressWidget, StatusPill } from "@/components/platform";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
-import { TrophyShelf } from "@/components/visual";
+import { FeaturedTrophy, TrophyShelf } from "@/components/visual";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer } from "@/lib/player";
 import { achievementCatalog } from "@/lib/platform/focus";
@@ -48,46 +48,55 @@ export function AchievementsPage() {
     .filter((a) => a.unlocked)
     .slice()
     .sort((a, b) => (b.unlockedAt ?? 0) - (a.unlockedAt ?? 0))[0];
+  const shelf = catalog
+    .filter((a) => a.unlocked)
+    .slice()
+    .sort((a, b) => (b.unlockedAt ?? 0) - (a.unlockedAt ?? 0))
+    .slice(0, 4);
 
   return (
     <div className="px-5 py-8 md:px-10">
-      <p className="meta">Progression</p>
-      <h1 className="display mt-2 text-[44px] md:text-[64px]">Achievements</h1>
+      <h1 className="display text-[44px] md:text-[64px]">Achievements</h1>
       <div className="mt-8 flex flex-wrap items-end gap-10">
         <div>
           <p className="stat text-[56px]">
             {unlocked}
             <span className="ml-2 text-[18px] font-normal text-[var(--text-faint)]">/ {catalog.length}</span>
           </p>
-          <p className="meta mt-2">unlocked</p>
         </div>
         <div>
           <p className="stat text-[44px]">{pct}%</p>
-          <p className="meta mt-2">complete</p>
         </div>
         <div>
           <p className="stat text-[44px]">{totalXp.toLocaleString("en-US")}</p>
-          <p className="meta mt-2">XP from trophies</p>
+          <p className="mt-2 text-[12px] text-white/40">XP from trophies</p>
         </div>
-        {recent ? (
-          <div className="max-w-xs">
-            <p className="meta">Recent</p>
-            <p className="mt-2 text-[15px]">{recent.name}</p>
-            {recent.unlockedAt ? <p className="mt-1 text-[12px] text-[var(--text-faint)]">{formatUnlock(recent.unlockedAt)}</p> : null}
-          </div>
-        ) : null}
       </div>
-      <div className="mt-6 max-w-sm">
+      <div className="mt-5 max-w-sm">
         <ProgressWidget value={unlocked} max={catalog.length || 1} />
       </div>
 
       {recent ? (
         <section className="mt-10">
-          <p className="meta text-white/40">Recently unlocked</p>
+          <FeaturedTrophy
+            item={{
+              id: recent.id,
+              name: recent.name,
+              description: recent.description,
+              unlocked: true,
+              gameId: recent.gameId ?? "platform",
+              xp: recent.xp,
+            }}
+          />
+        </section>
+      ) : null}
+
+      {shelf.length ? (
+        <section className="mt-8">
+          <h2 className="text-[16px] text-white/70">Shelf</h2>
           <div className="mt-4">
             <TrophyShelf
-              featured
-              items={[recent].map((a) => ({
+              items={shelf.map((a) => ({
                 id: a.id,
                 name: a.name,
                 description: a.description,
@@ -100,7 +109,7 @@ export function AchievementsPage() {
         </section>
       ) : null}
 
-      <div className="mt-8 flex flex-wrap gap-6">
+      <div className="gw-filters mt-10">
         <div role="tablist" aria-label="Achievement filters">
           {FILTERS.map((f) => (
             <button
@@ -109,15 +118,13 @@ export function AchievementsPage() {
               role="tab"
               aria-selected={filter === f.id}
               onClick={() => setFilter(f.id)}
-              className={`mr-1 min-h-11 px-3 text-[13px] ${
-                filter === f.id ? "text-[var(--text)] shadow-[inset_0_-2px_0_var(--accent)]" : "text-[var(--text-dim)]"
-              }`}
+              className={`gw-chip ${filter === f.id ? "is-on" : ""}`}
             >
               {f.label}
             </button>
           ))}
         </div>
-        <div role="tablist" aria-label="Achievement sort">
+        <div role="tablist" aria-label="Achievement sort" className="mt-3">
           {SORTS.map((s) => (
             <button
               key={s.id}
@@ -125,9 +132,7 @@ export function AchievementsPage() {
               role="tab"
               aria-selected={sort === s.id}
               onClick={() => setSort(s.id)}
-              className={`mr-1 min-h-11 px-3 text-[13px] ${
-                sort === s.id ? "text-[var(--text)] shadow-[inset_0_-2px_0_var(--accent)]" : "text-[var(--text-dim)]"
-              }`}
+              className={`gw-chip ${sort === s.id ? "is-on" : ""}`}
             >
               {s.label}
             </button>
@@ -138,7 +143,7 @@ export function AchievementsPage() {
       {filtered.length === 0 ? (
         <EmptyState title="Nothing in this filter" body="Switch games — trophies live with the run that earned them." />
       ) : (
-        <ul className="mt-8 grid gap-3 md:grid-cols-2">
+        <ul className="mt-6 grid gap-2 md:grid-cols-2">
           {filtered.map((a) => {
             const expanded = open === a.id;
             const date = a.unlocked ? formatUnlock(a.unlockedAt) : null;
@@ -147,26 +152,21 @@ export function AchievementsPage() {
                 <button
                   type="button"
                   onClick={() => setOpen(expanded ? null : a.id)}
-                  className={`flex w-full items-start gap-4 px-4 py-4 text-left ${
-                    a.unlocked ? "gw-frame gw-stage" : "gw-stage opacity-60"
-                  }`}
+                  className={`gw-trophy-row ${a.unlocked ? "is-open" : "is-locked"}`}
                 >
                   <AchievementIcon id={a.id} gameId={a.gameId} unlocked={a.unlocked} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="meta">
-                          {a.gameTitle} · {a.xp} XP
-                        </p>
-                        <p className={`mt-1 text-[16px] ${a.unlocked ? "text-[var(--text)]" : "text-[var(--text)]"}`}>{a.name}</p>
-                        <p className="mt-1 text-[13px] text-[var(--text-dim)]">{a.description}</p>
-                        {date ? <p className="mt-1 text-[12px] text-[var(--text-faint)]">Unlocked {date}</p> : null}
+                        <p className={`text-[16px] ${a.unlocked ? "text-white" : "text-white/55"}`}>{a.name}</p>
+                        <p className="mt-1 text-[13px] text-white/50">{a.description}</p>
+                        {date ? <p className="stat mt-2 text-[13px] text-white/70">{date}</p> : null}
                       </div>
                       <StatusPill kind={a.unlocked ? "complete" : "locked"} />
                     </div>
                     {expanded ? (
-                      <p className="mt-3 text-[12px] text-[var(--text-faint)]">
-                        {a.how} · {a.gameTitle}
+                      <p className="mt-3 text-[12px] text-white/40">
+                        {a.how} · {a.gameTitle} · {a.xp} XP
                       </p>
                     ) : null}
                   </div>

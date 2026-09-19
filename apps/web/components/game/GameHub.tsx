@@ -52,7 +52,7 @@ export function GameHub({ game }: { game: GameManifest }) {
     <article>
       <GameBackdrop slug={game.slug} className="min-h-[70vh] md:min-h-[86vh]" dim={0.12} variant="hero" priority>
         <div className="flex min-h-[70vh] flex-col justify-end px-5 pb-10 pt-20 md:min-h-[86vh] md:px-10 md:pb-16">
-          <p className="meta text-white/55">{game.genre}</p>
+          <p className="text-[13px] text-white/55">{game.genre}</p>
           <h1 className="display mt-3 max-w-[14ch] text-[48px] text-white md:text-[80px]">{game.title}</h1>
           <p className="mt-3 max-w-md text-[16px] text-white/75">{game.tagline}</p>
           <p className="mt-4 text-[13px] text-white/55">

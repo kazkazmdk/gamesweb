@@ -10,7 +10,7 @@ export function QuickAction({
 }: {
   href?: string;
   children: ReactNode;
-  tone?: "primary" | "ghost" | "quiet";
+  tone?: "primary" | "platform" | "ghost" | "quiet";
   cue?: boolean;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
   return (

@@ -15,18 +15,18 @@ export function GameModeSelector({
 }) {
   if (options.length <= 1) {
     return (
-      <p className="meta">
+      <p className="text-[13px] text-white/50">
         {label} · {options[0]?.label ?? "Default"}
       </p>
     );
   }
   return (
     <div>
-      <p className="meta mb-2">{label}</p>
+      <p className="mb-2 text-[12px] text-white/45">{label}</p>
       <div
         role="tablist"
         aria-label={label}
-        className="flex gap-1 overflow-x-auto scrollbar-none"
+        className="gw-switcher"
         onKeyDown={(e) => {
           const i = options.findIndex((o) => o.id === value);
           if (e.key === "ArrowRight" || e.key === "ArrowDown") {
@@ -47,7 +47,7 @@ export function GameModeSelector({
               type="button"
               role="tab"
               aria-selected={selected}
-              className={`min-h-11 shrink-0 px-3 text-[13px] ${selected ? "text-[var(--text)] shadow-[inset_0_-2px_0_var(--accent)]" : "text-[var(--text-dim)]"}`}
+              className={`gw-chip ${selected ? "is-on" : ""}`}
               tabIndex={selected ? 0 : -1}
               onClick={() => onChange(opt.id)}
             >

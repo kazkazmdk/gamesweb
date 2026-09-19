@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { stabilizeVisual } from "./visual-helpers";
 import { mkdirSync } from "node:fs";
 
-const OUT = "docs/qa-platform-visual-closeout";
+const OUT = process.env.QA_OUT ?? "docs/qa-art-direction-polish";
 
 test.skip(!process.env.QA_MATRIX, "Set QA_MATRIX=1 to capture the closeout matrix");
 
@@ -78,6 +78,7 @@ test("platform mobile 390", async ({ page }) => {
     ["/friends", "friends-390"],
     ["/leaderboards", "leaderboards-390"],
     ["/me", "profile-390"],
+    ["/achievements", "achievements-390"],
   ];
   for (const [path, name] of routes) {
     await page.goto(path);

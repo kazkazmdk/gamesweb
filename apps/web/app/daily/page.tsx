@@ -31,7 +31,6 @@ export default function DailyArcadePage() {
     <div data-testid="daily-arcade">
       <GameBackdrop slug={current?.game?.slug ?? "neon-drift"} className="min-h-[100svh]" dim={0.18} priority>
         <div className="flex min-h-[40vh] flex-col justify-end px-5 pb-6 pt-20 md:min-h-[42vh] md:px-10">
-          <p className="meta text-white/50">Today&apos;s Arcade</p>
           <h1 className="display mt-3 max-w-[12ch] text-[52px] text-white md:text-[84px]">
             {cleared ? "Cleared" : current?.game?.title ?? "Daily Arcade"}
           </h1>
@@ -46,8 +45,7 @@ export default function DailyArcadePage() {
           ) : null}
         </div>
         <section className="px-5 pb-10 md:px-10">
-          <p className="meta text-white/40">Route</p>
-          <div className="mt-4">
+          <div className="mt-2">
             <EventRoute
               steps={steps.map((s, i) => ({
                 key: `${s.event.gameId}:${s.event.mode}`,

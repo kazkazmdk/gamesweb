@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { GameArt } from "@/components/game/GameArt";
 import { homeStage } from "@/components/home/home-stage";
+import { SceneEnrichment } from "./SceneEnrichment";
 
 export function GameBackdrop({
   slug,
@@ -25,7 +26,7 @@ export function GameBackdrop({
           slug={slug}
           variant={variant}
           priority={priority}
-          className="gw-backdrop-art h-full w-full"
+          className="gw-backdrop-art gw-art-drift h-full w-full"
           style={
             {
               objectPosition: dir.crop.desktop,
@@ -36,9 +37,14 @@ export function GameBackdrop({
             } as CSSProperties
           }
         />
+        <SceneEnrichment slug={slug} />
         <div className="absolute inset-0" style={{ background: dir.leftWash }} />
         <div className="absolute inset-0" style={{ background: dir.bottomWash }} />
+        <div className="gw-atmosphere" aria-hidden />
+        <div className="gw-vignette" aria-hidden />
+        <div className="gw-stage-grain" aria-hidden />
         <div className="absolute inset-0 bg-black" style={{ opacity: dim }} />
+        <div className="gw-inner-edge" aria-hidden />
       </div>
       <div className="relative">{children}</div>
     </div>

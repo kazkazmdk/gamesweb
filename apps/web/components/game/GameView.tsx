@@ -29,6 +29,30 @@ import type Phaser from "phaser";
 
 const RESULT_INPUT_GRACE_MS = 450;
 
+function useCountUp(value: number, ms = 720) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const reduce =
+      typeof document !== "undefined" &&
+      (document.documentElement.classList.contains("reduce-motion") ||
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    if (reduce || value === 0) {
+      setN(value);
+      return;
+    }
+    const t0 = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - t0) / ms);
+      setN(Math.round(value * (1 - (1 - p) ** 3)));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [ms, value]);
+  return n;
+}
+
 export function GameView({ slug }: { slug: string }) {
   const game = getManifest(slug);
   const store = useStore();
@@ -610,6 +634,8 @@ function Results({
           ? `PB +${Math.round(pbDelta).toLocaleString()}`
           : `${Math.abs(Math.round(pbDelta)).toLocaleString()} off PB`;
 
+  const quiet = score === 0 && !wonChallenge && !continueEndless;
+  const shownScore = useCountUp(score);
   const primary = continueEndless ? (
     <ChamferButton onClick={() => onContinueEndless?.()}>Continue Endless</ChamferButton>
   ) : wonChallenge ? (
@@ -645,9 +671,11 @@ function Results({
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/25" />
         </div>
       ) : null}
-      <div className="relative mx-auto flex min-h-full w-[min(560px,94vw)] flex-col justify-end px-5 py-10 md:px-8">
-        <p className="meta text-white/50">{result}</p>
-        <p className="display mt-3 text-[88px] leading-none text-white md:text-[128px]">{formatScore(gameId, score)}</p>
+      <div className={`relative mx-auto flex min-h-full w-[min(560px,94vw)] flex-col justify-end px-5 py-10 md:px-8 ${quiet ? "gw-result-quiet" : ""}`}>
+        <p className="text-[13px] text-white/55">{quiet ? "Attempt" : result}</p>
+        <p className="display gw-count-up mt-3 text-[88px] leading-none text-white md:text-[128px]">
+          {formatScore(gameId, shownScore)}
+        </p>
         {challengeOutcome ? (
           <p className="mt-3 text-[16px] text-emerald-300">
             {challengeOutcome === "win" ? "You won" : challengeOutcome === "draw" ? "Draw" : "They still lead"}
@@ -699,7 +727,7 @@ function Results({
             </ChamferButton>
           ) : null}
           {action.type !== "challenge_friend" && !wonChallenge ? (
-            <ChamferButton tone="quiet" cue={false} onClick={makeChallenge}>
+            <ChamferButton tone="platform" cue={false} onClick={makeChallenge}>
               Share challenge
             </ChamferButton>
           ) : nextSlug ? (

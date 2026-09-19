@@ -451,20 +451,22 @@ export class CrowdScene extends Phaser.Scene {
     const cy = h * view.cy;
     const shown = this.qualityMembers();
     const person = view.person;
-    const massW = 88 + this.pack * 3.1 * view.zoom;
-    const massH = 28 + this.pack * 0.55;
-    g.fillStyle(0xff8a62, 0.16 + Math.min(0.34, this.pack * 0.004));
-    g.fillEllipse(cx, cy + 18, massW, massH);
-    g.fillStyle(0xff6a42, 0.12);
-    g.fillEllipse(cx, cy + 8, massW * 0.72, massH * 0.7);
+    const massW = 110 + this.pack * 3.8 * view.zoom;
+    const massH = 34 + this.pack * 0.7;
+    g.fillStyle(0x000000, 0.28);
+    g.fillEllipse(cx + 6, cy + 26, massW * 0.92, massH * 0.55);
+    g.fillStyle(0xff8a62, 0.2 + Math.min(0.4, this.pack * 0.005));
+    g.fillEllipse(cx, cy + 16, massW, massH);
+    g.fillStyle(0xff6a42, 0.16);
+    g.fillEllipse(cx, cy + 6, massW * 0.74, massH * 0.72);
     for (const m of shown) {
       const mx = Phaser.Math.Clamp(cx + m.ox * w * (1.15 + this.pack * 0.006), w * 0.18, w * 0.82);
       const my = cy + m.oy * (0.55 + this.pack * 0.004);
       drawMiniPerson(g, mx, my, 0xff8a62, this.time.now / 140 + m.phase, person);
     }
     if (this.pack > shown.length) {
-      g.fillStyle(0xff8a62, 0.28);
-      g.fillEllipse(cx, cy + 10, 48 + (this.pack - shown.length) * 1.4, 22 + (this.pack - shown.length) * 0.35);
+      g.fillStyle(0xff8a62, 0.34);
+      g.fillEllipse(cx, cy + 8, 64 + (this.pack - shown.length) * 1.8, 26 + (this.pack - shown.length) * 0.42);
     }
     drawParticles(g, this.parts);
     fillVignette(g, w, h, 0.28);

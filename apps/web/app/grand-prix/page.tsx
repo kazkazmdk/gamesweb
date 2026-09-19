@@ -22,7 +22,6 @@ export default function GrandPrixPage() {
     <div data-testid="grand-prix">
       <GameBackdrop slug={current?.game?.slug ?? "sky-stack"} className="min-h-[100svh]" dim={0.2} priority>
         <div className="flex min-h-[38vh] flex-col justify-end px-5 pb-6 pt-20 md:min-h-[40vh] md:px-10">
-          <p className="meta text-white/50">Arcade Grand Prix</p>
           <h1 className="display mt-3 max-w-[14ch] text-[48px] text-white md:text-[76px]">
             {cleared ? "Cup complete" : `Round ${currentIdx + 1}`}
           </h1>
@@ -43,8 +42,7 @@ export default function GrandPrixPage() {
           ) : null}
         </div>
         <section className="px-5 pb-10 md:px-10">
-          <p className="meta text-white/40">Cup route</p>
-          <div className="mt-4">
+          <div className="mt-2">
             <EventRoute
               cols={5}
               steps={rounds.map((r) => {

@@ -363,6 +363,8 @@ export class SkyStackScene extends Phaser.Scene {
       },
       { y: this.camY },
     );
+    g.fillStyle(alt < 40 ? 0xffd8a8 : 0xa8c8ff, alt < 40 ? 0.08 : 0.05);
+    g.fillCircle(w * 0.18, 90 + this.camY * 0.04, 70);
     for (const c of this.clouds) {
       g.fillStyle(0xffffff, c.a * (alt < 40 ? 0.9 : 0.35));
       g.fillCircle(c.x, c.y + this.camY * 0.12, c.r);
@@ -372,9 +374,11 @@ export class SkyStackScene extends Phaser.Scene {
     for (let i = 0; i < this.stack.length; i += 1) {
       const s = this.stack[i];
       const y = s.y + this.camY + ox;
+      g.fillStyle(0x000000, 0.18);
+      g.fillRoundedRect(s.x + 5, y + 6, s.w, SLAB_H - 4, 6);
       g.fillStyle(this.colorFor(i), 1);
       g.fillRoundedRect(s.x, y, s.w, SLAB_H - 4, 6);
-      g.fillStyle(0xffffff, 0.12);
+      g.fillStyle(0xffffff, 0.14);
       g.fillRoundedRect(s.x + 4, y + 3, Math.max(8, s.w - 16), 5, 3);
     }
     const top = this.stack[this.stack.length - 1];
