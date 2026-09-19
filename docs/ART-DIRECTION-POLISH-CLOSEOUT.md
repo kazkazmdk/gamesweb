@@ -4,7 +4,7 @@
 
 - Branch: `cursor/art-direction-polish-c08e`
 - Base: `cursor/platform-visual-closeout-c08e` @ `327e7865d6ce1466515dea7d6d4fd96f3e967a01`
-- SHA: *(stamped after the matrix commit)*
+- SHA: `0aa593dba613b94717dc4443f81a84153e5d0bf8`
 - PR: https://github.com/kazkazmdk/gamesweb/pull/15
 
 Aucun merge. Home n’a pas été redesigné. Pas de nouvelle marque, pas de nouveau design system.
