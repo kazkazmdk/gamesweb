@@ -68,10 +68,38 @@ export default function CrewPage() {
       </section>
 
       <section className="mt-10 px-5 md:px-10">
-        <p className="meta text-white/40">House feed</p>
-        <ul className="mt-4 max-w-xl space-y-3 text-white/70">
-          {crew.feed.length ? crew.feed.map((f) => <li key={f.id}>{f.text}</li>) : <li>No feed yet. A personal best shows up here.</li>}
+        <p className="meta text-white/40">House</p>
+        <ul className="mt-4 flex flex-wrap gap-4">
+          {crew.members.map((name) => (
+            <li key={name} className="flex items-center gap-3">
+              <span className="gw-avatar grid h-11 w-11 place-items-center bg-white/10 text-[11px] tracking-[0.14em]" aria-hidden>
+                {name.slice(0, 2).toUpperCase()}
+              </span>
+              <span className="text-[15px] text-white/80">{name}</span>
+            </li>
+          ))}
         </ul>
+      </section>
+
+      <section className="mt-10 px-5 md:px-10">
+        {crew.feed.length ? (
+          <>
+            <p className="meta text-white/40">House feed</p>
+            <ul className="mt-4 max-w-xl space-y-3 text-white/70">
+              {crew.feed.map((f) => (
+                <li key={f.id}>{f.text}</li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <EmptyStateStage
+            heading="p"
+            slug="territory-rush"
+            kicker="House feed"
+            title="Quiet house"
+            body="A personal best shows up here. No invented activity."
+          />
+        )}
         <div className="mt-6 flex flex-wrap gap-2">
           {CREW_REACTIONS.map((r) => (
             <button key={r} type="button" className="gw-cta-ghost min-h-10 px-3" onClick={() => setReact(r)}>

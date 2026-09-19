@@ -688,6 +688,10 @@ html.reduce-motion .home-copy-in {
   align-items: end;
 }
 
+.gw-podium--solo {
+  grid-template-columns: minmax(0, 32rem);
+}
+
 .gw-pause-item {
   display: flex;
   min-height: 52px;

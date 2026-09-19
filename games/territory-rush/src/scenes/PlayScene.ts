@@ -368,6 +368,18 @@ export class TerritoryScene extends Phaser.Scene {
     const c = this.cell;
     g.fillStyle(this.arena === 0 ? 0x16101a : 0x12161e, 1);
     g.fillRect(0, 0, COLS * c, ROWS * c);
+    for (let y = 0; y < ROWS; y += 1) {
+      for (let x = 0; x < COLS; x += 1) {
+        if (this.get(x, y) !== 0) continue;
+        const district = ((x / 6) | 0) + ((y / 5) | 0);
+        g.fillStyle(this.arena === 0 ? (district % 2 ? 0x1c1622 : 0x18121c) : district % 2 ? 0x161a22 : 0x12161c, 1);
+        g.fillRect(x * c, y * c, c, c);
+        if (x % 6 === 0 || y % 5 === 0) {
+          g.fillStyle(0xffffff, 0.035);
+          g.fillRect(x * c, y * c, x % 6 === 0 ? 2 : c, y % 5 === 0 ? 2 : c);
+        }
+      }
+    }
     if (this.arena === 0) {
       g.lineStyle(2, 0xffffff, 0.05);
       g.strokeRect(8, 8, COLS * c - 16, ROWS * c - 16);
@@ -383,7 +395,7 @@ export class TerritoryScene extends Phaser.Scene {
       for (const span of contourSpans(this.grid, COLS, ROWS, owner)) {
         g.fillRoundedRect(span.x * c, span.y * c, span.w * c, c + 0.6, 3);
       }
-      g.lineStyle(2.2, outlines[owner], 0.85);
+      g.lineStyle(owner === 1 ? 3 : 2.2, outlines[owner], owner === 1 ? 0.95 : 0.8);
       for (let y = 0; y < ROWS; y += 1) {
         for (let x = 0; x < COLS; x += 1) {
           if (this.get(x, y) !== owner) continue;

@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { clamp, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, drawRunner, fillBackdrop, mixColor, type GameKeyboard } from "@gamesweb/game-core";
+import { clamp, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, drawRunner, fillBackdrop, mixColor, drawGateArch, drawLamp, type GameKeyboard } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { velocityRunManifest } from "@gamesweb/game-sdk";
 import { COURSES, medalFor, nextMedalTarget, type Course, type Rect } from "../systems/courses";
@@ -506,19 +506,22 @@ export class VelocityPlayScene extends Phaser.Scene {
       const x = i * 280 + this.camX * 0.58;
       const bh = 160 + (i % 4) * 50;
       g.fillRect(x, this.course.height - bh - 40, 70 + (i % 3) * 18, bh);
-      g.fillStyle(th.accent, 0.06);
+      g.fillStyle(th.accent, 0.1);
       g.fillRect(x + 10, this.course.height - bh + 20, 8, 14);
+      g.fillRect(x + 28, this.course.height - bh + 48, 8, 14);
+      g.fillRect(x + 46, this.course.height - bh + 32, 8, 14);
       g.fillStyle(mixColor(th.sky, 0x000000, 0.35), 1);
     }
+    g.fillStyle(0x0a1016, 0.55);
+    g.fillRect(0, this.course.height - 28, this.course.width, 28);
     g.fillStyle(th.accent, 0.04);
     for (let x = 0; x < this.course.width; x += 96) g.fillRect(x, 0, 2, this.course.height);
-    g.fillStyle(0xf3f1ec, 0.9);
-    g.fillRect(36, this.course.height - 90, 10, 54);
-    g.fillRect(86, this.course.height - 90, 10, 54);
-    for (let i = 0; i < 6; i += 1) {
-      g.fillStyle(i % 2 ? 0x111113 : 0xf3f1ec, 1);
-      g.fillRect(36 + i * 10, this.course.height - 96, 10, 8);
-    }
+    drawGateArch(g, 28, this.course.height - 168, 88, 140, 0xf3f1ec, th.accent);
+    drawLamp(g, 148, this.course.height - 90, 54, th.accent, 0x1a2430);
+    g.fillStyle(mixColor(th.sky, 0xffffff, 0.08), 1);
+    g.fillRect(220, this.course.height - 210, 18, 180);
+    g.fillStyle(th.accent, 0.22);
+    g.fillRect(216, this.course.height - 218, 26, 10);
 
     if (this.course.world === "training") {
       g.fillStyle(mixColor(th.sky, 0x000000, 0.28), 1);
@@ -581,12 +584,9 @@ export class VelocityPlayScene extends Phaser.Scene {
         g.fillStyle(0xffffff, 0.25);
         g.fillRect(live.x + 2, live.y + 2, live.w - 4, 3);
       } else if (s.kind === "finish") {
-        g.fillStyle(0x8ff3ff, 0.2);
+        drawGateArch(g, s.x - 8, s.y, s.w + 16, s.h, 0x8ff3ff, th.accent);
+        g.fillStyle(0x8ff3ff, 0.16);
         g.fillRect(s.x - 10, s.y, s.w + 20, s.h);
-        g.fillStyle(0x8ff3ff, 0.95);
-        g.fillRect(s.x, s.y, 8, s.h);
-        g.fillRect(s.x + s.w - 8, s.y, 8, s.h);
-        g.fillRect(s.x, s.y, s.w, 10);
       } else if (s.kind === "checkpoint") {
         const pulse = 0.45 + Math.sin(this.time.now / 180) * 0.25;
         g.fillStyle(th.accent, pulse);

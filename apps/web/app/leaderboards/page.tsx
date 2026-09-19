@@ -53,19 +53,19 @@ export default function LeaderboardsPage() {
 
   return (
     <div>
-      <GameBackdrop slug={game.slug} className="min-h-[48vh]" dim={0.28} priority>
-        <div className="flex min-h-[48vh] flex-col justify-end px-5 pb-8 pt-20 md:px-10">
+      <GameBackdrop slug={game.slug} className="min-h-[28vh] md:min-h-[42vh]" dim={0.28} priority>
+        <div className="flex min-h-[28vh] flex-col justify-end px-5 pb-6 pt-16 md:min-h-[42vh] md:px-10 md:pb-8 md:pt-20">
           <p className="meta text-white/50">Competition</p>
-          <h1 className="display mt-2 text-[44px] text-white md:text-[64px]">Leaderboards</h1>
-          <p className="mt-2 max-w-xl text-[15px] text-white/65">Verified when the run looks human. Flagged stays off the board.</p>
+          <h1 className="display mt-2 text-[36px] text-white md:text-[64px]">Leaderboards</h1>
+          <p className="mt-2 max-w-xl text-[14px] text-white/65 md:text-[15px]">Verified when the run looks human. Flagged stays off the board.</p>
         </div>
       </GameBackdrop>
 
-      <div className="px-5 py-8 md:px-10">
+      <div className="px-5 py-6 md:px-10 md:py-8">
         <div
           role="tablist"
           aria-label="Game"
-          className="flex gap-2 overflow-x-auto scrollbar-none"
+          className="flex gap-3 overflow-x-auto scrollbar-none"
         >
           {GAME_MANIFESTS.map((g) => {
             const selected = g.id === game.id;
@@ -76,16 +76,17 @@ export default function LeaderboardsPage() {
                 type="button"
                 role="tab"
                 aria-selected={selected}
-                className={`relative h-16 w-28 shrink-0 overflow-hidden ${selected ? "gw-frame" : "opacity-55"}`}
+                className={`relative h-24 w-40 shrink-0 overflow-hidden md:h-[7.5rem] md:w-52 ${selected ? "gw-frame" : "opacity-50"}`}
                 onClick={() => selectGame(g.id)}
               >
                 <GameArt slug={g.slug} variant="tile" position={dir.tile} className="h-full w-full" />
-                <span className="sr-only">{g.title}</span>
+                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2 pb-2 pt-6 text-left text-[12px] text-white md:text-[13px]">
+                  {g.title}
+                </span>
               </button>
             );
           })}
         </div>
-        <p className="mt-3 text-[13px] text-white/55">{game.title}</p>
 
         <div className="mt-6 flex flex-wrap gap-8">
           <GameModeSelector label="Mode" options={modes} value={mode} onChange={setMode} />
@@ -134,14 +135,14 @@ export default function LeaderboardsPage() {
         ) : (
           <>
             {podium.length ? (
-              <section className="mt-10">
-                <p className="meta text-white/40">Podium</p>
+              <section className="mt-6 md:mt-8">
+                <p className="meta text-white/40">{podium.length === 1 ? "Standing" : "Podium"}</p>
                 <div className="mt-4">
                   <RankPodium rows={podium} />
                 </div>
               </section>
             ) : null}
-            <ol className="mt-10 max-w-2xl">
+            <ol className="mt-8 max-w-2xl">
               {rank.top10.slice(3).map((r, i) => (
                 <BoardRow
                   key={`${r.name}-${i + 4}`}

@@ -136,8 +136,8 @@ export class CrowdScene extends Phaser.Scene {
     const n = Math.max(1, Math.min(96, Math.round(this.pack)));
     while (this.members.length < n) {
       this.members.push({
-        ox: scatter ? (Math.random() - 0.5) * 0.16 : 0,
-        oy: scatter ? (Math.random() - 0.5) * 36 : 0,
+        ox: scatter ? (Math.random() - 0.5) * 0.42 : 0,
+        oy: scatter ? (Math.random() - 0.5) * 42 : 0,
         vx: 0,
         vy: 0,
         phase: Math.random() * Math.PI * 2,
@@ -229,7 +229,7 @@ export class CrowdScene extends Phaser.Scene {
       m.vy += ay * dt;
       m.vx *= 0.86;
       m.vy *= 0.86;
-      const packSpread = 0.16 + Math.min(0.28, this.pack * 0.0028);
+      const packSpread = 0.22 + Math.min(0.46, this.pack * 0.005);
       m.ox = Phaser.Math.Clamp(m.ox + m.vx * dt + Math.sin(this.time.now / 180 + m.phase) * 0.0008, -packSpread, packSpread);
       m.oy = Phaser.Math.Clamp(m.oy + m.vy * dt + Math.cos(this.time.now / 160 + m.phase) * 0.4, -58, 48);
     }
@@ -451,14 +451,14 @@ export class CrowdScene extends Phaser.Scene {
     const cy = h * view.cy;
     const shown = this.qualityMembers();
     const person = view.person;
-    const massW = 88 + this.pack * 3.1 * view.zoom;
-    const massH = 28 + this.pack * 0.55;
-    g.fillStyle(0xff8a62, 0.16 + Math.min(0.34, this.pack * 0.004));
+    const massW = 140 + this.pack * 5.2 * view.zoom;
+    const massH = 34 + this.pack * 0.7;
+    g.fillStyle(0xff8a62, 0.18 + Math.min(0.38, this.pack * 0.004));
     g.fillEllipse(cx, cy + 18, massW, massH);
-    g.fillStyle(0xff6a42, 0.12);
-    g.fillEllipse(cx, cy + 8, massW * 0.72, massH * 0.7);
+    g.fillStyle(0xff6a42, 0.14);
+    g.fillEllipse(cx, cy + 8, massW * 0.78, massH * 0.72);
     for (const m of shown) {
-      const mx = Phaser.Math.Clamp(cx + m.ox * w * (1.15 + this.pack * 0.006), w * 0.18, w * 0.82);
+      const mx = Phaser.Math.Clamp(cx + m.ox * w * (1.35 + this.pack * 0.008), w * 0.1, w * 0.9);
       const my = cy + m.oy * (0.55 + this.pack * 0.004);
       drawMiniPerson(g, mx, my, 0xff8a62, this.time.now / 140 + m.phase, person);
     }

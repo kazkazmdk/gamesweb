@@ -30,12 +30,23 @@ export default function FriendsPage() {
         </section>
       ) : null}
 
+      {player.friends.length === 0 ? (
+        <EmptyStateStage
+          heading="h1"
+          slug="neon-drift"
+          kicker="Social"
+          title="Friends"
+          body="No friends yet. Invite someone to chase a score. Presence only appears when they are actually here."
+          action={<InviteWidget />}
+        />
+      ) : (
       <div className="px-5 pt-8 md:px-10">
         <p className="meta text-white/45">Social</p>
         <h1 className="display mt-2 text-[44px] md:text-[64px]">Friends</h1>
       </div>
+      )}
 
-      {playing.length ? (
+      {player.friends.length === 0 ? null : playing.length ? (
         <section className="mt-8 px-5 md:px-10">
           <SectionHeader title="Playing now" />
           <div className="mt-4 grid gap-3">
@@ -100,18 +111,7 @@ export default function FriendsPage() {
         </section>
       ) : null}
 
-      {player.friends.length === 0 ? (
-        <div className="mt-8 px-5 md:px-10">
-          <EmptyStateStage
-            heading="p"
-            slug="neon-drift"
-            kicker="Floor"
-            title="No friends yet"
-            body="Invite someone to chase a score. Presence only appears when they are actually here."
-            action={<InviteWidget />}
-          />
-        </div>
-      ) : (
+      {player.friends.length === 0 ? null : (
         <div className="mt-12 space-y-10 px-5 md:px-10">
           <Group title="Online" empty="No one idle-online." friends={online} store={store} />
           <Group title="Requests" empty="No pending invites." friends={requests} store={store} />

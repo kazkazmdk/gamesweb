@@ -97,9 +97,27 @@ export function drawWorld(
       const n = samples[(i + 3) % samples.length];
       const turn = Math.abs(s.tx * n.ty - s.ty * n.tx);
       const side = s.width * 0.5 + 10;
-      if (i % 6 === 0) {
+      if (i % 5 === 0) {
         drawLamp(g, s.x + s.nx * (side + 8), s.y + s.ny * (side + 8), 28, theme.pole);
         drawLamp(g, s.x - s.nx * (side + 8), s.y - s.ny * (side + 8), 28, theme.pole);
+      }
+      if (i % 8 === 0) {
+        const far = side + 52 + (i % 12);
+        const fx = s.x + s.nx * far;
+        const fy = s.y + s.ny * far;
+        g.fillStyle(0x16141a, 1);
+        g.fillRect(fx - 16, fy - 44, 32, 58);
+        g.fillStyle(theme.accent, 0.14);
+        g.fillRect(fx - 8, fy - 32, 7, 9);
+        g.fillRect(fx + 2, fy - 20, 7, 9);
+      }
+      if (i % 11 === 0) {
+        const sx = s.x - s.nx * (side + 26);
+        const sy = s.y - s.ny * (side + 26);
+        g.fillStyle(0x2a2430, 1);
+        g.fillRect(sx - 3, sy - 22, 6, 28);
+        g.fillStyle(theme.accent, 0.88);
+        g.fillTriangle(sx, sy - 34, sx + 16, sy - 24, sx, sy - 14);
       }
       g.fillStyle(theme.barrier, 0.95);
       g.fillRect(s.x + s.nx * (side + 2) - 3, s.y + s.ny * (side + 2) - 8, 6, 16);
@@ -274,13 +292,11 @@ export function drawHudChrome(
   if (meters) {
     const drift = Math.min(1, meters.drift);
     overlay.fillStyle(0xffffff, 0.1);
-    overlay.fillRect(24, 118, 132, 3);
-    overlay.fillStyle(0xe35aa0, 0.9);
-    overlay.fillRect(24, 118, 132 * drift, 3);
-    if (meters.live > 8) {
-      overlay.fillStyle(0x8dffc1, 0.85);
-      overlay.fillRect(24, 124, Math.min(132, meters.live / 40), 2);
-    }
+    overlay.fillRect(24, 168, 168, 4);
+    overlay.fillStyle(0xe35aa0, 0.92);
+    overlay.fillRect(24, 168, 168 * drift, 4);
+    overlay.fillStyle(0x8dffc1, meters.live > 8 ? 0.9 : 0.22);
+    overlay.fillRect(24, 176, Math.min(168, Math.max(8, meters.live / 28)), 3);
   }
   if (!touch) return;
   overlay.fillStyle(0xffffff, 0.05);

@@ -61,19 +61,21 @@ export function AchievementIcon({
   id,
   gameId,
   unlocked,
+  size = "md",
 }: {
   id: string;
   key?: string;
   gameId: string;
   unlocked: boolean;
+  size?: "md" | "lg";
 }) {
   const key = id.split(":")[1] ?? id;
   const accent = accentFor(gameId);
   const glyph = glyphFor(key);
-  const stroke = unlocked ? accent : "rgba(243,241,236,0.62)";
-  const fill = unlocked ? `${accent}28` : "rgba(255,255,255,0.04)";
+  const stroke = unlocked ? accent : "rgba(243,241,236,0.38)";
+  const fill = unlocked ? `${accent}28` : "rgba(255,255,255,0.03)";
   return (
-    <svg viewBox="0 0 48 48" className="h-12 w-12 shrink-0" aria-hidden>
+    <svg viewBox="0 0 48 48" className={`${size === "lg" ? "h-16 w-16" : "h-12 w-12"} shrink-0`} aria-hidden>
       <polygon points="6,2 42,2 46,6 46,42 42,46 6,46 2,42 2,6" fill={fill} stroke={stroke} strokeWidth="1.4" />
       {glyph.paths?.map((d) => (
         <path key={d} d={d} fill="none" stroke={stroke} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />

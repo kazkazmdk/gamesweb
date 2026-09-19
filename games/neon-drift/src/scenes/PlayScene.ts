@@ -137,7 +137,7 @@ export class DriftPlayScene extends Phaser.Scene {
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hud = this.add
-      .text(24, 52, "", { fontFamily: "ui-sans-serif, system-ui, sans-serif", fontSize: "17px", color: "#f3f1ec" })
+      .text(24, 88, "", { fontFamily: "ui-sans-serif, system-ui, sans-serif", fontSize: "18px", color: "#f3f1ec" })
       .setScrollFactor(0)
       .setDepth(21);
     this.deltaTxt = this.add
@@ -161,16 +161,16 @@ export class DriftPlayScene extends Phaser.Scene {
       .setDepth(24)
       .setAlpha(0);
     this.hint = this.add
-      .text(this.scale.width / 2, this.scale.height - 78, this.hintCopy(), {
+      .text(this.scale.width / 2, this.scale.height * 0.7, this.hintCopy(), {
         fontFamily: "ui-sans-serif, system-ui, sans-serif",
-        fontSize: "14px",
+        fontSize: "28px",
         color: "#f3f1ec",
         align: "center",
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(21)
-      .setAlpha(this.shouldTutorial() ? 0.9 : 0);
+      .setAlpha(this.shouldTutorial() ? 0.94 : 0);
     this.shownHint = this.shouldTutorial();
     this.tutorialStep = this.shouldTutorial() ? "hold" : "done";
     this.wasDrifting = false;
@@ -224,7 +224,7 @@ export class DriftPlayScene extends Phaser.Scene {
     this.fitCam(this.scale.width, this.scale.height);
     this.scale.on("resize", (gs: Phaser.Structs.Size) => {
       this.fitCam(gs.width, gs.height);
-      this.hint.setPosition(this.scale.width / 2, this.scale.height - 78);
+      this.hint.setPosition(this.scale.width / 2, this.scale.height * 0.7);
       this.deltaTxt.setPosition(this.scale.width / 2, 86);
       this.countTxt.setPosition(this.scale.width / 2, this.scale.height / 2);
     });
@@ -568,9 +568,9 @@ export class DriftPlayScene extends Phaser.Scene {
       ? `\n${(1000 / Math.max(1, this.game.loop.actualFps)).toFixed?.(0) ?? ""} ${this.game.loop.actualFps | 0}fps  slip ${(this.car.slip * 57.3).toFixed(0)}°  ${this.car.driftAmount.toFixed(2)}`
       : "";
     this.hud.setText(
-      `BANKED  ${banked.toLocaleString()}${live > 8 ? `\nLIVE    +${live}` : ""}\nCOMBO   ×${combo.toFixed(1)}\n${this.def.name}   lap ${this.lap}/${NEON.lapsToFinish}   ${elapsed}s${dbg}`,
+      `BANKED  ${banked.toLocaleString()}\nLIVE    ${live > 0 ? `+${live}` : "—"}\nCOMBO   ×${combo.toFixed(1)}\n${this.def.name}   lap ${this.lap}/${NEON.lapsToFinish}   ${elapsed}s${dbg}`,
     );
-    this.hud.setColor(this.car.drifting ? "#ffd6ea" : "#f3f1ec");
+    this.hud.setColor(this.car.drifting ? "#ffd6ea" : this.comboBreakFlash > 0 ? "#ff8aa0" : "#f3f1ec");
     if (this.tutorialStep !== "done") this.hint.setText(this.hintCopy());
     this.hint.setAlpha(this.shownHint || this.comboBreakFlash > 0 ? 0.92 : 0);
     this.hint.setColor(this.comboBreakFlash > 0 ? "#ff8aa0" : this.bankFlash > 0 ? "#8dffc1" : "#f3f1ec");

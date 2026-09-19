@@ -572,6 +572,7 @@ function Results({
   const buildHint = typeof metadata?.buildHint === "string" ? metadata.buildHint : null;
   const boss = metadata?.boss === true || metadata?.boss === "defeated";
 
+  const hollow = score === 0;
   const shownAt = useRef(0);
   if (shownAt.current === 0 && typeof performance !== "undefined") shownAt.current = performance.now();
 
@@ -610,7 +611,9 @@ function Results({
           ? `PB +${Math.round(pbDelta).toLocaleString()}`
           : `${Math.abs(Math.round(pbDelta)).toLocaleString()} off PB`;
 
-  const primary = continueEndless ? (
+  const primary = hollow ? (
+    <ChamferButton onClick={onRetry}>Play again</ChamferButton>
+  ) : continueEndless ? (
     <ChamferButton onClick={() => onContinueEndless?.()}>Continue Endless</ChamferButton>
   ) : wonChallenge ? (
     <ChamferButton
@@ -647,7 +650,18 @@ function Results({
       ) : null}
       <div className="relative mx-auto flex min-h-full w-[min(560px,94vw)] flex-col justify-end px-5 py-10 md:px-8">
         <p className="meta text-white/50">{result}</p>
-        <p className="display mt-3 text-[88px] leading-none text-white md:text-[128px]">{formatScore(gameId, score)}</p>
+        {hollow ? (
+          <>
+            <p className="display mt-3 text-[48px] leading-none text-white md:text-[72px]">No score banked</p>
+            {gameId === "neon-drift" ? (
+              <p className="mt-5 text-[15px] tracking-[0.08em] text-white/80">HOLD DRIFT → COMBO → BANK IT</p>
+            ) : (
+              <p className="mt-5 text-[15px] text-white/70">{retryHint ?? "Run it again. The score is still waiting."}</p>
+            )}
+          </>
+        ) : (
+          <p className="display mt-3 text-[88px] leading-none text-white md:text-[128px]">{formatScore(gameId, score)}</p>
+        )}
         {challengeOutcome ? (
           <p className="mt-3 text-[16px] text-emerald-300">
             {challengeOutcome === "win" ? "You won" : challengeOutcome === "draw" ? "Draw" : "They still lead"}
@@ -693,7 +707,7 @@ function Results({
         <div className="mt-8 flex flex-col items-start gap-3">
           {primary}
           {copied ? <p className="text-[12px] text-white/50">Challenge link copied</p> : null}
-          {action.type !== "retry_pb" && !continueEndless ? (
+          {action.type !== "retry_pb" && !continueEndless && !hollow ? (
             <ChamferButton tone="ghost" cue={false} onClick={onRetry}>
               Play again
             </ChamferButton>
