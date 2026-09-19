@@ -4,7 +4,7 @@
 
 - Branch: `cursor/platform-visual-closeout-c08e`
 - Base: `cursor/home-final-closeout-c08e` @ `9fd62bff7c35034f713cbdc2ddec510f2b8ebef9`
-- SHA: `c5f1ccf` (P1 QA pass; stamp after this commit)
+- SHA: `cb96748`
 
 Aucun merge. Home n’a pas été redesigné. Cette passe ne recommence pas le closeout : elle ferme les P1 encore visibles.
 
