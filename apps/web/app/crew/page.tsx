@@ -5,7 +5,7 @@ import { arcadeStore } from "@/lib/social/arcade-store";
 import { useArcade } from "@/lib/social/use-arcade";
 import { usePlayer } from "@/lib/player";
 import { useAccent } from "@/components/shell/AppShell";
-import { EmptyStateStage, ProgressionStrip } from "@/components/visual";
+import { EmptyStateStage, GameBackdrop, ProgressionStrip } from "@/components/visual";
 import { ProgressWidget } from "@/components/platform";
 import { useEffect, useState } from "react";
 
@@ -30,32 +30,34 @@ export default function CrewPage() {
 
   return (
     <div className="pb-16" data-testid="crew">
-      <div className="relative overflow-hidden px-5 py-12 md:px-10">
-        <p className="meta text-white/45">Crew</p>
-        <div className="mt-5 flex flex-wrap items-end gap-6">
-          <span
-            className="gw-avatar grid h-24 w-24 place-items-center bg-[color-mix(in_srgb,var(--accent)_22%,#141416)] text-[22px] tracking-[0.18em] text-white"
-            aria-hidden
-          >
-            {emblem}
-          </span>
-          <div>
-            <h1 className="display text-[48px] md:text-[72px]">{crew.name}</h1>
-            <p className="mt-2 text-[14px] text-white/60">
-              {crew.tag} · {crew.members.length}/30
-            </p>
+      <GameBackdrop slug="territory-rush" className="min-h-[52vh]" dim={0.3} priority>
+        <div className="flex min-h-[52vh] flex-col justify-end px-5 pb-10 pt-20 md:px-10">
+          <p className="meta text-white/45">Crew</p>
+          <div className="mt-5 flex flex-wrap items-end gap-6">
+            <span
+              className="gw-avatar grid h-24 w-24 place-items-center bg-[color-mix(in_srgb,var(--accent)_22%,#141416)] text-[22px] tracking-[0.18em] text-white"
+              aria-hidden
+            >
+              {emblem}
+            </span>
+            <div>
+              <h1 className="display text-[48px] text-white md:text-[72px]">{crew.name}</h1>
+              <p className="mt-2 text-[14px] text-white/60">
+                {crew.tag} · {crew.members.length}/30
+              </p>
+            </div>
+          </div>
+          <div className="mt-8 max-w-xl">
+            <ProgressionStrip
+              level={crew.level}
+              into={crew.xp % 120}
+              needed={120}
+              next="Crew XP"
+              trophies={`${crew.members.length}`}
+            />
           </div>
         </div>
-        <div className="mt-8 max-w-xl">
-          <ProgressionStrip
-            level={crew.level}
-            into={crew.xp % 120}
-            needed={120}
-            next="Crew XP"
-            trophies={`${crew.members.length}`}
-          />
-        </div>
-      </div>
+      </GameBackdrop>
 
       <section className="px-5 md:px-10">
         <p className="meta text-white/40">This week</p>

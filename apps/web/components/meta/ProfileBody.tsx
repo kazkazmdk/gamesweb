@@ -13,7 +13,8 @@ import {
   StatsWidget,
 } from "@/components/platform";
 import { useAccent } from "@/components/shell/AppShell";
-import { PlayerIdentity, TrophyShelf } from "@/components/visual";
+import { EmptyStateStage, PlayerIdentity, TrophyShelf } from "@/components/visual";
+import { ChamferButton } from "@/components/visual/ChamferButton";
 import { usePlayer } from "@/lib/player";
 import {
   activityFromHistory,
@@ -169,18 +170,24 @@ function PublicProfile({ username }: { username: string }) {
   }
   if (state === "missing") {
     return (
-      <div className="px-5 py-10 md:px-10">
-        <h1 className="display text-[48px]">Player not found</h1>
-        <p className="mt-3 text-[14px] text-[var(--text-dim)]">No public profile matches @{username}.</p>
-      </div>
+      <EmptyStateStage
+        slug="neon-drift"
+        kicker="Player"
+        title="Player not found"
+        body={`No public profile matches @${username}.`}
+        action={<ChamferButton href="/friends">Back to friends</ChamferButton>}
+      />
     );
   }
   if (state === "error" || !data) {
     return (
-      <div className="px-5 py-10 md:px-10">
-        <h1 className="display text-[48px]">Profile unavailable</h1>
-        <p className="mt-3 text-[14px] text-[var(--text-dim)]">Could not load this player right now.</p>
-      </div>
+      <EmptyStateStage
+        slug="velocity-run"
+        kicker="Player"
+        title="Profile unavailable"
+        body="Could not load this player right now."
+        action={<ChamferButton href="/me">Open your profile</ChamferButton>}
+      />
     );
   }
 
