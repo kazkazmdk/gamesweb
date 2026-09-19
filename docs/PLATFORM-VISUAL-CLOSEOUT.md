@@ -4,7 +4,7 @@
 
 - Branch: `cursor/platform-visual-closeout-c08e`
 - Base: `cursor/home-final-closeout-c08e` @ `9fd62bff7c35034f713cbdc2ddec510f2b8ebef9`
-- SHA: `PENDING` (remplacé par le commit qui inclut ce fichier)
+- SHA: `2e73cd03f9da9bad4516ff1ffec9cc77a7096823`
 
 Aucun merge. Home n’a pas été redesigné.
 
