@@ -112,7 +112,7 @@ export class TerritoryScene extends Phaser.Scene {
     this.ended = false;
     this.claims = 0;
     this.cuts = 0;
-    this.parts = new ParticlePool(80);
+    this.parts = new ParticlePool(140);
     this.synth = (this.game.registry.get("synth") as Synth | undefined) ?? new Synth();
     this.game.registry.set("synth", this.synth);
     this.synth.setSettings(this.platform.audio.getSettings());
@@ -271,9 +271,12 @@ export class TerritoryScene extends Phaser.Scene {
           this.captureWave = 1;
           const gained = this.pct(id) - this.lastPct;
           this.lastPct = this.pct(1);
-          if (!isBot && gained > 0.2) this.banners.push({ text: `+${gained.toFixed(0)}%`, t: 0.7 });
-          this.juice.cameraPunch(0.35);
+          if (!isBot && gained > 0.2) this.banners.push({ text: `+${gained.toFixed(0)}%`, t: 0.85 });
+          this.juice.cameraPunch(n > 40 ? 0.7 : 0.4);
           this.synth.tone(240 + this.combo * 20, 0.05, "sine", 0.04, 0.12);
+          const cx = (this.px + 0.5) * this.cell;
+          const cy = (this.py + 0.5) * this.cell;
+          this.parts.burst(cx, cy, Math.min(36, 10 + Math.floor(n / 8)), this.ownerColor(id), 90, 260);
           if (!isBot) void this.platform.achievement.unlock("first-claim");
         }
         trail.length = 0;
@@ -337,6 +340,11 @@ export class TerritoryScene extends Phaser.Scene {
     return (n / this.grid.length) * 100;
   }
 
+  private ownerColor(id: Owner) {
+    const colors = this.arena === 0 ? [0xf2ead8, 0xff4d6d, 0x3d9cff, 0xffd166, 0x7d5fff] : [0xe8f0e4, 0x2ec8b0, 0xff8a4a, 0x8aa0ff, 0xff6ab0];
+    return colors[id] ?? 0xff4d6d;
+  }
+
   private finish() {
     if (this.ended) return;
     this.ended = true;
@@ -375,8 +383,8 @@ export class TerritoryScene extends Phaser.Scene {
         const park = ((x / 8) | 0) + ((y / 6) | 0);
         g.fillStyle(park % 3 === 0 ? (this.arena === 0 ? 0xe4dcc4 : 0xd8e8d4) : this.arena === 0 ? 0xf6f0e2 : 0xeef4ea, 1);
         g.fillRect(x * c, y * c, c, c);
-        if ((x + y * 3) % 17 === 0 && x > 1 && y > 1) {
-          drawToyHouse(g, x * c + 1, y * c + 4, c - 2, c - 5, park % 2 ? 0xf4d8b0 : 0xd8e8f0, park % 2 ? 0xc45c3a : 0x3a6a88);
+        if ((x + y * 5) % 31 === 0 && x > 2 && y > 2 && this.get(x - 1, y) === 0 && this.get(x + 1, y) === 0) {
+          drawToyHouse(g, x * c + 2, y * c + 5, c - 4, c - 6, park % 2 ? 0xf4d8b0 : 0xd8e8f0, park % 2 ? 0xc45c3a : 0x3a6a88);
         }
       }
     }
@@ -390,11 +398,19 @@ export class TerritoryScene extends Phaser.Scene {
       g.fillRoundedRect(x * c, y * c, c, c, this.arena === 0 ? 2 : 0);
     }
     for (let owner = 1; owner <= 4; owner += 1) {
-      g.fillStyle(colors[owner], 0.92);
+      g.fillStyle(colors[owner], 0.96);
       for (const span of contourSpans(this.grid, COLS, ROWS, owner)) {
         g.fillRoundedRect(span.x * c, span.y * c, span.w * c, c + 0.6, 3);
       }
-      g.lineStyle(owner === 1 ? 3 : 2.2, outlines[owner], owner === 1 ? 0.95 : 0.8);
+      g.fillStyle(0xffffff, 0.1);
+      for (let y = 0; y < ROWS; y += 1) {
+        for (let x = 0; x < COLS; x += 1) {
+          if (this.get(x, y) !== owner) continue;
+          if ((x + y) % 3 === 0) g.fillCircle(x * c + c * 0.35, y * c + c * 0.4, 1.6);
+        }
+      }
+      const pulse = owner === 1 ? 0.85 + Math.sin(this.time.now / 180) * 0.12 : 0.75;
+      g.lineStyle(owner === 1 ? 4 : 2.4, outlines[owner], pulse);
       for (let y = 0; y < ROWS; y += 1) {
         for (let x = 0; x < COLS; x += 1) {
           if (this.get(x, y) !== owner) continue;
@@ -406,18 +422,26 @@ export class TerritoryScene extends Phaser.Scene {
       }
     }
     for (const f of this.flashes) {
-      g.fillStyle(0xffffff, f.t * 0.45);
+      g.fillStyle(colors[f.id], f.t * 0.55);
       for (const i of f.cells) {
         const x = i % COLS;
         const y = (i / COLS) | 0;
         g.fillRect(x * c, y * c, c, c);
       }
+      g.fillStyle(0xffffff, f.t * 0.28);
+      for (const i of f.cells) {
+        const x = i % COLS;
+        const y = (i / COLS) | 0;
+        g.fillCircle(x * c + c / 2, y * c + c / 2, 3);
+      }
     }
     if (this.captureWave > 0) {
-      g.fillStyle(0xffffff, this.captureWave * 0.1);
+      g.fillStyle(colors[1], this.captureWave * 0.14);
       g.fillRect(0, 0, COLS * c, ROWS * c);
-      g.fillStyle(colors[1], this.captureWave * 0.16);
-      g.fillCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, 28 + (1 - this.captureWave) * 70);
+      g.fillStyle(0xffffff, this.captureWave * 0.12);
+      g.fillCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, 40 + (1 - this.captureWave) * 160);
+      g.lineStyle(6, colors[1], this.captureWave * 0.7);
+      g.strokeCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, 36 + (1 - this.captureWave) * 180);
     }
     drawRibbon(g, ribbonPoints(this.trail, c), this.shield > 0 ? 0x8fe8ff : 0xffffff, this.trail.length > 8 ? 1.15 : 1);
     for (const b of this.bots) drawRibbon(g, ribbonPoints(b.trail, c), colors[b.id], 0.85);
@@ -478,17 +502,27 @@ export class TerritoryScene extends Phaser.Scene {
           this.vis = { x: this.px, y: this.py };
         },
         closeLoop: () => {
-          if (this.trail.length < 3) {
-            this.trail = [
-              { x: this.px + 1, y: this.py },
-              { x: this.px + 2, y: this.py },
-              { x: this.px + 2, y: this.py + 1 },
-              { x: this.px + 1, y: this.py + 1 },
-            ];
-          }
-          this.fill(1, this.trail);
+          const x0 = 3;
+          const y0 = 3;
+          const x1 = 28;
+          const y1 = 22;
+          const trail: Array<{ x: number; y: number }> = [];
+          for (let x = x0; x <= x1; x += 1) trail.push({ x, y: y0 });
+          for (let y = y0; y <= y1; y += 1) trail.push({ x: x1, y });
+          for (let x = x1; x >= x0; x -= 1) trail.push({ x, y: y1 });
+          for (let y = y1; y >= y0; y -= 1) trail.push({ x: x0, y });
+          this.trail = trail;
+          const before = this.grid.slice();
+          const n = this.fill(1, trail);
+          const cells: number[] = [];
+          for (let i = 0; i < this.grid.length; i += 1) if (before[i] !== this.grid[i]) cells.push(i);
+          this.flashes.push({ cells, t: 1, id: 1 });
           this.captureWave = 1;
-          this.flashes.push({ cells: this.trail.map((c) => this.idx(c.x, c.y)), t: 1, id: 1 });
+          this.largest = Math.max(this.largest, n);
+          this.claims += 1;
+          this.lastPct = this.pct(1);
+          this.banners.push({ text: `+${this.pct(1).toFixed(0)}%`, t: 1 });
+          this.parts.burst(16 * this.cell, 12 * this.cell, 28, this.ownerColor(1), 110, 280);
           this.trail = [];
         },
         hideHud: () => {

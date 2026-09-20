@@ -10,7 +10,7 @@ import {
   createGameKeyboard,
   drawParticles,
   drawMiniPerson,
-  drawGateArch,
+  drawCrowdGateSign,
   fillBackdrop,
   fillVignette,
   type GameKeyboard,
@@ -247,7 +247,9 @@ export class CrowdScene extends Phaser.Scene {
       void this.platform.achievement.unlock("pack-gate");
       if (op?.kind === "mul" && op.n >= 4) void this.platform.achievement.unlock("x4");
       pulseHaptic(7);
-      this.parts.burst(this.scale.width * (0.2 + this.x * 0.6), this.scale.height * 0.78, 10, 0xff7a59, 80, 280);
+      this.juice.cameraPunch(op?.kind === "mul" ? 0.55 : 0.32);
+      this.parts.burst(this.scale.width * (0.2 + this.x * 0.6), this.scale.height * 0.78, op?.kind === "mul" ? 22 : 14, 0xff7a59, 90, 300);
+      if (this.pack > before) this.banners.push({ text: `${opLabel(op)}`, t: 0.55 });
       if (seg.type === "finish") {
         this.payoff = 1.35;
         this.banners.push({ text: `${this.pack >= 96 ? "96" : this.pack >= 48 ? "48" : this.pack >= 24 ? "24" : "12"}`, t: 1.2 });
@@ -323,12 +325,12 @@ export class CrowdScene extends Phaser.Scene {
     let t = this.labels[i];
     if (!t) {
       t = this.add
-        .text(x, y, text, { fontFamily: "ui-sans-serif, system-ui", fontSize: "15px", color, fontStyle: "700" })
+        .text(x, y, text, { fontFamily: "ui-sans-serif, system-ui", fontSize: "44px", color, fontStyle: "800" })
         .setOrigin(0.5)
         .setDepth(16);
       this.labels[i] = t;
     }
-    t.setPosition(x, y).setText(text).setColor(color).setVisible(true).setAlpha(1);
+    t.setPosition(x, y).setText(text).setColor(color).setVisible(true).setAlpha(1).setFontSize(text.length > 3 ? "36px" : "48px");
   }
 
   private targetFraming() {
@@ -378,8 +380,12 @@ export class CrowdScene extends Phaser.Scene {
     g.fillRect(w * 0.84, h * 0.42, w * 0.16, h);
     g.fillStyle(0xe8a050, 1);
     for (let i = 0; i < 6; i += 1) {
-      g.fillRect(8, h * 0.2 + i * 90 - (this.z * 0.15) % 90, 40, 48);
-      g.fillRect(w - 48, h * 0.24 + i * 90 - (this.z * 0.15) % 90, 40, 48);
+      g.fillRect(8, h * 0.2 + i * 90 - (this.z * 0.15) % 90, 44, 52);
+      g.fillRect(w - 52, h * 0.24 + i * 90 - (this.z * 0.15) % 90, 44, 52);
+      g.fillStyle(i % 2 ? 0xff6a4a : 0xffd166, 0.85);
+      g.fillRect(14, h * 0.2 + i * 90 - (this.z * 0.15) % 90 - 18, 8, 22);
+      g.fillRect(w - 28, h * 0.24 + i * 90 - (this.z * 0.15) % 90 - 18, 8, 22);
+      g.fillStyle(0xe8a050, 1);
     }
     g.fillStyle(0xd8d0c4, 1);
     g.fillRect(w * 0.16, 0, w * 0.68, h);
@@ -399,22 +405,26 @@ export class CrowdScene extends Phaser.Scene {
       const y = h * (0.58 + view.zoom * 0.06) - (s.z - this.z) * depth;
       if (y < -50 || y > h + 50) continue;
       if (s.type === "gate" || s.type === "finish") {
-        const leftC = s.left?.kind === "mul" || s.left?.kind === "add" ? 0x2db36a : 0xe23a4a;
-        const rightC = s.right?.kind === "mul" || s.right?.kind === "add" ? 0x2db36a : 0xe23a4a;
-        drawGateArch(g, w * 0.18, y - 48, w * 0.28, 78, leftC);
-        drawGateArch(g, w * 0.54, y - 48, w * 0.28, 78, rightC);
+        const leftGood = s.left?.kind === "mul" || s.left?.kind === "add";
+        const rightGood = s.right?.kind === "mul" || s.right?.kind === "add";
+        const leftC = leftGood ? 0x1db36a : 0xe23a4a;
+        const rightC = rightGood ? 0x1db36a : 0xe23a4a;
+        const near = Math.abs(s.z - this.z) < 90;
+        const gh = near ? 118 : 92;
+        drawCrowdGateSign(g, w * 0.17, y - gh, w * 0.3, gh + 28, leftC);
+        drawCrowdGateSign(g, w * 0.53, y - gh, w * 0.3, gh + 28, rightC);
         if (s.type === "finish") {
           g.fillStyle(0x2a2018, 1);
-          g.fillRect(w * 0.4, y - 150, w * 0.2, 150);
-          g.fillStyle(0xffd166, 0.85 + (this.payoff > 0 ? 0.15 : 0));
-          g.fillRect(w * 0.43, y - 140, w * 0.14, 110);
-          g.fillRect(w * 0.38, y - 160, w * 0.24, 18);
+          g.fillRect(w * 0.4, y - 168, w * 0.2, 168);
+          g.fillStyle(0xffd166, 0.9 + (this.payoff > 0 ? 0.1 : 0));
+          g.fillRect(w * 0.43, y - 156, w * 0.14, 122);
+          g.fillRect(w * 0.36, y - 178, w * 0.28, 22);
           g.fillStyle(0xff8a4a, 0.55);
-          g.fillCircle(w * 0.5, y - 170, 16 + Math.min(28, this.pack * 0.15));
+          g.fillCircle(w * 0.5, y - 188, 18 + Math.min(28, this.pack * 0.15));
         }
-        this.labelAt(labelN, w * 0.33, y - 18, opLabel(s.left), "#fff4ea");
+        this.labelAt(labelN, w * 0.32, y - gh + 28, opLabel(s.left), "#fffdf6");
         labelN += 1;
-        this.labelAt(labelN, w * 0.67, y - 18, opLabel(s.right), "#fff4ea");
+        this.labelAt(labelN, w * 0.68, y - gh + 28, opLabel(s.right), "#fffdf6");
         labelN += 1;
       } else if (s.type === "enemy") {
         const n = this.clash && Math.abs(s.z - this.z) < 40 ? Math.max(2, Math.round(this.clash.right * (this.clash.t / 0.85))) : 10;
@@ -510,6 +520,10 @@ export class CrowdScene extends Phaser.Scene {
           const snap = this.targetFraming();
           this.viewZoom = snap.zoom;
           this.viewCy = snap.cy;
+        },
+        seekGate: () => {
+          const gate = this.segs.find((s) => s.type === "gate");
+          this.z = Math.max(0, (gate?.z ?? 160) - 42);
         },
         hideHud: () => {
           this.hud.setVisible(false);

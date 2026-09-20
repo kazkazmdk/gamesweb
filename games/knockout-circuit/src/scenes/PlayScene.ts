@@ -331,6 +331,15 @@ export class KnockoutScene extends Phaser.Scene {
         g.fillRect(x, this.map.height * 0.18, 12, this.map.height * 0.42);
         g.fillRect(x - 46, this.map.height * 0.18, 104, 10);
       }
+      g.fillStyle(0x2a2218, 0.55);
+      g.fillRect(this.camX * 0.2, this.map.height * 0.08, 220, 48);
+      g.fillStyle(0xffe08a, 0.9);
+      g.fillRect(this.camX * 0.2 + 10, this.map.height * 0.08 + 10, 200, 28);
+      const crowd = [0xff6b4a, 0x4ad4e8, 0xffd166, 0xff8ad4];
+      for (let i = 0; i < 18; i += 1) {
+        g.fillStyle(crowd[i % crowd.length], 0.85);
+        g.fillCircle(40 + i * 28 + this.camX * 0.05, this.map.height * 0.22, 7);
+      }
     } else if (env === "skyworks") {
       g.fillStyle(0xfff4c8, 0.85);
       g.fillCircle(this.map.width * 0.72, 84, 56);
@@ -378,74 +387,76 @@ export class KnockoutScene extends Phaser.Scene {
         const cx = live.x + live.w / 2;
         const cy = live.y + live.h / 2;
         g.fillStyle(0x2a2218, 1);
-        g.fillRect(cx - 8, cy + 16, 16, 36);
-        g.fillStyle(0x3a3224, 1);
-        g.fillCircle(cx, cy, 16);
+        g.fillRect(cx - 10, cy + 18, 20, 40);
+        g.fillStyle(0xffe08a, 0.35);
+        g.fillCircle(cx, cy, 46);
         g.save();
         g.translateCanvas(cx, cy);
         g.rotateCanvas(a);
-        g.fillStyle(th.danger, 0.95);
-        g.fillRect(-52, -6, 104, 12);
-        g.fillRect(-6, -52, 12, 104);
-        g.fillStyle(0xffe08a, 0.35);
-        g.fillRect(-48, -3, 18, 6);
-        g.fillStyle(0xc4b48a, 1);
-        g.fillCircle(0, 0, 10);
-        g.fillStyle(0xffffff, 0.85);
-        g.fillCircle(0, 0, 4);
+        g.fillStyle(th.danger, 1);
+        g.fillRoundedRect(-78, -11, 156, 22, 10);
+        g.fillRoundedRect(-11, -78, 22, 156, 10);
+        g.fillStyle(0xffe08a, 0.55);
+        g.fillRect(-72, -6, 22, 12);
+        g.fillStyle(0xffffff, 0.9);
+        g.fillCircle(0, 0, 12);
         g.restore();
         continue;
       }
       if (s.kind === "beam") {
-        const pulse = 0.45 + Math.sin(t * 9 + (s.phase ?? 0)) * 0.3;
-        g.fillStyle(0x2a2a30, 1);
-        g.fillRect(live.x - 10, live.y - 8, 16, live.h + 16);
-        g.fillRect(live.x + live.w - 6, live.y - 8, 16, live.h + 16);
-        g.fillStyle(th.danger, pulse);
-        g.fillRect(live.x, live.y + live.h / 2 - 3, live.w, 6);
-        g.fillStyle(0xffffff, 0.55);
-        g.fillRect(live.x, live.y + live.h / 2 - 1, live.w, 2);
+        g.fillStyle(0xff6b4a, 1);
+        g.fillRoundedRect(live.x - 6, live.y - 4, live.w + 12, live.h + 8, live.h / 2 + 4);
+        g.fillStyle(0xffffff, 0.28);
+        const stripe = ((t * 48) % 16);
+        for (let i = -16; i < live.w + 16; i += 16) g.fillRect(live.x + i + stripe, live.y + 2, 6, live.h - 4);
         continue;
       }
       if (s.kind === "spike") {
+        g.fillStyle(0x6a6a70, 1);
+        g.fillRect(live.x + live.w / 2 - 6, live.y + live.h, 12, 18);
         g.fillStyle(th.danger, 1);
-        g.fillTriangle(live.x, live.y + live.h, live.x + live.w / 2, live.y, live.x + live.w, live.y + live.h);
+        g.fillRoundedRect(live.x, live.y, live.w, live.h, 6);
+        g.fillStyle(0xffffff, 0.3);
+        g.fillRect(live.x + 4, live.y + 3, live.w - 8, 4);
         continue;
       }
       if (s.kind === "finish") {
         g.fillStyle(0x2a2218, 1);
-        g.fillRect(live.x, live.y, 10, live.h);
-        g.fillRect(live.x + live.w - 10, live.y, 10, live.h);
-        g.fillStyle(0xffe08a, 0.95);
-        g.fillRect(live.x, live.y, live.w, 16);
-        for (let i = 0; i < 6; i += 1) {
+        g.fillRect(live.x, live.y, 12, live.h);
+        g.fillRect(live.x + live.w - 12, live.y, 12, live.h);
+        g.fillStyle(0xffe08a, 1);
+        g.fillRect(live.x, live.y, live.w, 22);
+        for (let i = 0; i < 8; i += 1) {
           g.fillStyle(i % 2 ? 0x111113 : 0xf3f1ec, 1);
-          g.fillRect(live.x + 8 + i * 8, live.y, 8, 16);
+          g.fillRect(live.x + 8 + i * 10, live.y, 10, 22);
         }
+        g.fillStyle(0xff6b4a, 0.45);
+        g.fillCircle(live.x + live.w / 2, live.y - 18, 16);
         continue;
       }
       if (s.kind === "gate") {
         g.fillStyle(0x3a3a44, 1);
-        g.fillRect(live.x - 8, live.y, 8, live.h);
-        g.fillRect(live.x + live.w, live.y, 8, live.h);
-        g.fillStyle(0xffffff, 0.28 + Math.sin(t * 3) * 0.08);
-        g.fillRect(live.x, live.y, live.w, live.h);
+        g.fillRect(live.x - 14, live.y - 8, 14, live.h + 16);
+        g.fillRect(live.x + live.w, live.y - 8, 14, live.h + 16);
+        g.fillStyle(th.danger, 0.55 + Math.sin(t * 4) * 0.2);
+        g.fillRect(live.x, live.y, live.w, 16);
+        g.fillRect(live.x, live.y + live.h - 16, live.w, 16);
         continue;
       }
       if (s.kind === "mover") {
         g.fillStyle(0x2a2a30, 1);
-        g.fillRect(live.x - 20, live.y + live.h / 2 - 2, live.w + 40, 4);
+        g.fillRect(live.x - 24, live.y + live.h / 2 - 3, live.w + 48, 6);
         g.fillStyle(th.ground, 1);
-        g.fillRoundedRect(live.x, live.y, live.w, live.h, 4);
-        g.fillStyle(0xffe8b0, 0.4);
-        g.fillRect(live.x, live.y, live.w, 4);
+        g.fillRoundedRect(live.x, live.y, live.w, live.h, 6);
+        g.fillStyle(0xff8a4a, 0.7);
+        for (let i = 6; i < live.w - 4; i += 14) g.fillTriangle(live.x + i, live.y + 4, live.x + i + 8, live.y + live.h / 2, live.x + i, live.y + live.h - 4);
         continue;
       }
       if (s.kind === "fall") {
-        g.fillStyle(mixColor(th.ground, 0x000000, 0.2), 1);
-        g.fillRect(live.x, live.y, live.w, live.h);
-        g.lineStyle(2, th.danger, 0.55);
-        g.lineBetween(live.x + 6, live.y + 4, live.x + live.w - 6, live.y + live.h - 4);
+        g.fillStyle(0x8aa0b0, 0.85);
+        g.fillCircle(live.x + live.w / 2, live.y + live.h / 2, Math.max(live.w, live.h) * 0.55);
+        g.fillStyle(0xffffff, 0.35);
+        g.fillCircle(live.x + live.w / 2, live.y + live.h / 2, Math.max(live.w, live.h) * 0.22);
         continue;
       }
       g.fillStyle(s.route === "expert" ? 0xff8a4a : th.ground, 1);

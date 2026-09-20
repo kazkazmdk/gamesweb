@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { clamp, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, drawRunner, fillBackdrop, mixColor, drawGateArch, drawHvac, drawBillboard, drawCrane, type GameKeyboard } from "@gamesweb/game-core";
+import { clamp, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, drawRunner, fillBackdrop, mixColor, drawGateArch, drawHvac, drawBillboard, drawCrane, drawAntenna, type GameKeyboard } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { velocityRunManifest } from "@gamesweb/game-sdk";
 import { COURSES, medalFor, nextMedalTarget, type Course, type Rect } from "../systems/courses";
@@ -504,7 +504,7 @@ export class VelocityPlayScene extends Phaser.Scene {
       },
       { x: this.camX, y: this.camY },
     );
-    g.fillStyle(mixColor(th.bg, 0x3a5a78, 0.35), 1);
+    g.fillStyle(mixColor(th.bg, this.course.world === "transit" ? 0x6a4a28 : this.course.world === "ascent" ? 0x1a3048 : 0x3a5a78, 0.4), 1);
     for (let i = 0; i < 16; i += 1) {
       const x = i * 280 + this.camX * 0.42;
       const bh = 180 + (i % 4) * 56;
@@ -526,26 +526,30 @@ export class VelocityPlayScene extends Phaser.Scene {
     }
 
     if (this.course.world === "training") {
-      for (let i = 0; i < 10; i += 1) {
-        drawHvac(g, 180 + i * 310 + this.camX * 0.12, this.course.height - 210 - (i % 3) * 18, 52, 30, i % 2 ? 0xe8e2d8 : 0xd4d0c8);
+      for (let i = 0; i < 12; i += 1) {
+        drawHvac(g, 140 + i * 280 + this.camX * 0.12, this.course.height - 220 - (i % 3) * 22, 56, 32, i % 2 ? 0xe8e2d8 : 0xd4d0c8);
       }
+      g.fillStyle(0xb8b4ac, 1);
+      for (let i = 0; i < 8; i += 1) g.fillRect(220 + i * 360, this.course.height - 248, 80, 8);
       drawBillboard(g, 640, 220, 110, 48, 0xff6a32);
       drawBillboard(g, 1680, 180, 90, 40, 0x2a6a88);
     } else if (this.course.world === "transit") {
-      drawCrane(g, 420 + this.camX * 0.08, this.course.height - 40, 260, 0xff6a32);
-      drawCrane(g, 1480 + this.camX * 0.08, this.course.height - 40, 220, 0xd8d2c8);
-      g.fillStyle(0x6a7380, 0.35);
-      for (let i = 0; i < 8; i += 1) g.fillRect(i * 360 + 80, 70, 14, this.course.height);
-      g.fillStyle(0xffe08a, 0.55);
-      for (let i = 0; i < 10; i += 1) g.fillCircle(160 + i * 240, 86, 10);
+      drawCrane(g, 420 + this.camX * 0.08, this.course.height - 40, 280, 0xff6a32);
+      drawCrane(g, 980 + this.camX * 0.08, this.course.height - 40, 200, 0x3a3a40);
+      drawCrane(g, 1680 + this.camX * 0.08, this.course.height - 40, 240, 0xd8d2c8);
+      g.fillStyle(0x6a7380, 0.55);
+      for (let i = 0; i < 8; i += 1) g.fillRect(i * 360 + 80, 40, 16, this.course.height);
+      g.fillStyle(0xffc857, 0.7);
+      for (let i = 0; i < 10; i += 1) g.fillCircle(160 + i * 240, 70, 12);
+      g.fillStyle(0x3a3a40, 1);
+      for (let i = 0; i < 6; i += 1) g.fillRect(i * 480 + 40, this.course.height - 160, 120, 10);
     } else {
-      g.fillStyle(0x6a8090, 1);
-      for (let i = 0; i < 6; i += 1) g.fillRect(i * 420 + 90, 24, 8, 120);
-      g.fillStyle(0xffffff, 0.55);
-      for (let i = 0; i < 6; i += 1) g.fillCircle(i * 420 + 94, 20, 10);
-      drawBillboard(g, 980, 80, 140, 54, 0xff7a20);
-      g.fillStyle(0x2a4a68, 0.18);
-      for (let i = 0; i < 8; i += 1) g.fillTriangle(i * 520, this.course.height, i * 520 + 180, this.course.height - 180, i * 520 + 380, this.course.height);
+      for (let i = 0; i < 7; i += 1) drawAntenna(g, i * 420 + 90, this.course.height - 40, 220 + (i % 3) * 40, 0xd8e0e8);
+      g.fillStyle(0x8ec8e8, 0.18);
+      for (let i = 0; i < 8; i += 1) g.fillRect(i * 380 + 40, 80, 70, this.course.height * 0.45);
+      drawBillboard(g, 980, 70, 150, 58, 0x4ad4e8);
+      g.fillStyle(0x1a3048, 0.28);
+      for (let i = 0; i < 6; i += 1) g.fillTriangle(i * 560, this.course.height, i * 560 + 200, this.course.height - 220, i * 560 + 420, this.course.height);
     }
     for (const s of this.course.solids) {
       const live = this.liveHazard(s);
@@ -738,6 +742,12 @@ export class VelocityPlayScene extends Phaser.Scene {
         hideHud: () => {
           this.hud.setVisible(false);
           this.overlay.setVisible(false);
+        },
+        setCourse: (id: string) => {
+          const idx = COURSES.findIndex((c) => c.id === id || c.world === id);
+          if (idx < 0) return;
+          this.game.registry.set("courseIndex", idx);
+          this.scene.restart();
         },
       },
     );

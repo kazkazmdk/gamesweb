@@ -343,10 +343,10 @@ export class SkyStackScene extends Phaser.Scene {
     const h = this.scale.height;
     const alt = this.floors;
     const skyTop =
-      alt < 10 ? 0xf2c8a8 : alt < 25 ? 0x8ec4e8 : alt < 40 ? 0xf0b060 : alt < 60 ? 0xc8a8e0 : 0xb090d0;
+      alt < 8 ? 0xf2c8a8 : alt < 20 ? 0x8ec4e8 : alt < 36 ? 0xf0b060 : alt < 56 ? 0xc8a8e0 : 0xb8a0d8;
     const mid =
-      alt < 10 ? 0xf0d8c0 : alt < 25 ? 0xb8d8ee : alt < 40 ? 0xf0c888 : alt < 60 ? 0xd4c0e8 : 0xc4b0dc;
-    const bottom = alt < 40 ? 0xe8d8c8 : 0xd8c8e0;
+      alt < 8 ? 0xf4d4b8 : alt < 20 ? 0xb8d8ee : alt < 36 ? 0xf2c070 : alt < 56 ? 0xd8c4ec : 0xc8b4e0;
+    const bottom = alt < 20 ? 0xf0d8c4 : alt < 36 ? 0xf0d0a0 : 0xe0d0ec;
     fillBackdrop(
       g,
       w,
@@ -376,9 +376,13 @@ export class SkyStackScene extends Phaser.Scene {
       const s = this.stack[i];
       const y = s.y + this.camY + ox;
       g.fillStyle(this.colorFor(i), 1);
-      g.fillRoundedRect(s.x, y, s.w, SLAB_H - 4, 7);
-      g.fillStyle(0xffffff, 0.28);
-      g.fillRoundedRect(s.x + 5, y + 3, Math.max(8, s.w - 18), 6, 3);
+      g.fillRoundedRect(s.x, y, s.w, SLAB_H - 4, i > 36 ? 3 : 7);
+      g.fillStyle(0xffffff, alt < 20 ? 0.22 : alt < 36 ? 0.34 : 0.42);
+      g.fillRoundedRect(s.x + 5, y + 3, Math.max(8, s.w - 18), alt < 36 ? 6 : 8, 3);
+      if (alt >= 36) {
+        g.fillStyle(0xa8d8f0, 0.16);
+        g.fillRect(s.x + 8, y + 2, s.w - 16, SLAB_H - 8);
+      }
       g.fillStyle(0x000000, 0.06);
       g.fillRect(s.x + 6, y + SLAB_H - 10, s.w - 12, 3);
     }

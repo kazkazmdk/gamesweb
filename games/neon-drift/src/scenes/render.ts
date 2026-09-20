@@ -1,5 +1,5 @@
 import type Phaser from "phaser";
-import { drawArcadeCar, drawBush, drawContainer, drawCrane, drawSodiumLamp, mixColor } from "@gamesweb/game-core";
+import { drawArcadeCar, drawBush, drawContainer, drawCrane, drawGuardRail, drawRock, drawSodiumLamp, mixColor } from "@gamesweb/game-core";
 import type { Car } from "../systems/vehicle";
 import type { TrackDef, TrackSample } from "../systems/track";
 import type { GhostSample } from "../systems/ghost";
@@ -102,68 +102,68 @@ export function drawWorld(
 
   if (quality === "low") return;
 
-  for (let i = 0; i < samples.length; i += 3) {
+  for (let i = 0; i < samples.length; i += 2) {
     const s = samples[i];
-    const n = samples[(i + 3) % samples.length];
+    const n = samples[(i + 2) % samples.length];
     const turn = Math.abs(s.tx * n.ty - s.ty * n.tx);
     const side = s.width * 0.5 + 8;
-    if (i % 4 === 0) {
-      drawSodiumLamp(g, s.x + s.nx * (side + 10), s.y + s.ny * (side + 10), 34, theme.pole);
-      drawSodiumLamp(g, s.x - s.nx * (side + 10), s.y - s.ny * (side + 10), 34, theme.pole);
+    if (def.id === "velocity") {
+      if (i % 8 === 0) drawSodiumLamp(g, s.x + s.nx * (side + 12), s.y + s.ny * (side + 12), 30, theme.pole);
+      if (i % 3 === 0) {
+        drawBush(g, s.x + s.nx * (side + 20), s.y + s.ny * (side + 20), 12 + (i % 3) * 2, mixColor(theme.grass, 0x0a1810, 0.2));
+        drawBush(g, s.x - s.nx * (side + 24), s.y - s.ny * (side + 24), 10, mixColor(theme.grass, 0x243818, 0.15));
+      }
+      if (i % 4 === 0) drawRock(g, s.x + s.nx * (side + 34), s.y + s.ny * (side + 34), 9 + (i % 3), 0x3a403c);
+      if (i % 2 === 0) drawGuardRail(g, s.x + s.nx * (side + 4) - 10, s.y + s.ny * (side + 4), 22);
+    } else if (def.id === "foundation") {
+      if (i % 3 === 0) {
+        drawSodiumLamp(g, s.x + s.nx * (side + 10), s.y + s.ny * (side + 10), 36, theme.pole);
+        drawSodiumLamp(g, s.x - s.nx * (side + 10), s.y - s.ny * (side + 10), 36, theme.pole);
+      }
+      if (i % 6 === 0) drawContainer(g, s.x - s.nx * (side + 28) - 16, s.y - s.ny * (side + 28) - 10, 34, 18, i % 12 === 0 ? 0xc45c3a : 0x3a6a88);
+      if (i % 10 === 0) {
+        g.fillStyle(0x3a3a36, 1);
+        g.fillRect(s.x + s.nx * (side + 26) - 22, s.y + s.ny * (side + 26) - 18, 44, 22);
+        g.fillStyle(theme.pole, 0.35);
+        g.fillRect(s.x + s.nx * (side + 26) - 16, s.y + s.ny * (side + 26) - 12, 10, 8);
+      }
+      if (i % 2 === 0) {
+        g.fillStyle(mixColor(theme.barrier, 0xffffff, 0.12), 1);
+        g.fillRect(s.x + s.nx * (side + 2) - 4, s.y + s.ny * (side + 2) - 7, 8, 14);
+      }
+    } else {
+      if (i % 5 === 0) drawSodiumLamp(g, s.x + s.nx * (side + 8), s.y + s.ny * (side + 8), 28, 0xd8e8ff);
+      if (i % 4 === 0) {
+        g.fillStyle(0x1a222c, 1);
+        g.fillRect(s.x + s.nx * (side + 6) - 8, s.y + s.ny * (side + 6) - 36, 18, 52);
+        g.fillStyle(0xf0b84a, 0.16 + (Math.sin(t / 240 + i) > 0.2 ? 0.1 : 0));
+        g.fillRect(s.x + s.nx * (side + 8) - 2, s.y + s.ny * (side + 8) - 22, 6, 6);
+      }
+      if (i % 7 === 0) {
+        g.fillStyle(0x2a2430, 1);
+        g.fillRect(s.x - s.nx * (side + 16) - 3, s.y - s.ny * (side + 16) - 22, 6, 26);
+        g.fillStyle(theme.pole, 0.95);
+        g.fillTriangle(s.x - s.nx * (side + 16), s.y - s.ny * (side + 16) - 34, s.x - s.nx * (side + 16) + 14, s.y - s.ny * (side + 16) - 22, s.x - s.nx * (side + 16), s.y - s.ny * (side + 16) - 12);
+      }
     }
-    if (i % 5 === 0) {
-      drawBush(g, s.x + s.nx * (side + 22), s.y + s.ny * (side + 22), 11 + (i % 3) * 2, mixColor(theme.grass, 0x0a1810, 0.2));
-      drawBush(g, s.x - s.nx * (side + 26), s.y - s.ny * (side + 26), 9 + (i % 4), mixColor(theme.grass, 0x243818, 0.15));
-    }
-    if (i % 6 === 0) {
+    if (i % 6 === 0 && def.id !== "velocity") {
       const fx = s.x + s.nx * (side + 28);
       const fy = s.y + s.ny * (side + 28);
       g.fillStyle(theme.building, 1);
-      g.fillRect(fx - 14, fy - 40, 28, 52);
-      g.fillStyle(theme.pole, 0.22 + (Math.sin(t / 260 + i) > 0.2 ? 0.12 : 0));
+      g.fillRect(fx - 14, fy - 44, 30, 56);
+      g.fillStyle(theme.pole, 0.2 + (Math.sin(t / 260 + i) > 0.2 ? 0.12 : 0));
       g.fillRect(fx - 8, fy - 28, 6, 7);
       g.fillRect(fx + 2, fy - 16, 6, 7);
-      if (i % 18 === 0) {
-        g.fillStyle(theme.accent, 0.55);
-        g.fillRect(fx - 12, fy - 46, 24, 8);
-      } else if (i % 12 === 0) {
-        g.fillStyle(0x4ad4e8, 0.4);
-        g.fillRect(fx - 12, fy - 46, 24, 8);
-      }
     }
-    if (i % 9 === 0) {
-      const sx = s.x - s.nx * (side + 18);
-      const sy = s.y - s.ny * (side + 18);
-      g.fillStyle(0x2a2430, 1);
-      g.fillRect(sx - 3, sy - 20, 6, 24);
-      g.fillStyle(theme.pole, 0.92);
-      g.fillTriangle(sx, sy - 32, sx + 14, sy - 22, sx, sy - 12);
-    }
-    g.fillStyle(mixColor(theme.barrier, 0xffffff, 0.18), 0.95);
-    g.fillRect(s.x + s.nx * (side + 2) - 3, s.y + s.ny * (side + 2) - 8, 6, 16);
-    g.fillRect(s.x - s.nx * (side + 2) - 3, s.y - s.ny * (side + 2) - 8, 6, 16);
     if (turn > 0.1) {
-      g.fillStyle(theme.pole, 0.9);
+      g.fillStyle(theme.pole, 0.92);
       const hx = s.x + s.nx * (s.width * 0.3);
       const hy = s.y + s.ny * (s.width * 0.3);
       g.fillTriangle(hx, hy, hx + s.tx * 16, hy + s.ty * 16, hx + s.nx * 8, hy + s.ny * 8);
     }
     const px = s.x - s.nx * (side + 20);
     const py = s.y - s.ny * (side + 20);
-    if (def.id === "foundation") {
-      if (i % 18 === 0) drawContainer(g, px - 16, py - 12, 32, 18, i % 36 === 0 ? 0xc45c3a : 0x3a6a88);
-      if (i === 36) drawCrane(g, px, py + 16, 70, 0x3a3a40);
-    } else if (def.id === "technical") {
-      if (i % 21 === 0) {
-        g.fillStyle(0x1c2230, 1);
-        g.fillRect(px - 10, py - 36, 24, 42);
-        g.fillStyle(0xffb45a, 0.28);
-        g.fillRect(px - 4, py - 24, 7, 7);
-      }
-    } else if (i % 15 === 0) {
-      g.fillStyle(0x2a3440, 1);
-      g.fillRect(px - 4, py - 28, 8, 32);
-    }
+    if (def.id === "foundation" && i === 36) drawCrane(g, px, py + 16, 70, 0x3a3a40);
   }
 
   // short tunnel collar so a mid-run frame can read as a place
@@ -249,8 +249,8 @@ export function drawMarks(g: Phaser.GameObjects.Graphics, marks: Mark[], dt: num
   for (const m of marks) {
     m.life -= dt;
     if (m.life <= 0) continue;
-    g.fillStyle(0x141418, Math.min(0.7, m.life * 0.28 + m.slip * 0.3));
-    g.fillCircle(m.x, m.y, 4.4 + m.slip * 2.4);
+    g.fillStyle(0x141418, Math.min(0.82, m.life * 0.32 + m.slip * 0.38));
+    g.fillCircle(m.x, m.y, 5.2 + m.slip * 3.4);
   }
 }
 

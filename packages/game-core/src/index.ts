@@ -34,6 +34,15 @@ export {
   drawBillboard,
   drawToyHouse,
   drawFungusPatch,
+  drawGuardRail,
+  drawRock,
+  drawAntenna,
+  drawCrowdGateSign,
+  drawFoamRoller,
+  drawSkitterer,
+  drawSwarmer,
+  drawSpore,
+  drawShellTank,
 } from "./production";
 export type { QualityTier, DrawGfx } from "./production";
 
