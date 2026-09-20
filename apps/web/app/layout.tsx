@@ -4,6 +4,7 @@ import { Figtree, Syne } from "next/font/google";
 import { headers } from "next/headers";
 import { AppShell } from "@/components/shell/AppShell";
 import { PlayerProvider } from "@/lib/player";
+import { websiteJsonLd } from "@/lib/seo-content/schema";
 import "./globals.css";
 
 const body = Figtree({
@@ -49,12 +50,14 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
-  const jsonLd = {
+  const site = websiteJsonLd();
+  const app = {
     "@context": "https://schema.org",
     "@type": "WebApplication",
     name: brand.productName,
     applicationCategory: "GameApplication",
     operatingSystem: "Web",
+    url: site.url,
     offers: {
       "@type": "Offer",
       price: "0",
@@ -65,7 +68,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" className={`${body.variable} ${display.variable}`}>
       <body className="ambient antialiased">
-        <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(site) }} />
+        <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(app) }} />
         <div className="grain" aria-hidden />
         <PlayerProvider>
           <AppShell>{children}</AppShell>

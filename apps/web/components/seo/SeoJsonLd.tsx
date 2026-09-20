@@ -1,0 +1,18 @@
+import { headers } from "next/headers";
+
+export async function SeoJsonLd({ data }: { data: unknown | unknown[] }) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const payloads = Array.isArray(data) ? data : [data];
+  return (
+    <>
+      {payloads.map((item, i) => (
+        <script
+          key={i}
+          nonce={nonce}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(item) }}
+        />
+      ))}
+    </>
+  );
+}

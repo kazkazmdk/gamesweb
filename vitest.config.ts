@@ -9,6 +9,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "apps/web"),
+      "@gamesweb/game-sdk": path.resolve(__dirname, "packages/game-sdk/src/index.ts"),
+      "@gamesweb/config": path.resolve(__dirname, "packages/config/src/index.ts"),
+      "@gamesweb/analytics": path.resolve(__dirname, "packages/analytics/src/index.ts"),
     },
   },
 });

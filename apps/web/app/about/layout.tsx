@@ -1,13 +1,8 @@
-import { brand } from "@gamesweb/config";
 import type { Metadata } from "next";
-import { INDEX } from "@/lib/seo";
+import { entryMetadata } from "@/lib/seo";
+import { entryByPath } from "@/lib/seo-content/registry";
 
-export const metadata: Metadata = {
-  title: "About",
-  description: `${brand.productName} is a browser arcade with one player identity across instant games.`,
-  alternates: { canonical: "/about" },
-  ...INDEX,
-};
+export const metadata: Metadata = entryMetadata(entryByPath("/about")!);
 
 export default function AboutLayout({ children }: { children: React.ReactNode }) {
   return children;

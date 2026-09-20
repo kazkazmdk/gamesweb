@@ -29,6 +29,7 @@ export function GameArt({
   position,
   priority = false,
   style,
+  alt = "",
 }: {
   slug: string;
   className?: string;
@@ -36,6 +37,7 @@ export function GameArt({
   position?: string;
   priority?: boolean;
   style?: CSSProperties;
+  alt?: string;
 }) {
   const file = variant === "tile" ? "hero" : variant === "backdrop" ? "backdrop" : "hero";
   const pos = position ?? POSITION[slug]?.[variant] ?? "center";
@@ -45,7 +47,7 @@ export function GameArt({
   return (
     <img
       src={src}
-      alt=""
+      alt={alt}
       draggable={false}
       fetchPriority={priority ? "high" : "low"}
       loading={priority ? "eager" : "lazy"}

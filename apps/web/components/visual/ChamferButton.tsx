@@ -13,6 +13,7 @@ export function ChamferButton({
   tone = "primary",
   cue = tone === "primary",
   className = "",
+  prefetch,
   ...props
 }: {
   href?: string;
@@ -20,6 +21,7 @@ export function ChamferButton({
   tone?: keyof typeof TONES;
   cue?: boolean;
   className?: string;
+  prefetch?: boolean;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
   const cls = `${TONES[tone]} ${className}`.trim();
   const body = (
@@ -30,7 +32,7 @@ export function ChamferButton({
   );
   if (href) {
     return (
-      <Link href={href} className={cls} onClick={props.onClick as never}>
+      <Link href={href} className={cls} prefetch={prefetch} onClick={props.onClick as never}>
         {body}
       </Link>
     );

@@ -1,10 +1,12 @@
-import { brand } from "@gamesweb/config";
-import { GAME_MANIFESTS, getManifest } from "@gamesweb/game-sdk";
+import { getManifest, GAME_MANIFESTS } from "@gamesweb/game-sdk";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { GameHub } from "@/components/game/GameHub";
-import { gameSeoTitle, INDEX, videoGameJsonLd } from "@/lib/seo";
+import { GameEditorial } from "@/components/seo/GameEditorial";
+import { entryMetadata } from "@/lib/seo";
+import { entryByPath } from "@/lib/seo-content/registry";
+import { breadcrumbJsonLd, videoGameJsonLd } from "@/lib/seo-content/schema";
 
 export function generateStaticParams() {
   return GAME_MANIFESTS.map((g) => ({ slug: g.slug }));
@@ -12,41 +14,25 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const game = getManifest(slug);
-  if (!game) return { title: "Game" };
-  const title = gameSeoTitle(game.title, game.genre);
-  const url = `/games/${game.slug}`;
-  const image = game.hero;
-  return {
-    title: { absolute: `${title} | ${brand.productName}` },
-    description: game.description,
-    alternates: { canonical: url },
-    ...INDEX,
-    openGraph: {
-      title: `${title} | ${brand.productName}`,
-      description: game.description,
-      url,
-      images: [{ url: image, alt: game.title }],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: `${title} | ${brand.productName}`,
-      description: game.description,
-      images: [image],
-    },
-  };
+  const entry = entryByPath(`/games/${slug}`);
+  if (!entry) return { title: "Game" };
+  return entryMetadata(entry);
 }
 
 export default async function GameHubPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const game = getManifest(slug);
-  if (!game) notFound();
-  const jsonLd = videoGameJsonLd(game);
+  const entry = entryByPath(`/games/${slug}`);
+  if (!game || !entry) notFound();
   const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const jsonLd = [videoGameJsonLd(game), breadcrumbJsonLd(entry)];
   return (
     <>
-      <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      {jsonLd.map((data, i) => (
+        <script key={i} nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />
+      ))}
       <GameHub game={game} />
+      <GameEditorial gameId={game.id} />
     </>
   );
 }
