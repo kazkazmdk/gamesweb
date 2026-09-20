@@ -21,7 +21,12 @@ export default function CrewPage() {
   if (!crew) {
     return (
       <div data-testid="crew">
-        <EmptyStateStage kicker="Crew" title="Opening the house" slug="territory-rush" />
+        <EmptyStateStage
+          kicker="Crew"
+          title="Opening the house"
+          body="A crew forms when you play. The feed stays empty until a real personal best lands — nothing is invented."
+          slug="territory-rush"
+        />
       </div>
     );
   }

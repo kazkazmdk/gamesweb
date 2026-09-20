@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { Figtree, Syne } from "next/font/google";
 import { headers } from "next/headers";
 import { AppShell } from "@/components/shell/AppShell";
+import { publicOrigin } from "@/lib/content/site";
 import { PlayerProvider } from "@/lib/player";
 import "./globals.css";
 
@@ -20,7 +21,7 @@ const display = Syne({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(publicOrigin()),
   title: {
     default: `${brand.productName} — ${brand.tagline}`,
     template: `%s · ${brand.productName}`,

@@ -31,14 +31,30 @@ export default function FriendsPage() {
       ) : null}
 
       {player.friends.length === 0 ? (
-        <EmptyStateStage
-          heading="h1"
-          slug="neon-drift"
-          kicker="Social"
-          title="Friends"
-          body="No friends yet. Invite someone to chase a score. Presence only appears when they are actually here."
-          action={<InviteWidget />}
-        />
+        <div>
+          <EmptyStateStage
+            heading="h1"
+            slug="neon-drift"
+            kicker="Social"
+            title="Invite a rival"
+            body="No friends yet. Presence only appears when they are actually here — this page stays quiet until then."
+            action={<InviteWidget />}
+          />
+          <div className="px-5 py-8 md:px-10">
+            <p className="meta text-white/40">Meanwhile</p>
+            <p className="mt-2 max-w-md text-[14px] text-[var(--text-dim)]">
+              Set a public record, then send the invite. The board is the reason to add someone.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-4 text-[14px]">
+              <ChamferButton href="/games" tone="ghost">
+                Browse games
+              </ChamferButton>
+              <ChamferButton href="/leaderboards" tone="quiet">
+                Leaderboards
+              </ChamferButton>
+            </div>
+          </div>
+        </div>
       ) : (
       <div className="px-5 pt-8 md:px-10">
         <p className="meta text-white/45">Social</p>
