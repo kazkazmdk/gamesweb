@@ -38,7 +38,7 @@ Rejected from the first tranche (honest overlap): `solo-games`, `keyboard-games`
 
 ## Sitemap
 
-- Production URL: `{NEXT_PUBLIC_APP_URL}/sitemap.xml`
+- Production URL: `{appUrl()}/sitemap.xml` — `NEXT_PUBLIC_APP_URL` if it is a public https origin, otherwise the Vercel host (`VERCEL_PROJECT_PRODUCTION_URL` / `VERCEL_URL`). Localhost is never written on a Vercel preview or production build.
 - Source: `indexableEntries()` in `apps/web/lib/seo-content/registry.ts`
 - `lastModified` comes from each entry’s `updatedAt`
 - Single sitemap. `shouldUseSitemapIndex()` is ready if the catalog ever crosses 40,000 URLs.

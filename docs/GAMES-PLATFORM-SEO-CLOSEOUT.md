@@ -142,6 +142,7 @@ Aucun bloquant build / e2e / indexation.
 - Neon: le gros drift n’est pas encore prouvé par la capture combo (LIVE reste 0 sur le shot `setDrive`).
 - Swarm: peak dense mais familles encore trop « formes » ; boss framing faible.
 - Copy catalogue `/games`: hero adouci (« public catalog ») dans ce commit. Vérifier le recapture n’a pas été refait.
+- Preview `f89298f` : sitemap / canonical / OG étaient encore `http://localhost:3000` parce que `NEXT_PUBLIC_APP_URL` n’existe pas sur Vercel. Corrigé pour lire l’hôte Vercel.
 
 ### P2
 

@@ -9,7 +9,7 @@ import {
   sitemapRecords,
 } from "../apps/web/lib/seo-content/registry";
 import { inboundMap } from "../apps/web/lib/seo-content/quality";
-import { isLocalhostUrl, productionUsesLocalhost } from "../apps/web/lib/seo-content/site";
+import { isLocalhostUrl, productionUsesLocalhost, siteOrigin } from "../apps/web/lib/seo-content/site";
 import { articleJsonLd, breadcrumbJsonLd, itemListJsonLd, videoGameJsonLd, websiteJsonLd } from "../apps/web/lib/seo-content/schema";
 import { GAME_MANIFESTS } from "@gamesweb/game-sdk";
 
@@ -68,8 +68,9 @@ describe("sitemap records", () => {
   it("never encodes localhost in production helpers", () => {
     expect(isLocalhostUrl("https://gamesweb.app/games")).toBe(false);
     expect(isLocalhostUrl("http://localhost:3000/games")).toBe(true);
-    if (process.env.VERCEL_ENV === "production") {
+    if (process.env.VERCEL_ENV === "production" || process.env.VERCEL_ENV === "preview") {
       expect(productionUsesLocalhost()).toBe(false);
+      expect(siteOrigin()).not.toMatch(/localhost|127\.0\.0\.1/);
     }
   });
 });

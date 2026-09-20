@@ -15,8 +15,28 @@ export function isVercelProduction(): boolean {
   return read("VERCEL_ENV") === "production";
 }
 
+const LOCAL_HOST = /localhost|127\.0\.0\.1|::1/;
+
+function asOrigin(raw: string) {
+  const trimmed = raw.replace(/\/$/, "");
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  return `https://${trimmed}`;
+}
+
 export function appUrl(): string {
-  return (read("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000").replace(/\/$/, "");
+  const explicit = read("NEXT_PUBLIC_APP_URL");
+  const vercelEnv = read("VERCEL_ENV");
+  const onVercel = vercelEnv === "production" || vercelEnv === "preview" || read("VERCEL") === "1";
+
+  if (onVercel) {
+    if (explicit && !LOCAL_HOST.test(explicit)) return asOrigin(explicit);
+    const host =
+      (vercelEnv === "production" ? read("VERCEL_PROJECT_PRODUCTION_URL") : undefined) ??
+      read("VERCEL_URL");
+    if (host) return asOrigin(host);
+  }
+
+  return (explicit ?? "http://localhost:3000").replace(/\/$/, "");
 }
 
 export function supabaseUrl(): string | undefined {

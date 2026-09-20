@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { AppShell } from "@/components/shell/AppShell";
 import { PlayerProvider } from "@/lib/player";
 import { websiteJsonLd } from "@/lib/seo-content/schema";
+import { appUrl } from "@/lib/env";
 import "./globals.css";
 
 const body = Figtree({
@@ -21,7 +22,7 @@ const display = Syne({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(appUrl()),
   title: {
     default: `${brand.productName} — ${brand.tagline}`,
     template: `%s · ${brand.productName}`,
