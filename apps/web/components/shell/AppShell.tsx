@@ -118,13 +118,24 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main className={home ? "" : "pb-28 pt-[var(--header-h)] md:pb-16"}>{children}</main>
-      {!home ? (
-        <footer className="hidden border-t border-[var(--line)] px-8 py-6 text-[12px] text-[var(--text-faint)] md:flex md:gap-6">
+      {home ? (
+        <nav className="sr-only" aria-label="Public catalog">
+          <Link href="/games">Games catalog</Link>
+          <Link href="/collections">Collections</Link>
+          <Link href="/guides">Guides</Link>
+          <Link href="/learn">Learn</Link>
+        </nav>
+      ) : (
+        <footer className="hidden border-t border-[var(--line)] px-8 py-6 text-[12px] text-[var(--text-faint)] md:flex md:flex-wrap md:gap-6">
+          <Link href="/games">Games</Link>
+          <Link href="/collections">Collections</Link>
+          <Link href="/guides">Guides</Link>
+          <Link href="/learn">Learn</Link>
           <Link href="/about">About</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </footer>
-      ) : null}
+      )}
       <nav
         className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-[var(--line)] bg-[color-mix(in_srgb,var(--bg)_88%,transparent)] pb-[var(--safe-bottom)] backdrop-blur-md md:hidden"
         aria-label="Mobile"

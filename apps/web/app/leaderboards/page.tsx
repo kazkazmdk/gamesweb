@@ -125,13 +125,35 @@ export default function LeaderboardsPage() {
             <EmptyState title="No rivals yet" body="Rivals appear after a real challenge result." />
           </div>
         ) : rows.length === 0 ? (
-          <div className="mt-10">
-            <EmptyState
-              title="No leaderboard yet"
-              body={`Play ${game.title} to set one.`}
-              action={<QuickAction href={`/play/${game.slug}`}>Play</QuickAction>}
-            />
-          </div>
+          <section className="relative mt-10 overflow-hidden">
+            <div className="pointer-events-none absolute inset-0 opacity-25">
+              <GameArt slug={game.slug} variant="hero" className="h-full w-full" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg)] via-[var(--bg)]/80 to-transparent" />
+            </div>
+            <div className="relative grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
+              <div className="gw-stage p-6 md:p-8">
+                <p className="meta text-white/40">First score</p>
+                <h2 className="display mt-2 text-[32px] md:text-[44px]">No leaderboard yet</h2>
+                <p className="mt-3 max-w-md text-[15px] text-[var(--text-dim)]">
+                  {game.title} has no verified standing on this board. Play a clean run — the first honest score opens the list. No ghost podium.
+                </p>
+                <div className="mt-6">
+                  <QuickAction href={`/play/${game.slug}`}>Play {game.title}</QuickAction>
+                </div>
+              </div>
+              <div className="gw-stage p-6">
+                <p className="meta text-white/40">Local context</p>
+                <p className="mt-3 text-[15px]">
+                  {rank.you
+                    ? `Your recorded mark: ${formatPlayScore(game.id, rank.you.score) ?? "—"}.`
+                    : "No personal best on this mode yet."}
+                </p>
+                <p className="mt-2 text-[13px] text-[var(--text-faint)]">
+                  Global rows stay empty until a run passes verification. Your PB still lives on the Game Hub.
+                </p>
+              </div>
+            </div>
+          </section>
         ) : (
           <>
             {podium.length ? (

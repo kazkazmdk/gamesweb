@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, seededRng, fillBackdrop, fillVignette, drawFungusPatch, drawContainer, type GameKeyboard } from "@gamesweb/game-core";
+import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, seededRng, fillBackdrop, fillVignette, drawFungusPatch, drawContainer, drawSkitterer, drawSwarmer, drawSpore, drawShellTank, type GameKeyboard } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { readRunContext, swarmProtocolManifest, utcDayKey } from "@gamesweb/game-sdk";
 import {
@@ -1230,26 +1230,35 @@ export class SwarmPlayScene extends Phaser.Scene {
       }
       const col = e.flash > 0 ? 0xffffff : KIND[e.kind].color;
       g.fillStyle(col, 1);
-      if (e.kind === "dart") g.fillTriangle(e.x + e.r, e.y, e.x - e.r * 0.7, e.y - e.r * 0.6, e.x - e.r * 0.7, e.y + e.r * 0.6);
-      else if (e.kind === "tank") {
-        g.fillRoundedRect(e.x - e.r, e.y - e.r * 0.7, e.r * 2, e.r * 1.4, 4);
-        g.fillStyle(0x120c10, 0.4);
-        g.fillRect(e.x - e.r + 4, e.y - 4, e.r * 2 - 8, 8);
+      if (e.kind === "dart") {
+        g.save();
+        g.translateCanvas(e.x, e.y);
+        g.rotateCanvas(Math.atan2(e.vy, e.vx) || 0);
+        g.fillStyle(col, 1);
+        g.fillTriangle(e.r + 4, 0, -e.r * 0.7, -e.r * 0.55, -e.r * 0.7, e.r * 0.55);
+        g.fillStyle(0x9ae84a, 0.55);
+        g.fillCircle(-e.r * 0.2, 0, 3);
+        g.restore();
+      } else if (e.kind === "tank") {
+        drawShellTank(g, e.x, e.y, e.r, col);
       } else if (e.kind === "spitter") {
-        g.fillCircle(e.x, e.y, e.r);
-        g.fillStyle(0xff8a4a, 0.8);
-        g.fillCircle(e.x, e.y - e.r * 0.2, e.r * 0.35);
+        drawSpore(g, e.x, e.y, e.r, col, 0.5 + Math.sin(this.time.now / 140 + e.x) * 0.5);
       } else if (e.kind === "splitter") {
         g.fillTriangle(e.x, e.y - e.r, e.x + e.r, e.y + e.r * 0.6, e.x - e.r, e.y + e.r * 0.6);
-        g.fillCircle(e.x, e.y, e.r * 0.35);
-      } else if (e.kind === "swarmling") g.fillCircle(e.x, e.y, e.r);
-      else if (e.kind === "chaser") {
+        g.fillStyle(0x9ae84a, 0.7);
+        g.fillCircle(e.x, e.y, e.r * 0.38);
+        g.fillCircle(e.x - e.r * 0.45, e.y + e.r * 0.15, e.r * 0.22);
+      } else if (e.kind === "swarmling") {
+        drawSwarmer(g, e.x, e.y, e.r, col);
+      } else if (e.kind === "chaser") {
+        drawSkitterer(g, e.x, e.y, e.r, col, this.time.now);
+      } else if (e.kind === "elite") {
+        g.fillStyle(col, 1);
         g.fillCircle(e.x, e.y, e.r);
-        g.fillStyle(0x2a2018, 0.55);
-        g.fillCircle(e.x + 3, e.y - 2, 3);
-        g.fillStyle(col, 0.85);
-        g.fillRect(e.x - e.r, e.y + 2, 5, 8);
-        g.fillRect(e.x + e.r - 5, e.y + 2, 5, 8);
+        g.lineStyle(3, 0xffe08a, 0.7);
+        g.strokeCircle(e.x, e.y, e.r + 6);
+        g.fillStyle(0xff6a32, 0.85);
+        g.fillTriangle(e.x, e.y - e.r - 8, e.x + 6, e.y - e.r + 2, e.x - 6, e.y - e.r + 2);
       } else if (e.kind === "warden") {
         g.fillRoundedRect(e.x - e.r, e.y - e.r, e.r * 2, e.r * 2, 8);
         g.fillStyle(0xffe0c0, 0.7);
@@ -1446,6 +1455,15 @@ export class SwarmPlayScene extends Phaser.Scene {
         hideHud: () => {
           this.hud.setVisible(false);
           this.overlay.setVisible(false);
+        },
+        seedPeak: () => {
+          const kinds = ["chaser", "dart", "tank", "spitter", "swarmling", "elite", "splitter"] as const;
+          for (let i = 0; i < 36; i += 1) {
+            const slot = this.enemies.find((e) => !e.active);
+            if (!slot) break;
+            const a = (i / 36) * Math.PI * 2;
+            spawnEnemy(slot, kinds[i % kinds.length], this.px + Math.cos(a) * (130 + (i % 5) * 18), this.py + Math.sin(a) * (130 + (i % 5) * 18), 1);
+          }
         },
       },
     );

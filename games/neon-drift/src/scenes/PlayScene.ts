@@ -399,6 +399,18 @@ export class DriftPlayScene extends Phaser.Scene {
 
     if (this.car.drifting) void this.platform.achievement.unlock("first-slide");
     if (this.score.combo >= 5) void this.platform.achievement.unlock("combo-5");
+    if (near && this.quality !== "low") {
+      this.parts.emit({
+        x: this.car.x + q.nx * 16,
+        y: this.car.y + q.ny * 16,
+        vx: (Math.random() - 0.5) * 30,
+        vy: (Math.random() - 0.5) * 30,
+        life: 160,
+        size: 2.4,
+        color: 0xf0b84a,
+        drag: 0.9,
+      });
+    }
     if (near && this.nearArmed) {
       this.nearArmed = false;
       this.score.nearMisses += 1;
@@ -451,15 +463,16 @@ export class DriftPlayScene extends Phaser.Scene {
       });
       if (this.marks.length > (this.quality === "high" ? 260 : 110)) this.marks.shift();
       if (this.quality === "high" || this.frames % 2 === 0) {
+        const heavy = this.car.driftAmount > 0.55;
         this.parts.emit({
           x: this.car.x - Math.cos(this.car.angle) * 14,
           y: this.car.y - Math.sin(this.car.angle) * 14,
-          vx: -this.car.vx * 0.1 + (Math.random() - 0.5) * 18,
-          vy: -this.car.vy * 0.1 + (Math.random() - 0.5) * 18,
-          life: 280 + this.car.driftAmount * 120,
-          size: 2 + this.car.driftAmount * 3,
-          color: 0xc9c4bf,
-          drag: 0.93,
+          vx: -this.car.vx * 0.12 + (Math.random() - 0.5) * (heavy ? 28 : 16),
+          vy: -this.car.vy * 0.12 + (Math.random() - 0.5) * (heavy ? 28 : 16),
+          life: 320 + this.car.driftAmount * 160,
+          size: (heavy ? 4 : 2) + this.car.driftAmount * 4,
+          color: heavy ? 0xe8e4dc : 0xc9c4bf,
+          drag: 0.92,
         });
       }
     }

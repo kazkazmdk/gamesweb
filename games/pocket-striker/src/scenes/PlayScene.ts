@@ -171,34 +171,54 @@ export class PocketScene extends Phaser.Scene {
   }
 
   private drawFurniture(g: Phaser.GameObjects.Graphics, theme: Layout["theme"]) {
-    g.fillStyle(0xf0c060, 0.22);
-    g.fillCircle(80, 36, 46);
+    g.fillStyle(0x2a2018, 0.18);
+    g.fillEllipse(this.layout.w / 2, this.layout.h + 18, this.layout.w * 0.7, 28);
+    g.fillStyle(0xf0c060, 0.28);
+    g.fillCircle(86, 40, 54);
     g.fillStyle(0x6a4a28, 1);
-    g.fillRect(68, 8, 8, 28);
-    g.fillStyle(0xffe08a, 0.9);
-    g.fillCircle(72, 8, 10);
+    g.fillRect(72, 4, 10, 34);
+    g.fillStyle(0xffe08a, 0.95);
+    g.fillCircle(77, 6, 13);
     g.fillStyle(0xf2e6d0, 1);
-    g.fillRoundedRect(28, 54, 36, 22, 3);
+    g.fillRoundedRect(18, 52, 42, 26, 4);
     g.fillStyle(0xc45c3a, 1);
-    g.fillRect(32, 58, 12, 14);
+    g.fillRect(22, 56, 14, 16);
+    g.fillStyle(0x3a6a88, 1);
+    g.fillRect(38, 58, 14, 16);
+    g.fillStyle(0x2a2018, 0.85);
+    g.fillRoundedRect(this.layout.w / 2 - 46, -6, 92, 22, 4);
+    g.fillStyle(0xffd166, 0.9);
+    g.fillRect(this.layout.w / 2 - 38, 0, 28, 10);
+    const crowd = theme === "arcade" ? [0xff6ad5, 0x4ad4e8, 0xffd166] : theme === "workshop" ? [0xc45c3a, 0x8a6a40, 0xffd166] : [0x3a7a44, 0xf2e6d0, 0xc45c3a];
+    for (let i = 0; i < 10; i += 1) {
+      g.fillStyle(crowd[i % crowd.length], 0.8);
+      g.fillCircle(90 + i * 54, this.layout.h + 10, 6);
+    }
     if (theme === "workshop") {
-      g.fillStyle(0x8a6a40, 0.7);
-      g.fillRect(40, 40, 54, 16);
-      g.fillRect(630, 40, 54, 16);
-      for (let i = 40; i < 680; i += 70) g.fillRect(i, 36, 10, 4);
+      g.fillStyle(0x8a6a40, 0.85);
+      g.fillRect(36, 36, 64, 18);
+      g.fillRect(620, 36, 64, 18);
+      for (let i = 40; i < 680; i += 64) g.fillRect(i, 32, 12, 5);
+      g.fillStyle(0x3a2a18, 1);
+      g.fillRect(52, 400, 22, 28);
+      g.fillRect(610, 400, 18, 22);
     } else if (theme === "garden") {
-      g.fillStyle(0x3a7a44, 0.7);
-      g.fillCircle(70, 70, 20);
-      g.fillCircle(650, 70, 16);
-      g.fillCircle(70, 410, 14);
-      g.fillCircle(650, 410, 18);
+      g.fillStyle(0x3a7a44, 0.8);
+      g.fillCircle(70, 70, 22);
+      g.fillCircle(650, 70, 18);
+      g.fillCircle(70, 410, 16);
+      g.fillCircle(650, 410, 20);
+      g.fillStyle(0xf0c060, 0.55);
+      g.fillCircle(86, 62, 6);
     } else {
-      g.fillStyle(0xc45c3a, 0.28);
-      g.fillRect(40, 40, 80, 8);
-      g.fillRect(600, 40, 80, 8);
-      g.fillStyle(0x3a6a88, 0.22);
-      g.fillRect(40, 430, 80, 8);
-      g.fillRect(600, 430, 80, 8);
+      g.fillStyle(0xc45c3a, 0.4);
+      g.fillRect(36, 36, 92, 10);
+      g.fillRect(580, 36, 92, 10);
+      g.fillStyle(0x3a6a88, 0.35);
+      g.fillRect(36, 426, 92, 10);
+      g.fillRect(580, 426, 92, 10);
+      g.fillStyle(0xff6ad5, 0.45);
+      g.fillCircle(120, 52, 8);
     }
   }
 

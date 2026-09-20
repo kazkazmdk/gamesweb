@@ -355,3 +355,110 @@ export function drawFungusPatch(g: DrawGfx, x: number, y: number, r: number, col
   g.fillStyle(0xe8dcc4, 0.35);
   g.fillCircle(x + r * 0.25, y + r * 0.1, r * 0.18);
 }
+
+export function drawGuardRail(g: DrawGfx, x: number, y: number, w: number, metal = 0xc8c4b8) {
+  g.fillStyle(0x2a2a28, 1);
+  g.fillRect(x, y - 10, 3, 14);
+  g.fillRect(x + w - 3, y - 10, 3, 14);
+  g.fillStyle(metal, 1);
+  g.fillRect(x, y - 8, w, 4);
+  g.fillStyle(0xf0b84a, 0.85);
+  g.fillRect(x + 2, y - 7, 6, 2);
+}
+
+export function drawRock(g: DrawGfx, x: number, y: number, r: number, color = 0x3a3a38) {
+  g.fillStyle(color, 1);
+  g.fillCircle(x, y, r);
+  g.fillStyle(mixRgb(color, 0x000000, 0.25), 1);
+  g.fillCircle(x + r * 0.25, y + r * 0.15, r * 0.62);
+  g.fillStyle(0xffffff, 0.08);
+  g.fillCircle(x - r * 0.3, y - r * 0.25, r * 0.22);
+}
+
+export function drawAntenna(g: DrawGfx, x: number, y: number, h: number, metal = 0xd0d4d8) {
+  g.fillStyle(metal, 1);
+  g.fillRect(x - 3, y - h, 6, h);
+  g.fillStyle(0xff6a32, 1);
+  g.fillCircle(x, y - h - 4, 5);
+  g.fillStyle(0xffffff, 0.35);
+  g.fillCircle(x, y - h - 18, 3);
+  g.lineStyle?.(2, metal, 0.7);
+  g.lineBetween?.(x, y - h, x - 16, y - h + 22);
+  g.lineBetween?.(x, y - h, x + 16, y - h + 22);
+}
+
+export function drawCrowdGateSign(
+  g: DrawGfx,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  color: number,
+) {
+  g.fillStyle(0x1a2018, 1);
+  g.fillRect(x + 10, y + 18, 14, h);
+  g.fillRect(x + w - 24, y + 18, 14, h);
+  g.fillStyle(color, 1);
+  fillRound(g, x, y, w, Math.max(46, h * 0.42), 10);
+  g.fillStyle(0xffffff, 0.22);
+  fillRound(g, x + 10, y + 8, w - 20, Math.max(28, h * 0.28), 8);
+  g.fillStyle(mixRgb(color, 0x000000, 0.25), 0.9);
+  g.fillRect(x + 8, y + Math.max(46, h * 0.42) - 6, w - 16, 8);
+}
+
+export function drawFoamRoller(g: DrawGfx, x: number, y: number, w: number, h: number, color: number, t: number) {
+  fillRound(g, x, y, w, h, h / 2);
+  g.fillStyle(0xffffff, 0.28);
+  const stripe = ((t * 40) % 18);
+  for (let i = -18; i < w + 18; i += 18) g.fillRect(x + i + stripe, y + 3, 7, h - 6);
+  g.fillStyle(mixRgb(color, 0x000000, 0.2), 1);
+  g.fillCircle(x + 6, y + h / 2, h * 0.32);
+  g.fillCircle(x + w - 6, y + h / 2, h * 0.32);
+}
+
+export function drawSkitterer(g: DrawGfx, x: number, y: number, r: number, color: number, t: number) {
+  const swing = Math.sin(t / 70) * 5;
+  g.fillStyle(color, 1);
+  g.fillCircle(x, y, r * 0.72);
+  g.fillStyle(mixRgb(color, 0x2a2018, 0.35), 1);
+  g.fillCircle(x + r * 0.35, y - r * 0.15, r * 0.32);
+  g.fillStyle(color, 0.92);
+  g.fillRect(x - r * 1.1, y + 2, r * 0.7, 3);
+  g.fillRect(x + r * 0.4, y + 2, r * 0.7, 3);
+  g.fillRect(x - r * 0.9, y + 6 + swing * 0.15, r * 0.55, 3);
+  g.fillRect(x + r * 0.35, y + 6 - swing * 0.15, r * 0.55, 3);
+  g.fillStyle(0x2a2018, 0.7);
+  g.fillCircle(x + r * 0.42, y - r * 0.2, 2.2);
+}
+
+export function drawSwarmer(g: DrawGfx, x: number, y: number, r: number, color: number) {
+  g.fillStyle(color, 0.95);
+  g.fillCircle(x, y, r);
+  g.fillStyle(mixRgb(color, 0x9ae84a, 0.4), 0.8);
+  g.fillCircle(x - r * 0.45, y - r * 0.15, r * 0.48);
+  g.fillCircle(x + r * 0.4, y + r * 0.1, r * 0.38);
+  g.fillStyle(0xe8dcc4, 0.45);
+  g.fillCircle(x + r * 0.1, y - r * 0.25, r * 0.18);
+}
+
+export function drawSpore(g: DrawGfx, x: number, y: number, r: number, color: number, pulse: number) {
+  g.fillStyle(color, 0.92);
+  g.fillCircle(x, y, r);
+  g.fillStyle(0x9ae84a, 0.35 + pulse * 0.25);
+  g.fillCircle(x, y, r * 1.35);
+  g.fillStyle(0xffe08a, 0.85);
+  g.fillCircle(x, y - r * 0.15, r * 0.32);
+  g.fillStyle(0x2a2018, 0.5);
+  g.fillCircle(x + r * 0.18, y - r * 0.22, 2);
+}
+
+export function drawShellTank(g: DrawGfx, x: number, y: number, r: number, color: number) {
+  g.fillStyle(mixRgb(color, 0x2a1810, 0.2), 1);
+  fillRound(g, x - r, y - r * 0.7, r * 2, r * 1.45, 6);
+  g.fillStyle(color, 1);
+  fillRound(g, x - r * 0.85, y - r * 0.5, r * 1.7, r * 1.05, 5);
+  g.fillStyle(0x2a1810, 0.45);
+  g.fillRect(x - r * 0.7, y - 3, r * 1.4, 6);
+  g.fillStyle(0xffc18a, 0.35);
+  g.fillRect(x - r * 0.4, y - r * 0.35, r * 0.8, 4);
+}

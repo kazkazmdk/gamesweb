@@ -76,7 +76,27 @@ test("eight games art direction matrix", async ({ page }) => {
       await page.waitForTimeout(250);
       await save(page, "territory-rush-trail-1440");
     }
-    if (slug === "crowd-control") await cmd(page, "setPack", 10);
+    if (slug === "velocity-run") {
+      await cmd(page, "hideHud");
+      await page.waitForTimeout(200);
+      await save(page, "velocity-run-hvac-1440");
+      await cmd(page, "setCourse", "transit");
+      await expect.poll(async () => (await debugOf(page))?.ready, { timeout: 20_000 }).toBeTruthy();
+      await cmd(page, "hideHud");
+      await page.waitForTimeout(250);
+      await save(page, "velocity-run-transit-1440");
+      await cmd(page, "setCourse", "ascent");
+      await expect.poll(async () => (await debugOf(page))?.ready, { timeout: 20_000 }).toBeTruthy();
+      await cmd(page, "hideHud");
+      await page.waitForTimeout(250);
+      await save(page, "velocity-run-comms-1440");
+    }
+    if (slug === "crowd-control") {
+      await cmd(page, "seekGate");
+      await page.waitForTimeout(200);
+      await save(page, "crowd-control-gate-before-1440");
+      await cmd(page, "setPack", 10);
+    }
     if (slug === "sky-stack") await cmd(page, "stackTo", 4);
     await page.waitForTimeout(700);
     await save(page, `${slug}-mid-1440`);
@@ -86,9 +106,14 @@ test("eight games art direction matrix", async ({ page }) => {
       await page.waitForTimeout(300);
       await save(page, "crowd-control-pack-30-1440");
       await cmd(page, "setPack", 86);
+      await page.waitForTimeout(200);
+      await save(page, "crowd-control-gate-after-1440");
     }
-    if (slug === "swarm-protocol") await cmd(page, "grantXp", 18);
-    if (slug === "sky-stack") await cmd(page, "stackTo", 28);
+    if (slug === "swarm-protocol") {
+      await cmd(page, "grantXp", 18);
+      await cmd(page, "seedPeak");
+    }
+    if (slug === "sky-stack") await cmd(page, "stackTo", 48);
     if (slug === "territory-rush") {
       await cmd(page, "closeLoop");
       await page.waitForTimeout(200);
