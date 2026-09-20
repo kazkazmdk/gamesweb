@@ -45,6 +45,9 @@ export type GwDebugCommands = {
   jump?: () => void;
   hideHud?: () => void;
   setPack?: (n: number) => void;
+  stackTo?: (n: number) => void;
+  exposeTrail?: () => void;
+  closeLoop?: () => void;
 };
 
 type GwDebugWindow = Window & {

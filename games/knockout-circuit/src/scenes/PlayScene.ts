@@ -93,7 +93,7 @@ export class KnockoutScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(this.map.theme.sky);
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
-    this.hud = this.add.text(20, 64, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#ffe8b0" }).setScrollFactor(0).setDepth(21);
+    this.hud = this.add.text(20, 64, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#2a1a10" }).setScrollFactor(0).setDepth(21);
     this.nativeKeys?.destroy();
     this.nativeKeys = createGameKeyboard();
     this.game.canvas.tabIndex = 0;
@@ -304,47 +304,47 @@ export class KnockoutScene extends Phaser.Scene {
   private drawPlace(g: Phaser.GameObjects.Graphics, th: MapDef["theme"]) {
     const env = this.map.env;
     if (env === "factory") {
-      g.fillStyle(mixColor(th.sky, 0x000000, 0.25), 1);
+      g.fillStyle(mixColor(th.sky, 0xffffff, 0.12), 1);
       for (let i = 0; i < 8; i += 1) {
-        const x = i * 380 + this.camX * 0.3;
-        g.fillRect(x, this.map.height * 0.35, 70, this.map.height * 0.65);
-        g.fillStyle(th.accent, 0.08);
-        g.fillRect(x + 12, this.map.height * 0.4, 10, 12);
-        g.fillStyle(mixColor(th.sky, 0x000000, 0.25), 1);
+        const x = i * 380 + this.camX * 0.18;
+        g.fillRect(x, this.map.height * 0.28, 86, this.map.height * 0.72);
+        g.fillStyle(0xffffff, 0.22);
+        g.fillRect(x + 14, this.map.height * 0.34, 14, 16);
+        g.fillStyle(mixColor(th.sky, 0xffffff, 0.12), 1);
       }
-      g.fillStyle(0x2a2218, 0.55);
-      g.fillRect(0, this.map.height - 48, this.map.width, 48);
-      g.fillStyle(th.danger, 0.55);
+      g.fillStyle(0xf2e6d0, 1);
+      g.fillRect(0, this.map.height - 52, this.map.width, 52);
+      g.fillStyle(th.danger, 0.85);
       for (let i = 0; i < this.map.width; i += 28) {
-        g.fillTriangle(i, this.map.height - 48, i + 14, this.map.height - 48, i + 14, this.map.height - 34);
+        g.fillTriangle(i, this.map.height - 52, i + 14, this.map.height - 52, i + 14, this.map.height - 34);
       }
-      g.fillStyle(th.accent, 0.16);
-      for (let i = 0; i < 5; i += 1) g.fillRect(i * 520 + this.camX * 0.12, this.map.height * 0.18, 140, 8);
+      g.fillStyle(th.accent, 0.55);
+      for (let i = 0; i < 5; i += 1) g.fillRect(i * 520 + this.camX * 0.08, this.map.height * 0.14, 160, 16);
       for (let i = 0; i < 7; i += 1) {
         const x = 90 + i * 380;
-        drawLamp(g, x, this.map.height * 0.42, 70, th.accent, 0x2a2218);
-        if (i % 2 === 0) drawContainer(g, x + 40, this.map.height - 92, 44, 28, i % 4 === 0 ? 0xc45c3a : 0x3a6a88);
+        drawLamp(g, x, this.map.height * 0.4, 64, 0xffe08a, 0x6a6a70);
+        if (i % 2 === 0) drawContainer(g, x + 40, this.map.height - 96, 48, 30, i % 4 === 0 ? 0xff6b4a : 0x4ad4e8);
       }
-      g.fillStyle(0x3a3224, 0.7);
+      g.fillStyle(0xc8c4bc, 0.85);
       for (let i = 0; i < 6; i += 1) {
         const x = 220 + i * 440;
-        g.fillRect(x, this.map.height * 0.22, 10, this.map.height * 0.4);
-        g.fillRect(x - 40, this.map.height * 0.22, 90, 8);
+        g.fillRect(x, this.map.height * 0.18, 12, this.map.height * 0.42);
+        g.fillRect(x - 46, this.map.height * 0.18, 104, 10);
       }
     } else if (env === "skyworks") {
-      g.fillStyle(mixColor(th.sky, 0xffffff, 0.06), 1);
-      g.fillCircle(this.map.width * 0.7, 90, 50);
-      g.fillStyle(mixColor(th.sky, 0x000000, 0.4), 1);
+      g.fillStyle(0xfff4c8, 0.85);
+      g.fillCircle(this.map.width * 0.72, 84, 56);
+      g.fillStyle(0xffffff, 0.55);
       for (let i = 0; i < 7; i += 1) {
-        const x = i * 460 + this.camX * 0.2;
-        g.fillRect(x + 80, 80, 8, this.map.height);
-        g.fillRect(x, 120 + (i % 3) * 40, 180, 8);
+        const x = i * 460 + this.camX * 0.14;
+        g.fillRect(x + 80, 70, 10, this.map.height);
+        g.fillRect(x, 110 + (i % 3) * 36, 180, 10);
       }
     } else {
-      g.fillStyle(th.accent, 0.08);
-      for (let i = 0; i < 12; i += 1) g.fillRect(i * 280 + this.camX * 0.15, 40, 4, this.map.height);
-      g.fillStyle(mixColor(th.sky, 0x000000, 0.3), 1);
-      g.fillRect(0, this.map.height * 0.2, this.map.width, 10);
+      g.fillStyle(th.accent, 0.16);
+      for (let i = 0; i < 12; i += 1) g.fillRect(i * 280 + this.camX * 0.1, 36, 8, this.map.height);
+      g.fillStyle(0xffffff, 0.4);
+      g.fillRect(0, this.map.height * 0.18, this.map.width, 12);
     }
   }
 
@@ -358,13 +358,13 @@ export class KnockoutScene extends Phaser.Scene {
       this.map.width,
       this.map.height,
       {
-        top: mixColor(th.sky, 0x000000, 0.15),
+        top: mixColor(th.sky, 0xffffff, 0.2),
         mid: th.sky,
-        bottom: mixColor(th.sky, th.ground, 0.35),
-        grain: 0.04,
+        bottom: mixColor(th.sky, 0xf4e8c8, 0.35),
+        grain: 0.02,
         blobs: [
-          { color: th.accent, x: 0.2, y: 0.18, r: 160, alpha: 0.07, parallax: 0.04 },
-          { color: th.danger, x: 0.78, y: 0.12, r: 120, alpha: 0.05, parallax: 0.05 },
+          { color: 0xfff4c8, x: 0.22, y: 0.16, r: 140, alpha: 0.28, parallax: 0.03 },
+          { color: 0xffffff, x: 0.78, y: 0.12, r: 110, alpha: 0.2, parallax: 0.04 },
         ],
       },
       { x: this.camX, y: this.camY },
@@ -448,14 +448,14 @@ export class KnockoutScene extends Phaser.Scene {
         g.lineBetween(live.x + 6, live.y + 4, live.x + live.w - 6, live.y + live.h - 4);
         continue;
       }
-      g.fillStyle(s.route === "expert" ? 0x8a4a18 : th.ground, 1);
-      g.fillRect(live.x, live.y, live.w, live.h);
-      g.fillStyle(0x000000, 0.18);
-      g.fillRect(live.x, live.y + live.h - 6, live.w, 6);
-      g.fillStyle(0xffe8b0, 0.35);
-      g.fillRect(live.x, live.y, live.w, 4);
-      g.fillStyle(th.accent, 0.25);
-      g.fillRect(live.x + 4, live.y + 2, 6, 3);
+      g.fillStyle(s.route === "expert" ? 0xff8a4a : th.ground, 1);
+      g.fillRoundedRect(live.x, live.y, live.w, live.h, 7);
+      g.fillStyle(0x000000, 0.08);
+      g.fillRect(live.x + 4, live.y + live.h - 6, live.w - 8, 5);
+      g.fillStyle(0xffffff, 0.35);
+      g.fillRect(live.x + 6, live.y + 3, live.w - 12, 5);
+      g.fillStyle(th.accent, 0.55);
+      g.fillRect(live.x + 8, live.y + 4, 10, 3);
     }
     for (const ghost of this.ghosts) {
       const pose = ghost.samples.find((s) => s.t >= this.timeMs) ?? ghost.samples[ghost.samples.length - 1];
@@ -484,8 +484,8 @@ export class KnockoutScene extends Phaser.Scene {
       dying: this.dying > 0,
       lean: this.dying > 0 ? this.rag.rot : this.vx * 0.0009,
     });
-    fillVignette(g, this.map.width, this.map.height, 0.18);
-    this.hud.setText(`${this.map.name}\n${(this.timeMs / 1000).toFixed(2)}s   ${this.map.env.toUpperCase()}`);
+    fillVignette(g, this.map.width, this.map.height, 0.08);
+    this.hud.setText(`GATE  ${this.map.name.toUpperCase()}\n${(this.timeMs / 1000).toFixed(2)}s   LIVE SHOW`);
     this.overlay.clear();
     const fa = this.juice.flashAlpha(0.016);
     if (fa) {
@@ -537,7 +537,7 @@ export function mountKnockoutCircuit(parent: HTMLElement, platform: PlatformSDK,
     parent,
     width: Math.max(320, parent.clientWidth || 1280),
     height: Math.max(240, parent.clientHeight || 720),
-    backgroundColor: "#1b1408",
+    backgroundColor: "#87c8ea",
     scale: { mode: Phaser.Scale.RESIZE },
     scene: [KnockoutScene],
     disableContextMenu: true,

@@ -292,3 +292,66 @@ export function drawSkyline(g: DrawGfx, y: number, w: number, color: number, see
     g.fillRect(bx, y - bh, 28 + (i % 3) * 10, bh);
   }
 }
+
+export function drawSodiumLamp(g: DrawGfx, x: number, y: number, h: number, glow = 0xf0b84a, pole = 0x2a2a28) {
+  g.fillStyle(pole, 1);
+  g.fillRect(x - 2, y - h, 4, h);
+  g.fillStyle(0x3a3a36, 1);
+  g.fillRect(x - 10, y - h - 4, 22, 5);
+  g.fillStyle(glow, 0.95);
+  g.fillCircle(x + 4, y - h - 2, 6);
+  g.fillStyle(glow, 0.16);
+  g.fillCircle(x + 4, y - h + 18, 26);
+  g.fillStyle(glow, 0.07);
+  g.fillCircle(x + 2, y + 4, 34);
+}
+
+export function drawBush(g: DrawGfx, x: number, y: number, r: number, color = 0x1c3a24) {
+  g.fillStyle(color, 1);
+  g.fillCircle(x, y, r);
+  g.fillCircle(x - r * 0.55, y + r * 0.15, r * 0.7);
+  g.fillCircle(x + r * 0.5, y + r * 0.1, r * 0.62);
+  g.fillStyle(0xffffff, 0.06);
+  g.fillCircle(x - r * 0.2, y - r * 0.25, r * 0.28);
+}
+
+export function drawHvac(g: DrawGfx, x: number, y: number, w: number, h: number, metal = 0xd8d2c8) {
+  g.fillStyle(0x000000, 0.18);
+  g.fillRect(x + 4, y + h, w - 6, 6);
+  g.fillStyle(metal, 1);
+  fillRound(g, x, y, w, h, 3);
+  g.fillStyle(0x8a9098, 1);
+  for (let i = 6; i < w - 4; i += 8) g.fillRect(x + i, y + 5, 3, h - 10);
+  g.fillStyle(0xff6a32, 0.85);
+  g.fillRect(x + 4, y + 2, 10, 3);
+}
+
+export function drawBillboard(g: DrawGfx, x: number, y: number, w: number, h: number, face: number, post = 0x2a2a30) {
+  g.fillStyle(post, 1);
+  g.fillRect(x + w * 0.2, y + h, 8, 36);
+  g.fillRect(x + w * 0.7, y + h, 8, 36);
+  g.fillStyle(face, 1);
+  fillRound(g, x, y, w, h, 4);
+  g.fillStyle(0xffffff, 0.22);
+  g.fillRect(x + 8, y + 8, w - 16, 10);
+  g.fillStyle(0x000000, 0.12);
+  g.fillRect(x + 10, y + h * 0.45, w * 0.4, 8);
+}
+
+export function drawToyHouse(g: DrawGfx, x: number, y: number, w: number, h: number, wall: number, roof: number) {
+  g.fillStyle(wall, 1);
+  fillRound(g, x, y, w, h, 3);
+  g.fillStyle(roof, 1);
+  g.fillTriangle(x - 3, y + 4, x + w / 2, y - h * 0.45, x + w + 3, y + 4);
+  g.fillStyle(0xffe08a, 0.7);
+  g.fillRect(x + w * 0.35, y + h * 0.35, w * 0.22, h * 0.28);
+}
+
+export function drawFungusPatch(g: DrawGfx, x: number, y: number, r: number, color = 0x3a6a48) {
+  g.fillStyle(color, 0.85);
+  g.fillCircle(x, y, r);
+  g.fillStyle(mixRgb(color, 0x9ae84a, 0.35), 0.55);
+  g.fillCircle(x - r * 0.3, y - r * 0.2, r * 0.45);
+  g.fillStyle(0xe8dcc4, 0.35);
+  g.fillCircle(x + r * 0.25, y + r * 0.1, r * 0.18);
+}

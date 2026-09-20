@@ -12,6 +12,7 @@ import {
   drawParticles,
   drawHoverBlade,
   fillVignette,
+  drawToyHouse,
   type GameKeyboard,
 } from "@gamesweb/game-core";
 import { readRunContext, territoryRushManifest, type PlatformSDK } from "@gamesweb/game-sdk";
@@ -116,7 +117,7 @@ export class TerritoryScene extends Phaser.Scene {
     this.game.registry.set("synth", this.synth);
     this.synth.setSettings(this.platform.audio.getSettings());
     this.gfx = this.add.graphics();
-    this.hud = this.add.text(16, 64, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#ffe0e6" }).setScrollFactor(0).setDepth(21);
+    this.hud = this.add.text(16, 64, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#3a2a18" }).setScrollFactor(0).setDepth(21);
     this.flashes = [];
     this.names.forEach((t) => t.destroy());
     this.names = this.bots.map((b) =>
@@ -363,31 +364,29 @@ export class TerritoryScene extends Phaser.Scene {
   private draw() {
     const g = this.gfx;
     g.clear();
-    const colors = this.arena === 0 ? [0x141018, 0xff4d6d, 0x4dabff, 0xffd166, 0x7d5fff] : [0x10141c, 0x5ad4c8, 0xff8a4a, 0xd4d4ff, 0xff6ab0];
+    const colors = this.arena === 0 ? [0xf2ead8, 0xff4d6d, 0x3d9cff, 0xffd166, 0x7d5fff] : [0xe8f0e4, 0x2ec8b0, 0xff8a4a, 0x8aa0ff, 0xff6ab0];
     const outlines = [0x000000, 0xffc1cc, 0xb8ddff, 0xffe9a8, 0xcbb8ff];
     const c = this.cell;
-    g.fillStyle(this.arena === 0 ? 0x16101a : 0x12161e, 1);
+    g.fillStyle(this.arena === 0 ? 0xf2ead8 : 0xe8f0e4, 1);
     g.fillRect(0, 0, COLS * c, ROWS * c);
     for (let y = 0; y < ROWS; y += 1) {
       for (let x = 0; x < COLS; x += 1) {
         if (this.get(x, y) !== 0) continue;
-        const district = ((x / 6) | 0) + ((y / 5) | 0);
-        g.fillStyle(this.arena === 0 ? (district % 2 ? 0x1c1622 : 0x18121c) : district % 2 ? 0x161a22 : 0x12161c, 1);
+        const park = ((x / 8) | 0) + ((y / 6) | 0);
+        g.fillStyle(park % 3 === 0 ? (this.arena === 0 ? 0xe4dcc4 : 0xd8e8d4) : this.arena === 0 ? 0xf6f0e2 : 0xeef4ea, 1);
         g.fillRect(x * c, y * c, c, c);
-        if (x % 6 === 0 || y % 5 === 0) {
-          g.fillStyle(0xffffff, 0.035);
-          g.fillRect(x * c, y * c, x % 6 === 0 ? 2 : c, y % 5 === 0 ? 2 : c);
+        if ((x + y * 3) % 17 === 0 && x > 1 && y > 1) {
+          drawToyHouse(g, x * c + 1, y * c + 4, c - 2, c - 5, park % 2 ? 0xf4d8b0 : 0xd8e8f0, park % 2 ? 0xc45c3a : 0x3a6a88);
         }
       }
     }
-    if (this.arena === 0) {
-      g.lineStyle(2, 0xffffff, 0.05);
-      g.strokeRect(8, 8, COLS * c - 16, ROWS * c - 16);
-    }
+    g.fillStyle(0xc4b898, 0.28);
+    for (let x = 0; x < COLS; x += 8) g.fillRect(x * c, 0, 3, ROWS * c);
+    for (let y = 0; y < ROWS; y += 6) g.fillRect(0, y * c, COLS * c, 3);
     for (const i of this.blocked) {
       const x = i % COLS;
       const y = (i / COLS) | 0;
-      g.fillStyle(this.arena === 0 ? 0x2a2430 : 0x0a0c10, 1);
+      g.fillStyle(this.arena === 0 ? 0xc8b890 : 0x8aa090, 1);
       g.fillRoundedRect(x * c, y * c, c, c, this.arena === 0 ? 2 : 0);
     }
     for (let owner = 1; owner <= 4; owner += 1) {
@@ -442,9 +441,9 @@ export class TerritoryScene extends Phaser.Scene {
       this.names[i]?.setPosition(bx, by - c * 0.7).setVisible(this.hud.visible);
     });
     drawParticles(g, this.parts);
-    fillVignette(g, this.scale.width, this.scale.height, 0.2);
+    fillVignette(g, this.scale.width, this.scale.height, 0.06);
     this.hud.setText(
-      `${Math.max(0, (TIME - this.t) / 1000).toFixed(0)}s   ${this.pct(1).toFixed(0)}%   ${this.arena === 0 ? "CIRCUIT" : "SHATTER"}${this.banners[0] ? `\n${this.banners[0].text}` : ""}`,
+      `PAINT  ${this.pct(1).toFixed(0)}%   ${Math.max(0, (TIME - this.t) / 1000).toFixed(0)}s\n${this.arena === 0 ? "TOY CITY" : "PLAZA"}${this.banners[0] ? `  ${this.banners[0].text}` : ""}`,
     );
   }
 
@@ -466,6 +465,32 @@ export class TerritoryScene extends Phaser.Scene {
       },
       {
         finishRun: () => this.finish(),
+        exposeTrail: () => {
+          this.trail = [
+            { x: this.px + 1, y: this.py },
+            { x: this.px + 2, y: this.py },
+            { x: this.px + 3, y: this.py },
+            { x: this.px + 3, y: this.py + 1 },
+            { x: this.px + 3, y: this.py + 2 },
+          ];
+          this.px = this.px + 3;
+          this.py = this.py + 2;
+          this.vis = { x: this.px, y: this.py };
+        },
+        closeLoop: () => {
+          if (this.trail.length < 3) {
+            this.trail = [
+              { x: this.px + 1, y: this.py },
+              { x: this.px + 2, y: this.py },
+              { x: this.px + 2, y: this.py + 1 },
+              { x: this.px + 1, y: this.py + 1 },
+            ];
+          }
+          this.fill(1, this.trail);
+          this.captureWave = 1;
+          this.flashes.push({ cells: this.trail.map((c) => this.idx(c.x, c.y)), t: 1, id: 1 });
+          this.trail = [];
+        },
         hideHud: () => {
           this.hud.setVisible(false);
           this.names.forEach((t) => t.setVisible(false));
@@ -488,7 +513,7 @@ export function mountTerritoryRush(parent: HTMLElement, platform: PlatformSDK, a
     parent,
     width: Math.max(320, parent.clientWidth || 1280),
     height: Math.max(240, parent.clientHeight || 720),
-    backgroundColor: "#1a1014",
+    backgroundColor: "#f2ead8",
     scale: { mode: Phaser.Scale.RESIZE },
     scene: [TerritoryScene],
     disableContextMenu: true,

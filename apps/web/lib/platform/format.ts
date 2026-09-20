@@ -63,3 +63,18 @@ export function greeting(date = new Date()) {
 export function hasRecord(score: number) {
   return Number.isFinite(score) && score > 0 && score < 1e12;
 }
+
+const ZERO_RESULT: Record<string, string> = {
+  "neon-drift": "No score banked",
+  "velocity-run": "No finish recorded",
+  "swarm-protocol": "No survival score",
+  "knockout-circuit": "Eliminated before scoring",
+  "pocket-striker": "No points scored",
+  "territory-rush": "No territory secured",
+  "sky-stack": "No stack score",
+  "crowd-control": "Run ended before scoring",
+};
+
+export function zeroResultCopy(gameId: string) {
+  return ZERO_RESULT[gameId] ?? "No score recorded";
+}

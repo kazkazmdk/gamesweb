@@ -79,18 +79,18 @@ export class SkyStackScene extends Phaser.Scene {
     this.synth = (this.game.registry.get("synth") as Synth | undefined) ?? new Synth();
     this.game.registry.set("synth", this.synth);
     this.synth.setSettings(this.platform.audio.getSettings());
-    this.cameras.main.setBackgroundColor("#101826");
+    this.cameras.main.setBackgroundColor("#f2c8a8");
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hud = this.add
-      .text(18, 64, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "18px", color: "#eaf6ff" })
+      .text(18, 64, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "18px", color: "#2a3040" })
       .setScrollFactor(0)
       .setDepth(21);
     this.banner = this.add
       .text(this.scale.width / 2, this.scale.height * 0.42, "TAP TO PLACE", {
         fontFamily: "ui-sans-serif, system-ui",
         fontSize: "16px",
-        color: "#9fd6ff",
+        color: "#5a6a80",
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
@@ -326,7 +326,7 @@ export class SkyStackScene extends Phaser.Scene {
   }
 
   private colorFor(i: number) {
-    const mats = [0x8ec8e8, 0xb8b0a4, 0xc8d0d8, 0x6ad0ff, 0xf0f4ff];
+    const mats = [0xe8c8b0, 0xd0c8bc, 0xc8d4dc, 0xf0d8a8, 0xe0d0e8];
     const band = this.floors < 10 ? 0 : this.floors < 25 ? 1 : this.floors < 40 ? 2 : this.floors < 60 ? 3 : 4;
     const base = mats[(band + this.theme) % mats.length];
     const h = (this.hue + i * 7) % 360;
@@ -343,10 +343,10 @@ export class SkyStackScene extends Phaser.Scene {
     const h = this.scale.height;
     const alt = this.floors;
     const skyTop =
-      alt < 10 ? 0x6aa8d8 : alt < 25 ? 0x8ec4e8 : alt < 40 ? 0xf0a060 : alt < 60 ? 0x1a2040 : 0x070b18;
+      alt < 10 ? 0xf2c8a8 : alt < 25 ? 0x8ec4e8 : alt < 40 ? 0xf0b060 : alt < 60 ? 0xc8a8e0 : 0xb090d0;
     const mid =
-      alt < 10 ? 0x1a2a44 : alt < 25 ? 0x3a5068 : alt < 40 ? 0x6a3040 : alt < 60 ? 0x10162a : 0x04060e;
-    const bottom = alt < 40 ? 0x101826 : 0x020308;
+      alt < 10 ? 0xf0d8c0 : alt < 25 ? 0xb8d8ee : alt < 40 ? 0xf0c888 : alt < 60 ? 0xd4c0e8 : 0xc4b0dc;
+    const bottom = alt < 40 ? 0xe8d8c8 : 0xd8c8e0;
     fillBackdrop(
       g,
       w,
@@ -363,8 +363,11 @@ export class SkyStackScene extends Phaser.Scene {
       },
       { y: this.camY },
     );
+    g.fillStyle(mixColor(bottom, 0xc4b090, 0.35), 1);
+    g.fillTriangle(-40, h, w * 0.28, h * 0.62 + this.camY * 0.04, w * 0.55, h);
+    g.fillTriangle(w * 0.4, h, w * 0.72, h * 0.58 + this.camY * 0.04, w + 40, h);
     for (const c of this.clouds) {
-      g.fillStyle(0xffffff, c.a * (alt < 40 ? 0.9 : 0.35));
+      g.fillStyle(0xffffff, c.a * (alt < 40 ? 1.15 : 0.7));
       g.fillCircle(c.x, c.y + this.camY * 0.12, c.r);
       g.fillCircle(c.x + c.r * 0.55, c.y + 8 + this.camY * 0.12, c.r * 0.7);
     }
@@ -373,9 +376,11 @@ export class SkyStackScene extends Phaser.Scene {
       const s = this.stack[i];
       const y = s.y + this.camY + ox;
       g.fillStyle(this.colorFor(i), 1);
-      g.fillRoundedRect(s.x, y, s.w, SLAB_H - 4, 6);
-      g.fillStyle(0xffffff, 0.12);
-      g.fillRoundedRect(s.x + 4, y + 3, Math.max(8, s.w - 16), 5, 3);
+      g.fillRoundedRect(s.x, y, s.w, SLAB_H - 4, 7);
+      g.fillStyle(0xffffff, 0.28);
+      g.fillRoundedRect(s.x + 5, y + 3, Math.max(8, s.w - 18), 6, 3);
+      g.fillStyle(0x000000, 0.06);
+      g.fillRect(s.x + 6, y + SLAB_H - 10, s.w - 12, 3);
     }
     const top = this.stack[this.stack.length - 1];
     if (this.halo > 0.02 && top) {
@@ -397,7 +402,7 @@ export class SkyStackScene extends Phaser.Scene {
       g.fillRoundedRect(this.moving.x, this.moving.y + this.camY, this.moving.w, SLAB_H - 4, 6);
     }
     drawParticles(g, this.parts, 0, this.camY);
-    fillVignette(g, w, h, 0.22 + Math.min(0.2, alt / 80));
+    fillVignette(g, w, h, 0.08 + Math.min(0.08, alt / 120));
     const mark = (floors: number, color: number, label: string) => {
       if (!floors) return;
       const y = this.stack[0].y - floors * (SLAB_H + 6) + this.camY;
@@ -410,7 +415,7 @@ export class SkyStackScene extends Phaser.Scene {
     mark(this.friendMark, 0x8dffc1, "FRIEND");
     mark(this.rivalMark, 0xff8aa0, "RIVAL");
     this.hud.setText(
-      `${this.floors}   ${this.score.toLocaleString()}${this.fever ? "  FEVER" : this.streak ? `  ${this.streak}x` : ""}`,
+      `HEIGHT  ${this.floors}   ${this.score.toLocaleString()}${this.fever ? "  STREAK" : this.streak ? `  ${this.streak}x` : ""}`,
     );
     this.overlay.clear();
     const fa = this.juice.flashAlpha(dt);
@@ -448,6 +453,14 @@ export class SkyStackScene extends Phaser.Scene {
           if (top) this.moving.x = top.x;
           this.tryPlace();
         },
+        stackTo: (n: number) => {
+          const target = Math.max(1, Math.min(48, Math.round(n)));
+          while (this.floors < target && !this.ended) {
+            const top = this.stack[this.stack.length - 1];
+            if (top) this.moving.x = top.x;
+            this.tryPlace();
+          }
+        },
         hideHud: () => this.hud.setVisible(false),
       },
     );
@@ -466,7 +479,7 @@ export function mountSkyStack(parent: HTMLElement, platform: PlatformSDK) {
     parent,
     width: Math.max(320, parent.clientWidth || 390),
     height: Math.max(240, parent.clientHeight || 844),
-    backgroundColor: "#101826",
+    backgroundColor: "#f2c8a8",
     scale: { mode: Phaser.Scale.RESIZE },
     scene: [SkyStackScene],
     disableContextMenu: true,

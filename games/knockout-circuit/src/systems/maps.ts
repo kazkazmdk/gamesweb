@@ -33,7 +33,7 @@ export const MAPS: MapDef[] = [
     width: 2800,
     height: 720,
     env: "factory",
-    theme: { sky: 0x0b0906, ground: 0x7a5628, accent: 0xffd166, danger: 0xff3b4e },
+    theme: { sky: 0x87c8ea, ground: 0xffd24a, accent: 0xff6b4a, danger: 0xff3b6a },
     solids: [
       { x: 40, y: 580, w: 40, h: 40, kind: "spawn" },
       plat(20, 620, 280),
@@ -58,7 +58,7 @@ export const MAPS: MapDef[] = [
     width: 1600,
     height: 2200,
     env: "factory",
-    theme: { sky: 0x07090e, ground: 0x3d5368, accent: 0xffd166, danger: 0xff4d62 },
+    theme: { sky: 0x9ad4f0, ground: 0x4ad4e8, accent: 0xff6b4a, danger: 0xff4d62 },
     solids: [
       { x: 80, y: 2040, w: 40, h: 40, kind: "spawn" },
       plat(40, 2080, 320),
@@ -86,7 +86,7 @@ export const MAPS: MapDef[] = [
     width: 3200,
     height: 800,
     env: "skyworks",
-    theme: { sky: 0x0c0708, ground: 0x6a3a28, accent: 0xffd166, danger: 0xff3d6a },
+    theme: { sky: 0xf4c878, ground: 0xffd24a, accent: 0xff7a3a, danger: 0xff3d6a },
     solids: [
       { x: 50, y: 620, w: 40, h: 40, kind: "spawn" },
       plat(20, 660, 260),
@@ -117,7 +117,7 @@ export const MAPS: MapDef[] = [
     width: 3000,
     height: 760,
     env: "factory",
-    theme: { sky: 0x10080c, ground: 0x6a2a38, accent: 0xffd166, danger: 0xff4d6d },
+    theme: { sky: 0xf2b8c8, ground: 0xff6b8a, accent: 0xffd166, danger: 0xff4d6d },
     solids: [
       { x: 40, y: 600, w: 40, h: 40, kind: "spawn" },
       plat(20, 640, 260),
@@ -140,7 +140,7 @@ export const MAPS: MapDef[] = [
     width: 2600,
     height: 800,
     env: "signal",
-    theme: { sky: 0x081014, ground: 0x2a4a58, accent: 0x8fe0ff, danger: 0xff5a6e },
+    theme: { sky: 0x8ec8e8, ground: 0x4ad4e8, accent: 0xffd166, danger: 0xff5a6e },
     solids: [
       { x: 50, y: 640, w: 40, h: 40, kind: "spawn" },
       plat(20, 680, 280),
@@ -163,7 +163,7 @@ export const MAPS: MapDef[] = [
     width: 3100,
     height: 740,
     env: "factory",
-    theme: { sky: 0x0c0c10, ground: 0x3a3a48, accent: 0xffd166, danger: 0xff4d62 },
+    theme: { sky: 0xf2e6d8, ground: 0xffd24a, accent: 0x3ad4c8, danger: 0xff4d62 },
     solids: [
       { x: 40, y: 580, w: 40, h: 40, kind: "spawn" },
       plat(20, 620, 240),
@@ -187,7 +187,7 @@ export const MAPS: MapDef[] = [
     width: 2400,
     height: 900,
     env: "skyworks",
-    theme: { sky: 0x12080a, ground: 0x5a3020, accent: 0xffc38a, danger: 0xff3d5a },
+    theme: { sky: 0xffd6a8, ground: 0xff8a4a, accent: 0xffd166, danger: 0xff3d5a },
     solids: [
       { x: 40, y: 760, w: 40, h: 40, kind: "spawn" },
       plat(20, 800, 260),
@@ -209,7 +209,7 @@ export const MAPS: MapDef[] = [
     width: 3400,
     height: 780,
     env: "signal",
-    theme: { sky: 0x081018, ground: 0x2a4050, accent: 0x9fe8ff, danger: 0xff5570 },
+    theme: { sky: 0xa8d8f0, ground: 0x7ad4e8, accent: 0xff6b4a, danger: 0xff5570 },
     solids: [
       { x: 40, y: 620, w: 40, h: 40, kind: "spawn" },
       plat(20, 660, 260),

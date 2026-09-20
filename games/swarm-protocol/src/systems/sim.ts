@@ -35,15 +35,15 @@ export const KIND: Record<
   EnemyKind,
   { hp: number; r: number; speed: number; damage: number; xp: number; color: number }
 > = {
-  chaser: { hp: 12, r: 12, speed: 78, damage: 8, xp: 4, color: 0xe8b089 },
-  dart: { hp: 6, r: 8, speed: 168, damage: 6, xp: 3, color: 0xf0d27a },
+  chaser: { hp: 12, r: 12, speed: 78, damage: 8, xp: 4, color: 0xe8dcc4 },
+  dart: { hp: 6, r: 8, speed: 168, damage: 6, xp: 3, color: 0x9ae84a },
   tank: { hp: 58, r: 24, speed: 42, damage: 16, xp: 12, color: 0xc45c3a },
-  spitter: { hp: 18, r: 13, speed: 58, damage: 8, xp: 6, color: 0xd98a4a },
-  splitter: { hp: 22, r: 16, speed: 70, damage: 9, xp: 8, color: 0xf07a3a },
-  elite: { hp: 110, r: 28, speed: 86, damage: 18, xp: 32, color: 0xffd4a8 },
-  boss: { hp: 680, r: 46, speed: 52, damage: 22, xp: 80, color: 0xffc18a },
-  swarmling: { hp: 4, r: 6, speed: 196, damage: 4, xp: 2, color: 0xffb48a },
-  warden: { hp: 820, r: 52, speed: 46, damage: 24, xp: 110, color: 0xff8a6a },
+  spitter: { hp: 18, r: 13, speed: 58, damage: 8, xp: 6, color: 0x7ad46a },
+  splitter: { hp: 22, r: 16, speed: 70, damage: 9, xp: 8, color: 0x6ab84a },
+  elite: { hp: 110, r: 28, speed: 86, damage: 18, xp: 32, color: 0xf4e8c0 },
+  boss: { hp: 680, r: 46, speed: 52, damage: 22, xp: 80, color: 0xd8c4a0 },
+  swarmling: { hp: 4, r: 6, speed: 196, damage: 4, xp: 2, color: 0xb8f06a },
+  warden: { hp: 820, r: 52, speed: 46, damage: 24, xp: 110, color: 0xff8a4a },
 };
 
 export function emptyBullet(): Bullet {

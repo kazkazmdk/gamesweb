@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { activityFromHistory, challengeViewModel, friendsBoard, latestUnlocks, playerStatsFromSnapshot } from "../apps/web/lib/platform/adapters";
-import { formatCountdown, formatPlayScore, formatRank, greeting, hasRecord } from "../apps/web/lib/platform/format";
+import { formatCountdown, formatPlayScore, formatRank, greeting, hasRecord, zeroResultCopy } from "../apps/web/lib/platform/format";
 import { boardModeOptions, boardModeFromPlayIndex, defaultBoardMode, isCompactCatalog, neonBoardMode, playModeOptions, resolvePlayIndex } from "../apps/web/lib/platform/modes";
 import type { PlayerSnapshot } from "../apps/web/lib/player-store";
 
@@ -24,6 +24,22 @@ describe("platform format", () => {
     expect(formatRank(314)).toBe("#314");
     expect(hasRecord(0)).toBe(false);
     expect(formatCountdown(3661000)).toBe("1:01:01");
+  });
+  it("keeps zero-result copy game-aware", () => {
+    expect(zeroResultCopy("neon-drift")).toBe("No score banked");
+    expect(zeroResultCopy("velocity-run")).toBe("No finish recorded");
+    expect(zeroResultCopy("swarm-protocol")).toBe("No survival score");
+    expect(zeroResultCopy("knockout-circuit")).toBe("Eliminated before scoring");
+    expect(zeroResultCopy("pocket-striker")).toBe("No points scored");
+    expect(zeroResultCopy("territory-rush")).toBe("No territory secured");
+    expect(zeroResultCopy("sky-stack")).toBe("No stack score");
+    expect(zeroResultCopy("crowd-control")).toBe("Run ended before scoring");
+    expect(zeroResultCopy("unknown-title")).toBe("No score recorded");
+    expect(Object.values({
+      v: zeroResultCopy("velocity-run"),
+      s: zeroResultCopy("swarm-protocol"),
+      k: zeroResultCopy("knockout-circuit"),
+    }).every((copy) => !/banked/i.test(copy))).toBe(true);
   });
   it("greets by hour", () => {
     expect(greeting(new Date("2026-09-15T15:00:00"))).toBe("Good afternoon");

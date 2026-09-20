@@ -104,11 +104,11 @@ export class CrowdScene extends Phaser.Scene {
     this.synth = (this.game.registry.get("synth") as Synth | undefined) ?? new Synth();
     this.game.registry.set("synth", this.synth);
     this.synth.setSettings(this.platform.audio.getSettings());
-    this.cameras.main.setBackgroundColor("#1a0e0a");
+    this.cameras.main.setBackgroundColor("#8ec8e8");
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hud = this.add
-      .text(16, 64, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#ffe0d4" })
+      .text(16, 64, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#1a3040" })
       .setScrollFactor(0)
       .setDepth(21);
     this.labels.forEach((t) => t.destroy());
@@ -361,28 +361,36 @@ export class CrowdScene extends Phaser.Scene {
       w,
       h,
       {
-        top: 0x2a140e,
-        mid: 0x1c100c,
-        bottom: 0x120a08,
-        grain: 0.05,
+        top: 0x8ec8e8,
+        mid: 0xb8dcf0,
+        bottom: 0x7ab86a,
+        grain: 0.02,
         blobs: [
-          { color: 0xff7a59, x: 0.18, y: 0.16, r: 90, alpha: 0.08, parallax: 0.04 },
-          { color: 0xffd166, x: 0.82, y: 0.22, r: 70, alpha: 0.06, parallax: 0.05 },
+          { color: 0xfff4c8, x: 0.2, y: 0.12, r: 90, alpha: 0.28, parallax: 0.03 },
+          { color: 0xffffff, x: 0.8, y: 0.18, r: 70, alpha: 0.2, parallax: 0.04 },
         ],
-        bands: [{ color: 0x2a1812, y: 0.58, h: 0.5, alpha: 1, parallax: 0 }],
+        bands: [{ color: 0x8ec46a, y: 0.62, h: 0.4, alpha: 1, parallax: 0 }],
       },
       { y: this.z },
     );
-    g.fillStyle(0x3a2218, 1);
+    g.fillStyle(0xf0c878, 1);
+    g.fillRect(0, h * 0.42, w * 0.16, h);
+    g.fillRect(w * 0.84, h * 0.42, w * 0.16, h);
+    g.fillStyle(0xe8a050, 1);
+    for (let i = 0; i < 6; i += 1) {
+      g.fillRect(8, h * 0.2 + i * 90 - (this.z * 0.15) % 90, 40, 48);
+      g.fillRect(w - 48, h * 0.24 + i * 90 - (this.z * 0.15) % 90, 40, 48);
+    }
+    g.fillStyle(0xd8d0c4, 1);
     g.fillRect(w * 0.16, 0, w * 0.68, h);
     const scroll = (this.z * 0.7) % 46;
-    g.fillStyle(0x2a1812, 0.55);
+    g.fillStyle(0xc8c0b4, 0.7);
     for (let y = -46 + scroll; y < h + 20; y += 46) {
-      g.fillRect(w * 0.16, y, w * 0.68, 10);
+      g.fillRect(w * 0.16, y, w * 0.68, 8);
     }
-    g.lineStyle(3, 0xffc38a, 0.18);
-    g.lineBetween(w / 2, 0, w / 2, h);
-    g.lineStyle(2, 0xff7a59, 0.16);
+    g.fillStyle(0xffffff, 0.35);
+    g.fillRect(w / 2 - 3, 0, 6, h);
+    g.lineStyle(4, 0xffd166, 0.35);
     g.strokeRect(w * 0.16, 0, w * 0.68, h);
 
     let labelN = 0;
@@ -391,10 +399,10 @@ export class CrowdScene extends Phaser.Scene {
       const y = h * (0.58 + view.zoom * 0.06) - (s.z - this.z) * depth;
       if (y < -50 || y > h + 50) continue;
       if (s.type === "gate" || s.type === "finish") {
-        const leftC = s.left?.kind === "mul" || s.left?.kind === "add" ? 0x2f6a3a : 0x6a2a28;
-        const rightC = s.right?.kind === "mul" || s.right?.kind === "add" ? 0x2f6a3a : 0x6a2a28;
-        drawGateArch(g, w * 0.2, y - 36, w * 0.26, 56, leftC);
-        drawGateArch(g, w * 0.54, y - 36, w * 0.26, 56, rightC);
+        const leftC = s.left?.kind === "mul" || s.left?.kind === "add" ? 0x2db36a : 0xe23a4a;
+        const rightC = s.right?.kind === "mul" || s.right?.kind === "add" ? 0x2db36a : 0xe23a4a;
+        drawGateArch(g, w * 0.18, y - 48, w * 0.28, 78, leftC);
+        drawGateArch(g, w * 0.54, y - 48, w * 0.28, 78, rightC);
         if (s.type === "finish") {
           g.fillStyle(0x2a2018, 1);
           g.fillRect(w * 0.4, y - 150, w * 0.2, 150);
@@ -451,24 +459,24 @@ export class CrowdScene extends Phaser.Scene {
     const cy = h * view.cy;
     const shown = this.qualityMembers();
     const person = view.person;
-    const massW = 140 + this.pack * 5.2 * view.zoom;
-    const massH = 34 + this.pack * 0.7;
-    g.fillStyle(0xff8a62, 0.18 + Math.min(0.38, this.pack * 0.004));
-    g.fillEllipse(cx, cy + 18, massW, massH);
-    g.fillStyle(0xff6a42, 0.14);
-    g.fillEllipse(cx, cy + 8, massW * 0.78, massH * 0.72);
+    const massW = 160 + this.pack * 6.4 * view.zoom;
+    const massH = 40 + this.pack * 0.9;
+    const crowdPalette = [0xff6a4a, 0xffd166, 0x4ad4e8, 0xff8ad4, 0x7d5fff, 0x3ad48a];
+    g.fillStyle(0x2a2018, 0.12 + Math.min(0.22, this.pack * 0.003));
+    g.fillEllipse(cx, cy + 22, massW, massH);
     for (const m of shown) {
-      const mx = Phaser.Math.Clamp(cx + m.ox * w * (1.35 + this.pack * 0.008), w * 0.1, w * 0.9);
-      const my = cy + m.oy * (0.55 + this.pack * 0.004);
-      drawMiniPerson(g, mx, my, 0xff8a62, this.time.now / 140 + m.phase, person);
+      const mx = Phaser.Math.Clamp(cx + m.ox * w * (1.55 + this.pack * 0.01), w * 0.1, w * 0.9);
+      const my = cy + m.oy * (0.7 + this.pack * 0.005);
+      const col = crowdPalette[Math.abs(Math.round(m.phase * 7)) % crowdPalette.length];
+      drawMiniPerson(g, mx, my, col, this.time.now / 140 + m.phase, person);
     }
     if (this.pack > shown.length) {
-      g.fillStyle(0xff8a62, 0.28);
-      g.fillEllipse(cx, cy + 10, 48 + (this.pack - shown.length) * 1.4, 22 + (this.pack - shown.length) * 0.35);
+      g.fillStyle(0xff8a62, 0.22);
+      g.fillEllipse(cx, cy + 10, 56 + (this.pack - shown.length) * 1.6, 24 + (this.pack - shown.length) * 0.4);
     }
     drawParticles(g, this.parts);
-    fillVignette(g, w, h, 0.28);
-    this.hud.setText(`${this.pack}${this.banners[0] ? `\n${this.banners[0].text}` : ""}`);
+    fillVignette(g, w, h, 0.08);
+    this.hud.setText(`PACK  ${this.pack}${this.banners[0] ? `\n${this.banners[0].text}` : ""}`);
     this.overlay.clear();
     const fa = this.juice.flashAlpha(0.016);
     if (fa) {
@@ -525,7 +533,7 @@ export function mountCrowdControl(parent: HTMLElement, platform: PlatformSDK, le
     parent,
     width: Math.max(320, parent.clientWidth || 720),
     height: Math.max(240, parent.clientHeight || 1280),
-    backgroundColor: "#1c100c",
+    backgroundColor: "#8ec8e8",
     scale: { mode: Phaser.Scale.RESIZE },
     scene: [CrowdScene],
     disableContextMenu: true,
