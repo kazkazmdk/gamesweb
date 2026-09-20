@@ -32,7 +32,7 @@ export const STATIC_PAGES: SeoEntry[] = [
     description: "Eight authored browser games. Genre, session length, input, and crawlable hubs. Arcade stays the personal launcher.",
     h1: "Games",
     intent: "Browse the public catalog.",
-    summary: "The indexable shelf. /arcade remains noindex.",
+    summary: "Eight authored browser games. Pick a title, then play it in the tab.",
     sections: [
       { heading: "Why play in the browser", body: "Each title boots in the tab, retries with R, and stores a real PB on your identity. No store page. No invented reviews." },
       { heading: "How to choose", body: "Use collections if you know the mood. Use guides if you already picked a title. Use this page if you want the eight cards." },

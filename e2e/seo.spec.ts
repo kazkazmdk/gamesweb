@@ -28,7 +28,8 @@ test("indexable SEO routes return 200 with unique canonicals", async ({ page }) 
     expect(titles.has(title), `dup title ${title}`).toBe(false);
     titles.add(title);
     const canonical = await page.locator('link[rel="canonical"]').getAttribute("href");
-    expect(canonical ?? "", path).toMatch(new RegExp(`${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?$`));
+    const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    expect(canonical ?? "", path).toMatch(path === "/" ? /\/$|:\d+$/ : new RegExp(`${escaped}/?$`));
     expect(canonicals.has(canonical ?? ""), path).toBe(false);
     canonicals.add(canonical ?? "");
     const robots = await page.locator('meta[name="robots"]').getAttribute("content");

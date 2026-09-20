@@ -13,7 +13,7 @@ export function CatalogPage() {
     <article data-seo-page="catalog">
       <SeoTracker kind={entry.kind} slug={entry.slug} />
       <SeoHero entry={entry} kicker="Public catalog">
-        <p className="mt-5 text-[13px] text-white/55">Arcade stays your personal shelf. This page is the crawlable one.</p>
+        <p className="mt-5 text-[13px] text-white/55">Arcade stays your personal shelf. This page is the public catalog.</p>
       </SeoHero>
       <div className="space-y-16 px-5 py-12 md:px-10">
         <section>

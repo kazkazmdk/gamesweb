@@ -2,7 +2,7 @@ import { getManifest } from "@gamesweb/game-sdk";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { GameArt } from "@/components/game/GameArt";
-import { GameBackdrop } from "@/components/visual";
+import { GameBackdrop } from "@/components/visual/GameBackdrop";
 import { crumbsFor } from "@/lib/seo-content/schema";
 import type { SeoEntry } from "@/lib/seo-content/types";
 import { SeoGameLink, SeoPlayButton } from "./SeoTracker";
