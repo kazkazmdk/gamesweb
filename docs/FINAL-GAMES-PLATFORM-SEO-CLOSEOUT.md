@@ -2,7 +2,7 @@
 
 Branch: `cursor/final-games-platform-seo-c08e`  
 Base: `cursor/game-art-direction-rebuild-c08e` @ `c7e307c`  
-Final SHA: `640b5f335ffacb33aa915668e0c763ce90a7d810`  
+Final SHA: `5452825` (docs stamp on `640b5f3` QA capture)  
 Implementation commits: `1107dd2` (games P1), `3f90e9c` (SEO/platform), `640b5f3` (docs/QA).  
 PR: https://github.com/kazkazmdk/gamesweb/pull/18  
 
