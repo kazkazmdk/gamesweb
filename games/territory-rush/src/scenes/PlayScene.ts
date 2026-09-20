@@ -196,10 +196,10 @@ export class TerritoryScene extends Phaser.Scene {
           else b.dir = sweepDir(this.botSteps[i], b.x, b.y);
           this.stepActor(b.id, b.dir.x, b.dir.y, b.trail, true);
         });
-        this.captureWave = Math.max(0, this.captureWave - dt * 1.8);
         for (const b of this.banners) b.t -= dt;
         this.banners = this.banners.filter((b) => b.t > 0);
       }
+      this.captureWave = Math.max(0, this.captureWave - dt * 0.6);
       if (this.t >= TIME) this.finish();
       this.boost = Math.max(0, this.boost - dt);
       this.shield = Math.max(0, this.shield - dt);
@@ -281,6 +281,25 @@ export class TerritoryScene extends Phaser.Scene {
     } else {
       trail.push({ x: nx, y: ny });
     }
+  }
+
+  private authoredCaptureLoop() {
+    const left = 4;
+    const right = 29;
+    const top = 4;
+    const bottom = 23;
+    const trail: Array<{ x: number; y: number }> = [];
+    const push = (x: number, y: number) => {
+      if (x < 0 || y < 0 || x >= COLS || y >= ROWS) return;
+      if (this.blocked.has(this.idx(x, y))) return;
+      if (trail.some((c) => c.x === x && c.y === y)) return;
+      trail.push({ x, y });
+    };
+    for (let x = left; x <= right; x += 1) push(x, top);
+    for (let y = top + 1; y <= bottom; y += 1) push(right, y);
+    for (let x = right - 1; x >= left; x -= 1) push(x, bottom);
+    for (let y = bottom - 1; y > top; y -= 1) push(left, y);
+    return trail;
   }
 
   private fill(id: Owner, trail: Array<{ x: number; y: number }>) {
@@ -375,7 +394,9 @@ export class TerritoryScene extends Phaser.Scene {
         const park = ((x / 8) | 0) + ((y / 6) | 0);
         g.fillStyle(park % 3 === 0 ? (this.arena === 0 ? 0xe4dcc4 : 0xd8e8d4) : this.arena === 0 ? 0xf6f0e2 : 0xeef4ea, 1);
         g.fillRect(x * c, y * c, c, c);
-        if ((x + y * 3) % 17 === 0 && x > 1 && y > 1) {
+        const nearOwned =
+          this.get(x + 1, y) !== 0 || this.get(x - 1, y) !== 0 || this.get(x, y + 1) !== 0 || this.get(x, y - 1) !== 0;
+        if ((x + y * 3) % 17 === 0 && x > 1 && y > 1 && !nearOwned) {
           drawToyHouse(g, x * c + 1, y * c + 4, c - 2, c - 5, park % 2 ? 0xf4d8b0 : 0xd8e8f0, park % 2 ? 0xc45c3a : 0x3a6a88);
         }
       }
@@ -390,9 +411,13 @@ export class TerritoryScene extends Phaser.Scene {
       g.fillRoundedRect(x * c, y * c, c, c, this.arena === 0 ? 2 : 0);
     }
     for (let owner = 1; owner <= 4; owner += 1) {
-      g.fillStyle(colors[owner], 0.92);
+      g.fillStyle(colors[owner], owner === 1 ? 0.98 : 0.94);
       for (const span of contourSpans(this.grid, COLS, ROWS, owner)) {
         g.fillRoundedRect(span.x * c, span.y * c, span.w * c, c + 0.6, 3);
+      }
+      g.fillStyle(colors[owner], owner === 1 ? 0.22 : 0.1);
+      for (const span of contourSpans(this.grid, COLS, ROWS, owner)) {
+        g.fillRoundedRect(span.x * c + 2, span.y * c + 2, Math.max(2, span.w * c - 4), c - 2, 2);
       }
       g.lineStyle(owner === 1 ? 3 : 2.2, outlines[owner], owner === 1 ? 0.95 : 0.8);
       for (let y = 0; y < ROWS; y += 1) {
@@ -414,12 +439,15 @@ export class TerritoryScene extends Phaser.Scene {
       }
     }
     if (this.captureWave > 0) {
-      g.fillStyle(0xffffff, this.captureWave * 0.1);
+      const wave = 1 - this.captureWave;
+      g.fillStyle(colors[1], this.captureWave * 0.22);
       g.fillRect(0, 0, COLS * c, ROWS * c);
-      g.fillStyle(colors[1], this.captureWave * 0.16);
-      g.fillCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, 28 + (1 - this.captureWave) * 70);
+      g.fillStyle(colors[1], 0.28 + this.captureWave * 0.42);
+      g.fillCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, 90 + wave * 340);
+      g.fillStyle(0xffffff, this.captureWave * 0.18);
+      g.fillCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, 48 + wave * 180);
     }
-    drawRibbon(g, ribbonPoints(this.trail, c), this.shield > 0 ? 0x8fe8ff : 0xffffff, this.trail.length > 8 ? 1.15 : 1);
+    drawRibbon(g, ribbonPoints(this.trail, c), this.shield > 0 ? 0x8fe8ff : 0xffffff, this.trail.length > 8 ? 1.35 : 1.2);
     for (const b of this.bots) drawRibbon(g, ribbonPoints(b.trail, c), colors[b.id], 0.85);
     for (const p of this.pickups) {
       g.fillStyle(p.kind === "speed" ? 0xffe08a : p.kind === "shield" ? 0x8fe8ff : 0xff8ad4, 0.95);
@@ -470,26 +498,30 @@ export class TerritoryScene extends Phaser.Scene {
             { x: this.px + 1, y: this.py },
             { x: this.px + 2, y: this.py },
             { x: this.px + 3, y: this.py },
-            { x: this.px + 3, y: this.py + 1 },
-            { x: this.px + 3, y: this.py + 2 },
+            { x: this.px + 4, y: this.py },
+            { x: this.px + 5, y: this.py },
+            { x: this.px + 6, y: this.py },
+            { x: this.px + 6, y: this.py + 1 },
+            { x: this.px + 6, y: this.py + 2 },
+            { x: this.px + 6, y: this.py + 3 },
           ];
-          this.px = this.px + 3;
-          this.py = this.py + 2;
+          this.px = this.px + 6;
+          this.py = this.py + 3;
           this.vis = { x: this.px, y: this.py };
         },
         closeLoop: () => {
-          if (this.trail.length < 3) {
-            this.trail = [
-              { x: this.px + 1, y: this.py },
-              { x: this.px + 2, y: this.py },
-              { x: this.px + 2, y: this.py + 1 },
-              { x: this.px + 1, y: this.py + 1 },
-            ];
-          }
+          const before = this.grid.slice();
+          this.trail = this.authoredCaptureLoop();
           this.fill(1, this.trail);
           this.captureWave = 1;
-          this.flashes.push({ cells: this.trail.map((c) => this.idx(c.x, c.y)), t: 1, id: 1 });
+          const cells: number[] = [];
+          for (let i = 0; i < this.grid.length; i += 1) if (before[i] !== this.grid[i]) cells.push(i);
+          this.flashes.push({ cells, t: 1.4, id: 1 });
           this.trail = [];
+          this.px = 8;
+          this.py = 14;
+          this.vis = { x: this.px, y: this.py };
+          this.lastPct = this.pct(1);
         },
         hideHud: () => {
           this.hud.setVisible(false);

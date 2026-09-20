@@ -13,7 +13,6 @@ import {
   RankWidget,
   SectionHeader,
 } from "@/components/platform";
-import { GameBackdrop } from "@/components/visual";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
 import { achievementProgress, friendOnBoard, rankViewModel } from "@/lib/platform/adapters";
@@ -50,27 +49,22 @@ export function GameHub({ game }: { game: GameManifest }) {
 
   return (
     <article>
-      <GameBackdrop slug={game.slug} className="min-h-[70vh] md:min-h-[86vh]" dim={0.12} variant="hero" priority>
-        <div className="flex min-h-[70vh] flex-col justify-end px-5 pb-10 pt-20 md:min-h-[86vh] md:px-10 md:pb-16">
-          <p className="meta text-white/55">{game.genre}</p>
-          <h1 className="display mt-3 max-w-[14ch] text-[48px] text-white md:text-[80px]">{game.title}</h1>
-          <p className="mt-3 max-w-md text-[16px] text-white/75">{game.tagline}</p>
-          <p className="mt-4 text-[13px] text-white/55">
-            {[formatPlayScore(game.id, pb) ?? "No record yet", selected?.label, rank.rank ? `#${rank.rank}` : null, friend ? `vs ${friend.name}` : null]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-          {ctx.daily ? (
-            <p className="mt-2 text-[13px] text-[var(--accent)]">{ctx.daily.done ? "Daily cleared" : `Daily · ${ctx.daily.label}`}</p>
-          ) : null}
-          <div className="mt-7 flex flex-wrap items-center gap-4">
-            <PlayButton href={`/play/${game.slug}`}>{played ? "Continue" : "Play"}</PlayButton>
-            <a href="#board" className="home-secondary">
-              Leaderboard ›
-            </a>
-          </div>
+      <section className="border-y border-white/8 px-5 py-5 md:px-10" aria-label="Your record">
+        <p className="text-[13px] text-[var(--text-dim)]">
+          {[formatPlayScore(game.id, pb) ?? "No record yet", selected?.label, rank.rank ? `#${rank.rank}` : null, friend ? `vs ${friend.name}` : null]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+        {ctx.daily ? (
+          <p className="mt-1 text-[13px] text-[var(--accent)]">{ctx.daily.done ? "Daily cleared" : `Daily · ${ctx.daily.label}`}</p>
+        ) : null}
+        <div className="mt-3 flex flex-wrap items-center gap-4">
+          <PlayButton href={`/play/${game.slug}`}>{played ? "Continue" : "Play"}</PlayButton>
+          <a href="#board" className="home-secondary">
+            Your board ›
+          </a>
         </div>
-      </GameBackdrop>
+      </section>
 
       <section className="px-5 py-6 md:px-10" aria-label="Mode">
         <h2 className="sr-only">Your run</h2>
@@ -200,55 +194,6 @@ export function GameHub({ game }: { game: GameManifest }) {
         </aside>
       </div>
 
-      <details className="border-t border-white/8 px-5 py-8 md:px-10">
-        <summary className="cursor-pointer text-white/45">
-          <h2 className="meta inline">The game</h2>
-          <span className="ml-3 text-[12px] tracking-[0.12em] uppercase">how it plays</span>
-        </summary>
-        <div className="mt-6 max-w-2xl space-y-8">
-          <section>
-            <p className="mt-3 text-[15px] text-[var(--text-dim)]">{game.description}</p>
-          </section>
-          <section>
-            <h2 className="meta">Features</h2>
-            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-[var(--text-dim)]">
-              {game.tags.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-              <li>{game.sessionHint}</li>
-              <li>{game.supportedDevices.join(" · ")}</li>
-            </ul>
-          </section>
-          <section>
-            <h2 className="meta">How to play</h2>
-            <ul className="mt-3 space-y-2 text-[15px] text-[var(--text-dim)]">
-              {game.howToPlay.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-            </ul>
-          </section>
-          <section>
-            <h2 className="meta">Controls</h2>
-            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[14px]">
-              {game.controls.map((c) => (
-                <div key={c.input} className="border-t border-[var(--line)] pt-2">
-                  <dt className="meta">{c.input}</dt>
-                  <dd>{c.action}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-          <section>
-            <h2 className="meta">FAQ</h2>
-            {game.faq.map((f) => (
-              <div key={f.q} className="mt-3 border-t border-[var(--line)] pt-3">
-                <p className="text-[14px]">{f.q}</p>
-                <p className="text-[13px] text-[var(--text-dim)]">{f.a}</p>
-              </div>
-            ))}
-          </section>
-        </div>
-      </details>
     </article>
   );
 }

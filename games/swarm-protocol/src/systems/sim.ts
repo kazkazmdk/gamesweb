@@ -374,11 +374,11 @@ export function phaseFor(elapsedSec: number): WavePhase {
 
 export function desiredCount(elapsedSec: number): number {
   const p = phaseFor(elapsedSec);
-  if (p === "learn") return 12;
-  if (p === "build") return 14;
-  if (p === "pressure") return 22;
-  if (p === "fantasy") return 20;
-  return 16;
+  if (p === "learn") return 10;
+  if (p === "build") return 20;
+  if (p === "pressure") return 34;
+  if (p === "fantasy") return 46;
+  return 40;
 }
 
 export function pickKind(elapsedSec: number, eliteOk: boolean): EnemyKind {

@@ -130,6 +130,7 @@ export class SwarmPlayScene extends Phaser.Scene {
   private arenaName: "core-chamber" | "fracture-zone" = "core-chamber";
   private hazardCd = 0;
   private deathFx = 0;
+  private cleaned: Array<{ x: number; y: number; r: number; t: number }> = [];
 
   constructor() {
     super("swarm-play");
@@ -253,6 +254,74 @@ export class SwarmPlayScene extends Phaser.Scene {
     }
   }
 
+  private seedPeakState() {
+    this.started = this.time.now - 330_000;
+    this.level = Math.max(this.level, 10);
+    this.kills = Math.max(this.kills, 80);
+    this.hp = Math.max(this.hp, 64);
+    const kinds = ["chaser", "dart", "tank", "spitter", "splitter", "elite", "swarmling"] as const;
+    let n = 0;
+    for (const e of this.enemies) {
+      if (e.kind === "boss" || e.kind === "warden") continue;
+      if (n >= 48) {
+        e.active = false;
+        continue;
+      }
+      const a = (n / 48) * Math.PI * 2;
+      const dist = 70 + (n % 6) * 32;
+      spawnEnemy(e, kinds[n % kinds.length], this.px + Math.cos(a) * dist, this.py + Math.sin(a) * dist, 1.05);
+      e.x = clamp(e.x, 40, ARENA - 40);
+      e.y = clamp(e.y, 40, ARENA - 40);
+      n += 1;
+    }
+    let oi = 0;
+    for (const o of this.orbs) {
+      if (oi >= 18) {
+        o.active = false;
+        continue;
+      }
+      const a = (oi / 18) * Math.PI * 2;
+      o.active = true;
+      o.x = this.px + Math.cos(a) * (46 + oi * 5);
+      o.y = this.py + Math.sin(a) * (46 + oi * 5);
+      o.vx = 0;
+      o.vy = 0;
+      o.value = 6;
+      oi += 1;
+    }
+    let bi = 0;
+    for (const b of this.bullets) {
+      if (bi >= 16) {
+        if (b.kind !== "hostile") b.active = false;
+        continue;
+      }
+      const a = (bi / 16) * Math.PI * 2;
+      b.active = true;
+      b.hostile = false;
+      b.x = this.px + Math.cos(a) * 28;
+      b.y = this.py + Math.sin(a) * 28;
+      b.vx = Math.cos(a) * 420;
+      b.vy = Math.sin(a) * 420;
+      b.life = 640;
+      b.damage = this.build.damage;
+      b.r = 5;
+      b.chain = 0;
+      b.pierce = 0;
+      b.split = 0;
+      b.over = bi % 4 === 0;
+      b.kind = "gun";
+      b.aoe = 0;
+      b.turn = 0;
+      bi += 1;
+    }
+    this.cleaned = Array.from({ length: 8 }, (_, i) => {
+      const a = (i / 8) * Math.PI * 2;
+      return { x: this.px + Math.cos(a) * 90, y: this.py + Math.sin(a) * 90, r: 22, t: 3.2 };
+    });
+    this.plasmaTicks.push({ x: this.px, y: this.py, t: 0.55, r: 70, hits: 0 });
+    this.deathFx = 0.35;
+  }
+
   private resetRun() {
     this.px = ARENA / 2;
     this.py = ARENA / 2;
@@ -278,6 +347,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.plasmaTicks = [];
     this.banners = [];
     this.deathFx = 0;
+    this.cleaned = [];
     this.hazardCd = 0;
     this.arenaName = arenaIdFor(this.endless, this.bossDown);
     this.solids = arenaSolids(this.arenaName);
@@ -388,6 +458,8 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.droneClock += dt;
     this.missileCd = Math.max(0, this.missileCd - dt);
     this.deathFx = Math.max(0, this.deathFx - dt);
+    for (const z of this.cleaned) z.t -= dt;
+    this.cleaned = this.cleaned.filter((z) => z.t > 0);
     for (const b of this.banners) b.t -= dt;
     this.banners = this.banners.filter((b) => b.t > 0);
 
@@ -908,6 +980,8 @@ export class SwarmPlayScene extends Phaser.Scene {
   private kill(e: Enemy, fromDash = false) {
     e.active = false;
     this.kills += 1;
+    this.cleaned.push({ x: e.x, y: e.y, r: 16 + e.r, t: 4.2 });
+    if (this.cleaned.length > 28) this.cleaned.shift();
     this.parts.burst(e.x, e.y, e.kind === "boss" || e.kind === "elite" ? 18 : 10, KIND[e.kind].color, 170, 280);
     this.synth.tone(160 + Math.random() * 90, 0.05, "sawtooth", 0.03, 0.22);
     if (fromDash && this.dashing > 0) void this.platform.achievement.unlock("dash-kill");
@@ -1175,6 +1249,12 @@ export class SwarmPlayScene extends Phaser.Scene {
     g.lineStyle(2, 0x9ae84a, 0.16);
     g.strokeRect(20, 20, ARENA - 40, ARENA - 40);
 
+    for (const z of this.cleaned) {
+      g.fillStyle(0xc8f090, Math.min(0.28, z.t * 0.08));
+      g.fillCircle(z.x, z.y, z.r);
+      g.fillStyle(0x142018, 0.35);
+      g.fillCircle(z.x, z.y, z.r * 0.55);
+    }
     for (const t of this.trails) {
       if (t.life <= 0) continue;
       g.fillStyle(0xf07a3a, t.life * 0.45);
@@ -1182,8 +1262,12 @@ export class SwarmPlayScene extends Phaser.Scene {
     }
     for (const o of this.orbs) {
       if (!o.active) continue;
-      g.fillStyle(0xffc58a, 0.9);
-      g.fillCircle(o.x, o.y, 4);
+      g.fillStyle(0xffe08a, 0.28);
+      g.fillCircle(o.x, o.y, 10);
+      g.fillStyle(0xffc58a, 1);
+      g.fillCircle(o.x, o.y, 5.5);
+      g.fillStyle(0xfff4d8, 0.9);
+      g.fillCircle(o.x - 1.5, o.y - 1.5, 2);
     }
     for (const p of this.plasmaTicks) {
       g.lineStyle(3, this.build.plasma ? 0xff4ad4 : 0xf07a3a, Math.min(0.85, p.t * 2.4));
@@ -1204,8 +1288,11 @@ export class SwarmPlayScene extends Phaser.Scene {
         g.fillStyle(0xff8a6a, 0.9);
         g.fillRect(b.x - 7, b.y - 2, 14, 4);
       } else {
-        g.fillStyle(b.hostile ? 0xc45c3a : b.over ? 0xffe0c0 : 0xf7ebe3, 1);
-        g.fillCircle(b.x, b.y, b.r);
+        const a = Math.atan2(b.vy, b.vx);
+        g.fillStyle(b.hostile ? 0xc45c3a : b.over ? 0xffe0c0 : 0xf7ebe3, 0.35);
+        g.fillCircle(b.x - Math.cos(a) * 8, b.y - Math.sin(a) * 8, b.r + 2);
+        g.fillStyle(b.hostile ? 0xff8a62 : b.over ? 0xfff0d0 : 0xffffff, 1);
+        g.fillCircle(b.x, b.y, b.r + (b.hostile ? 1.4 : 1.8));
       }
     }
     for (const m of this.missiles) {
@@ -1230,26 +1317,53 @@ export class SwarmPlayScene extends Phaser.Scene {
       }
       const col = e.flash > 0 ? 0xffffff : KIND[e.kind].color;
       g.fillStyle(col, 1);
-      if (e.kind === "dart") g.fillTriangle(e.x + e.r, e.y, e.x - e.r * 0.7, e.y - e.r * 0.6, e.x - e.r * 0.7, e.y + e.r * 0.6);
-      else if (e.kind === "tank") {
-        g.fillRoundedRect(e.x - e.r, e.y - e.r * 0.7, e.r * 2, e.r * 1.4, 4);
-        g.fillStyle(0x120c10, 0.4);
-        g.fillRect(e.x - e.r + 4, e.y - 4, e.r * 2 - 8, 8);
+      if (e.kind === "dart") {
+        g.fillTriangle(e.x + e.r, e.y, e.x - e.r * 0.85, e.y - e.r * 0.55, e.x - e.r * 0.85, e.y + e.r * 0.55);
+        g.fillStyle(0x2a3a20, 0.7);
+        g.fillTriangle(e.x + e.r * 0.2, e.y, e.x - e.r * 0.7, e.y - e.r * 0.9, e.x - e.r * 0.2, e.y);
+        g.fillTriangle(e.x + e.r * 0.2, e.y, e.x - e.r * 0.7, e.y + e.r * 0.9, e.x - e.r * 0.2, e.y);
+      } else if (e.kind === "tank") {
+        g.fillRoundedRect(e.x - e.r, e.y - e.r * 0.72, e.r * 2, e.r * 1.44, 5);
+        g.fillStyle(0x2a1810, 0.55);
+        g.fillRect(e.x - e.r + 3, e.y - e.r * 0.35, e.r * 2 - 6, 6);
+        g.fillRect(e.x - e.r + 3, e.y + e.r * 0.15, e.r * 2 - 6, 6);
+        g.fillStyle(0xe8dcc4, 0.7);
+        g.fillRect(e.x + e.r * 0.15, e.y - 3, e.r * 0.95, 6);
       } else if (e.kind === "spitter") {
         g.fillCircle(e.x, e.y, e.r);
-        g.fillStyle(0xff8a4a, 0.8);
-        g.fillCircle(e.x, e.y - e.r * 0.2, e.r * 0.35);
+        g.fillStyle(0x3a2018, 0.45);
+        g.fillCircle(e.x - e.r * 0.25, e.y + e.r * 0.1, e.r * 0.55);
+        g.fillStyle(0xff8a4a, 0.9);
+        g.fillCircle(e.x, e.y - e.r * 0.15, e.r * 0.4);
+        g.fillRect(e.x - 2, e.y - e.r - 4, 4, 8);
       } else if (e.kind === "splitter") {
-        g.fillTriangle(e.x, e.y - e.r, e.x + e.r, e.y + e.r * 0.6, e.x - e.r, e.y + e.r * 0.6);
-        g.fillCircle(e.x, e.y, e.r * 0.35);
-      } else if (e.kind === "swarmling") g.fillCircle(e.x, e.y, e.r);
-      else if (e.kind === "chaser") {
+        g.fillTriangle(e.x, e.y - e.r, e.x + e.r, e.y + e.r * 0.55, e.x - e.r, e.y + e.r * 0.55);
+        g.fillStyle(0x2a3a18, 0.55);
+        g.fillCircle(e.x - e.r * 0.45, e.y + 2, e.r * 0.32);
+        g.fillCircle(e.x + e.r * 0.45, e.y + 2, e.r * 0.32);
+        g.fillStyle(col, 1);
+        g.fillCircle(e.x, e.y, e.r * 0.32);
+      } else if (e.kind === "swarmling") {
         g.fillCircle(e.x, e.y, e.r);
-        g.fillStyle(0x2a2018, 0.55);
-        g.fillCircle(e.x + 3, e.y - 2, 3);
-        g.fillStyle(col, 0.85);
-        g.fillRect(e.x - e.r, e.y + 2, 5, 8);
-        g.fillRect(e.x + e.r - 5, e.y + 2, 5, 8);
+        g.fillStyle(0x2a3a18, 0.7);
+        g.fillRect(e.x - e.r - 2, e.y - 1, e.r * 0.7, 2);
+        g.fillRect(e.x + e.r - 2, e.y - 1, e.r * 0.7, 2);
+        g.fillRect(e.x - 1, e.y + e.r - 1, 2, e.r * 0.6);
+      } else if (e.kind === "chaser") {
+        g.fillRoundedRect(e.x - e.r, e.y - e.r * 0.7, e.r * 2, e.r * 1.4, e.r * 0.7);
+        g.fillStyle(0x2a2018, 0.6);
+        g.fillCircle(e.x + 4, e.y - 3, 3.2);
+        g.fillStyle(col, 0.9);
+        g.fillRect(e.x - e.r - 2, e.y + 3, 7, 9);
+        g.fillRect(e.x + e.r - 5, e.y + 3, 7, 9);
+        g.fillRect(e.x - 3, e.y + e.r - 2, 3, 8);
+        g.fillRect(e.x + 1, e.y + e.r - 2, 3, 8);
+      } else if (e.kind === "elite") {
+        g.fillRoundedRect(e.x - e.r, e.y - e.r * 0.85, e.r * 2, e.r * 1.7, 8);
+        g.fillStyle(0x2a2010, 0.4);
+        g.fillRect(e.x - e.r + 6, e.y - 6, e.r * 2 - 12, 12);
+        g.fillStyle(0xffe8b0, 0.85);
+        g.fillTriangle(e.x, e.y - e.r - 10, e.x + 10, e.y - e.r + 4, e.x - 10, e.y - e.r + 4);
       } else if (e.kind === "warden") {
         g.fillRoundedRect(e.x - e.r, e.y - e.r, e.r * 2, e.r * 2, 8);
         g.fillStyle(0xffe0c0, 0.7);
@@ -1447,6 +1561,7 @@ export class SwarmPlayScene extends Phaser.Scene {
           this.hud.setVisible(false);
           this.overlay.setVisible(false);
         },
+        seedPeak: () => this.seedPeakState(),
       },
     );
   }

@@ -16,7 +16,11 @@ export function isVercelProduction(): boolean {
 }
 
 export function appUrl(): string {
-  return (read("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000").replace(/\/$/, "");
+  const explicit = read("NEXT_PUBLIC_APP_URL");
+  if (explicit) return explicit.replace(/\/$/, "");
+  const vercel = read("VERCEL_URL");
+  if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`;
+  return "http://localhost:3000";
 }
 
 export function supabaseUrl(): string | undefined {

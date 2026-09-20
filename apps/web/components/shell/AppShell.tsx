@@ -119,7 +119,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
       <main className={home ? "" : "pb-28 pt-[var(--header-h)] md:pb-16"}>{children}</main>
       {!home ? (
-        <footer className="hidden border-t border-[var(--line)] px-8 py-6 text-[12px] text-[var(--text-faint)] md:flex md:gap-6">
+        <footer className="hidden border-t border-[var(--line)] px-8 py-6 text-[12px] text-[var(--text-faint)] md:flex md:flex-wrap md:gap-6">
+          <Link href="/games">Games</Link>
+          <Link href="/guides">Guides</Link>
+          <Link href="/collections">Collections</Link>
           <Link href="/about">About</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>

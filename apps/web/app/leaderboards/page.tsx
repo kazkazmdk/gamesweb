@@ -127,9 +127,10 @@ export default function LeaderboardsPage() {
         ) : rows.length === 0 ? (
           <div className="mt-10">
             <EmptyState
-              title="No leaderboard yet"
-              body={`Play ${game.title} to set one.`}
-              action={<QuickAction href={`/play/${game.slug}`}>Play</QuickAction>}
+              slug={game.slug}
+              title={`No ${game.title} board yet`}
+              body={`This board stays empty until someone finishes a verified ${game.title} run. Play ${game.sessionHint} and the first score becomes the standing.`}
+              action={<QuickAction href={`/play/${game.slug}`}>Set the first time</QuickAction>}
             />
           </div>
         ) : (

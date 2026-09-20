@@ -14,6 +14,7 @@ import { GameRail, type RailMark, type RailPresence } from "./GameRail";
 import { HomeSocial } from "./HomeSocial";
 import { HomeStage } from "./HomeStage";
 import { TodayArcade } from "./TodayArcade";
+import { HomeDiscover } from "./HomeDiscover";
 import { homeStage } from "./home-stage";
 
 export default function HomePage() {
@@ -264,6 +265,7 @@ export default function HomePage() {
         challenges={openChallenges}
         you={{ name: player.displayName || "You", avatar: player.avatar }}
       />
+      <HomeDiscover />
     </div>
   );
 }

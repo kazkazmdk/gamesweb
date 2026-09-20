@@ -19,9 +19,9 @@ export function applyOp(pack: number, op?: GateOp) {
 export function opLabel(op?: GateOp) {
   if (!op) return "";
   if (op.kind === "add") return `+${op.n}`;
-  if (op.kind === "mul") return `x${op.n}`;
-  if (op.kind === "sub") return `-${op.n}`;
-  return `/${op.n}`;
+  if (op.kind === "mul") return `×${op.n}`;
+  if (op.kind === "sub") return `TAX ${op.n}`;
+  return `TAX ÷${op.n}`;
 }
 
 export function buildCourse(seed: string): Segment[] {
