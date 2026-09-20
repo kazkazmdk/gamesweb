@@ -3,7 +3,7 @@
 Branch: `cursor/game-art-direction-rebuild-c08e`  
 Base: `cursor/platform-visual-closeout-c08e`  
 Implementation SHA: `43077fa477eb649a0ff0fca82f6e21441583c104`  
-Report / capture SHA: see the commit that adds this file.
+Report / capture SHA: `d8be0fba77f6b14678dd2f3b461085212cbf34ba` (this file + `docs/qa-game-art-direction/` captures).
 
 Home and platform pages were not redesigned. Mechanics and collisions were not rewritten. No reference assets were copied.
 
