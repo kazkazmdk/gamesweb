@@ -2,7 +2,7 @@
 
 - Branch: `cursor/games-platform-seo-closeout-c08e`
 - Base: `cursor/game-art-direction-rebuild-c08e` @ `c7e307cceec8d876b5f6e65134ba318e735fc222`
-- Head (pre-report): `d2493b2` + QA commit
+- SHA: `8aaea065284d055a80c7d29c1d526930a0a56471`
 - PR: https://github.com/kazkazmdk/gamesweb/pull/17
 - Aucun merge.
 
