@@ -42,10 +42,16 @@ export function AchievementsPage() {
   }
   const unlocked = catalog.filter((a) => a.unlocked).length;
   const pct = catalog.length ? Math.round((unlocked / catalog.length) * 100) : 0;
-  const recent = catalog
+  const recentList = catalog
     .filter((a) => a.unlocked)
     .slice()
-    .sort((a, b) => (b.unlockedAt ?? 0) - (a.unlockedAt ?? 0))[0];
+    .sort((a, b) => (b.unlockedAt ?? 0) - (a.unlockedAt ?? 0))
+    .slice(0, 3);
+  const recent = recentList[0];
+  const featuredLocked = catalog
+    .filter((a) => !a.unlocked)
+    .slice()
+    .sort((a, b) => (b.xp ?? 0) - (a.xp ?? 0))[0];
 
   return (
     <div className="px-5 py-8 md:px-10">
@@ -79,13 +85,13 @@ export function AchievementsPage() {
         <ProgressWidget value={unlocked} max={catalog.length || 1} />
       </div>
 
-      {recent ? (
+      {recentList.length ? (
         <section className="mt-10">
           <p className="meta text-white/40">Recently unlocked</p>
           <div className="mt-4">
             <TrophyShelf
               featured
-              items={[recent].map((a) => ({
+              items={recentList.map((a) => ({
                 id: a.id,
                 name: a.name,
                 description: a.description,
@@ -93,6 +99,34 @@ export function AchievementsPage() {
                 gameId: a.gameId ?? "platform",
                 xp: a.xp,
               }))}
+            />
+          </div>
+        </section>
+      ) : (
+        <section className="mt-10 gw-stage p-6">
+          <p className="meta text-white/40">Shelf</p>
+          <p className="mt-2 text-[18px]">Nothing unlocked yet</p>
+          <p className="mt-2 max-w-lg text-[14px] text-[var(--text-dim)]">
+            Trophies stay locked until a real run earns them. Play any of the eight games — the first unlock lands here, not a fake collection.
+          </p>
+        </section>
+      )}
+      {featuredLocked ? (
+        <section className="mt-8">
+          <p className="meta text-white/40">Still out of reach</p>
+          <div className="mt-4">
+            <TrophyShelf
+              featured
+              items={[
+                {
+                  id: featuredLocked.id,
+                  name: featuredLocked.name,
+                  description: featuredLocked.description,
+                  unlocked: false,
+                  gameId: featuredLocked.gameId ?? "platform",
+                  xp: featuredLocked.xp,
+                },
+              ]}
             />
           </div>
         </section>

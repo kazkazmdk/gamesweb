@@ -31,14 +31,29 @@ export default function FriendsPage() {
       ) : null}
 
       {player.friends.length === 0 ? (
-        <EmptyStateStage
-          heading="h1"
-          slug="neon-drift"
-          kicker="Social"
-          title="Friends"
-          body="No friends yet. Invite someone to chase a score. Presence only appears when they are actually here."
-          action={<InviteWidget />}
-        />
+        <>
+          <EmptyStateStage
+            heading="h1"
+            slug="neon-drift"
+            kicker="Social"
+            title="Friends"
+            body="No friends yet. Invite someone to chase a score. Presence only appears when they are actually here."
+            action={<InviteWidget />}
+          />
+          <section className="grid gap-6 px-5 py-10 md:grid-cols-3 md:px-10">
+            {[
+              { title: "Real presence", body: "A friend shows as playing only when they are on a run. Nobody is invented for the list." },
+              { title: "Challenges", body: "Send a score. They answer the same game, same rules. Empty here means no one has been invited yet." },
+              { title: "Friend boards", body: "Leaderboards stay honest. A friends board appears after they post a verified score." },
+            ].map((item) => (
+              <div key={item.title} className="gw-stage p-5">
+                <p className="meta text-white/40">With friends</p>
+                <p className="mt-2 text-[18px]">{item.title}</p>
+                <p className="mt-2 text-[14px] text-[var(--text-dim)]">{item.body}</p>
+              </div>
+            ))}
+          </section>
+        </>
       ) : (
       <div className="px-5 pt-8 md:px-10">
         <p className="meta text-white/45">Social</p>

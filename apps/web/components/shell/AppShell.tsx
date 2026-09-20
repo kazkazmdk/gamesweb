@@ -17,6 +17,8 @@ export const PLATFORM_ACCENT = "#d7c4a3";
 const DESKTOP_NAV = [
   { href: "/", label: "Games", match: (p: string) => p === "/" },
   { href: "/arcade", label: "Arcade", match: (p: string) => p.startsWith("/arcade") || p.startsWith("/challenges") || p.startsWith("/achievements") || p.startsWith("/daily") || p.startsWith("/grand-prix") },
+  { href: "/games", label: "Catalog", match: (p: string) => p === "/games" || p.startsWith("/collections") },
+  { href: "/guides", label: "Guides", match: (p: string) => p.startsWith("/guides") || p.startsWith("/learn") },
 ];
 
 const MOBILE_NAV = [
@@ -119,7 +121,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
       <main className={home ? "" : "pb-28 pt-[var(--header-h)] md:pb-16"}>{children}</main>
       {!home ? (
-        <footer className="hidden border-t border-[var(--line)] px-8 py-6 text-[12px] text-[var(--text-faint)] md:flex md:gap-6">
+        <footer className="hidden border-t border-[var(--line)] px-8 py-6 text-[12px] text-[var(--text-faint)] md:flex md:flex-wrap md:gap-6">
+          <Link href="/games">Games</Link>
+          <Link href="/collections">Collections</Link>
+          <Link href="/guides">Guides</Link>
+          <Link href="/learn">Learn</Link>
           <Link href="/about">About</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
