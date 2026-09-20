@@ -28,6 +28,12 @@ export {
   drawContainer,
   drawCrane,
   drawSkyline,
+  drawSodiumLamp,
+  drawBush,
+  drawHvac,
+  drawBillboard,
+  drawToyHouse,
+  drawFungusPatch,
 } from "./production";
 export type { QualityTier, DrawGfx } from "./production";
 

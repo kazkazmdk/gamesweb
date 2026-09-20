@@ -4,7 +4,7 @@ export const NEON = {
   ghostHz: 12,
   ghostKey: "gw:neon-ghost",
   trackKey: "gw:neon-track",
-  tutorialKey: "gw:neon-tutorial",
+  tutorialKey: "gw:neon-tutorial-v2",
   ghostToggleKey: "gw:neon-ghost-on",
   sectorCount: 3,
 } as const;

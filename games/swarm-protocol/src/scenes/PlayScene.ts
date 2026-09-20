@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, seededRng, fillBackdrop, fillVignette, type GameKeyboard } from "@gamesweb/game-core";
+import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, seededRng, fillBackdrop, fillVignette, drawFungusPatch, drawContainer, type GameKeyboard } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { readRunContext, swarmProtocolManifest, utcDayKey } from "@gamesweb/game-sdk";
 import {
@@ -149,11 +149,11 @@ export class SwarmPlayScene extends Phaser.Scene {
     else resetSimRng();
     this.arenaName = arenaIdFor(this.endless, this.bossDown);
     this.solids = arenaSolids(this.arenaName);
-    this.cameras.main.setBackgroundColor("#120c10");
+    this.cameras.main.setBackgroundColor("#0c1816");
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hud = this.add
-      .text(22, 74, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#f7ebe3" })
+      .text(22, 74, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#d8f0c8" })
       .setScrollFactor(0)
       .setDepth(21);
     this.cards = [0, 1, 2].map((i) =>
@@ -1084,45 +1084,56 @@ export class SwarmPlayScene extends Phaser.Scene {
 
   private drawArena(g: Phaser.GameObjects.Graphics, fracture: boolean) {
     if (this.deathFx > 0) {
-      g.fillStyle(0xffe0c0, this.deathFx * 0.08);
+      g.fillStyle(0x9ae84a, this.deathFx * 0.08);
       g.fillRect(0, 0, ARENA, ARENA);
     }
+    for (let i = 0; i < 18; i += 1) {
+      drawFungusPatch(g, 80 + (i * 173) % (ARENA - 120), 90 + (i * 211) % (ARENA - 140), 18 + (i % 5) * 6, i % 2 ? 0x2a4a38 : 0x3a6a48);
+    }
+    drawContainer(g, 180, 220, 70, 36, 0xc45c3a);
+    drawContainer(g, 1100, 980, 64, 32, 0x3a6a88);
+    drawContainer(g, 420, 1080, 54, 28, 0x6a4a28);
+    g.fillStyle(0x2a3a34, 0.55);
+    for (let i = 0; i < 8; i += 1) g.fillRect(60 + i * 160, 70, 4, 90);
+    g.fillStyle(0x6a7a70, 0.35);
+    g.fillRect(200, 640, 220, 8);
+    g.fillRect(860, 400, 180, 8);
     for (const s of this.solids) {
       if (s.kind === "column") {
-        g.fillStyle(0x2a1620, 0.95);
-        g.fillRoundedRect(s.x, s.y, s.w, s.h, 6);
-        g.fillStyle(0xf07a3a, 0.35);
+        g.fillStyle(0x2a3a34, 0.95);
+        g.fillRoundedRect(s.x, s.y, s.w, s.h, 8);
+        g.fillStyle(0x9ae84a, 0.28);
         g.fillRect(s.x + 8, s.y + 10, s.w - 16, 8);
-        g.fillStyle(0xffc18a, 0.18);
+        g.fillStyle(0xe8dcc4, 0.16);
         g.fillCircle(s.x + s.w / 2, s.y + 18, 10);
       } else if (s.kind === "reactor") {
-        g.fillStyle(0x3a2030, 0.95);
+        g.fillStyle(0x3a3028, 0.95);
         g.fillRoundedRect(s.x, s.y, s.w, s.h, 10);
-        g.fillStyle(0xf07a3a, 0.45 + Math.sin(this.time.now / 180) * 0.15);
+        g.fillStyle(0x9ae84a, 0.45 + Math.sin(this.time.now / 180) * 0.15);
         g.fillCircle(s.x + s.w / 2, s.y + s.h / 2, 22);
-        g.lineStyle(2, 0xffc18a, 0.4);
+        g.lineStyle(2, 0xc8f090, 0.4);
         g.strokeCircle(s.x + s.w / 2, s.y + s.h / 2, 30);
       } else if (s.kind === "rail") {
-        g.fillStyle(0xf07a3a, 0.55);
+        g.fillStyle(0xc45c3a, 0.55);
         g.fillRect(s.x, s.y, s.w, s.h);
         g.fillStyle(0xffe0c0, 0.35);
         g.fillRect(s.x, s.y + 6, s.w, 4);
       } else if (s.kind === "fissure") {
-        g.fillStyle(0x080204, 0.92);
+        g.fillStyle(0x08100c, 0.92);
         g.fillRect(s.x, s.y, s.w, s.h);
-        g.fillStyle(0xff4d3a, 0.35);
+        g.fillStyle(0x9ae84a, 0.35);
         g.fillRect(s.x, s.y + 4, s.w, 6);
       } else if (s.kind === "debris") {
-        g.fillStyle(0x3a1810, 0.88);
+        g.fillStyle(0x4a3020, 0.88);
         g.fillTriangle(s.x, s.y + s.h, s.x + s.w * 0.4, s.y, s.x + s.w, s.y + s.h);
         g.fillRect(s.x + 8, s.y + s.h * 0.4, s.w * 0.5, s.h * 0.4);
       } else {
-        g.fillStyle(0xff6a3a, 0.28 + Math.sin(this.time.now / 140) * 0.1);
+        g.fillStyle(0x9ae84a, 0.22 + Math.sin(this.time.now / 140) * 0.08);
         g.fillRect(s.x, s.y, s.w, s.h);
       }
     }
     if (!fracture) {
-      g.fillStyle(0x2a1620, 0.28);
+      g.fillStyle(0x2a3a34, 0.28);
       g.fillRect(40, 40, ARENA - 80, 18);
       g.fillRect(40, ARENA - 58, ARENA - 80, 18);
     }
@@ -1138,30 +1149,30 @@ export class SwarmPlayScene extends Phaser.Scene {
       ARENA,
       fracture
         ? {
-            top: 0x24140c,
-            mid: 0x180c08,
-            bottom: 0x0c0604,
+            top: 0x1a2818,
+            mid: 0x101810,
+            bottom: 0x0a100c,
             grain: 0.05,
             blobs: [
-              { color: 0xff6a3a, x: 0.3, y: 0.2, r: 260, alpha: 0.12, parallax: 0.03 },
-              { color: 0x6a2010, x: 0.8, y: 0.7, r: 300, alpha: 0.1, parallax: 0.04 },
+              { color: 0x9ae84a, x: 0.3, y: 0.2, r: 260, alpha: 0.1, parallax: 0.03 },
+              { color: 0xc45c3a, x: 0.8, y: 0.7, r: 300, alpha: 0.08, parallax: 0.04 },
             ],
           }
         : {
-            top: 0x1c1014,
-            mid: 0x140c10,
-            bottom: 0x0c080a,
-            grain: 0.035,
+            top: 0x14241e,
+            mid: 0x0e1a16,
+            bottom: 0x0a1210,
+            grain: 0.03,
             blobs: [
-              { color: 0xf07a3a, x: 0.28, y: 0.22, r: 220, alpha: 0.1, parallax: 0.02 },
-              { color: 0x6a2a48, x: 0.74, y: 0.68, r: 260, alpha: 0.09, parallax: 0.03 },
-              { color: 0xffc58a, x: 0.56, y: 0.18, r: 140, alpha: 0.05, parallax: 0.04 },
+              { color: 0x3a6a48, x: 0.28, y: 0.22, r: 220, alpha: 0.12, parallax: 0.02 },
+              { color: 0xc45c3a, x: 0.74, y: 0.68, r: 260, alpha: 0.08, parallax: 0.03 },
+              { color: 0x9ae84a, x: 0.56, y: 0.18, r: 140, alpha: 0.05, parallax: 0.04 },
             ],
           },
       { x: this.camX, y: this.camY },
     );
     this.drawArena(g, fracture);
-    g.lineStyle(2, 0xf07a3a, 0.18);
+    g.lineStyle(2, 0x9ae84a, 0.16);
     g.strokeRect(20, 20, ARENA - 40, ARENA - 40);
 
     for (const t of this.trails) {
@@ -1234,8 +1245,11 @@ export class SwarmPlayScene extends Phaser.Scene {
       } else if (e.kind === "swarmling") g.fillCircle(e.x, e.y, e.r);
       else if (e.kind === "chaser") {
         g.fillCircle(e.x, e.y, e.r);
-        g.fillStyle(0x120c10, 0.5);
+        g.fillStyle(0x2a2018, 0.55);
         g.fillCircle(e.x + 3, e.y - 2, 3);
+        g.fillStyle(col, 0.85);
+        g.fillRect(e.x - e.r, e.y + 2, 5, 8);
+        g.fillRect(e.x + e.r - 5, e.y + 2, 5, 8);
       } else if (e.kind === "warden") {
         g.fillRoundedRect(e.x - e.r, e.y - e.r, e.r * 2, e.r * 2, 8);
         g.fillStyle(0xffe0c0, 0.7);
@@ -1321,7 +1335,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     const need = xpToLevel(this.level);
     const phase = phaseFor(survive);
     this.hud.setText(
-      `${survive.toFixed(0)}s   lv ${this.level}   ${this.kills} down\nHP ${Math.max(0, Math.ceil(this.hp))}   ${phase}   ${this.arenaName === "fracture-zone" ? "FRACTURE" : "CORE"}${this.bossSpawned ? (this.bossDown ? "  down" : this.endless ? "  WARDEN" : "  CORE") : ""}`,
+      `HULL ${Math.max(0, Math.ceil(this.hp))}   ${survive.toFixed(0)}s\nLV ${this.level}  ${this.kills} SALVAGED  ${phase.toUpperCase()}  ${this.arenaName === "fracture-zone" ? "INFESTED" : "DECK"}${this.bossSpawned ? (this.bossDown ? "  DOWN" : this.endless ? "  WARDEN" : "  CORE") : ""}`,
     );
     void need;
 
@@ -1450,7 +1464,7 @@ export function mountSwarmProtocol(parent: HTMLElement, platform: PlatformSDK) {
     parent,
     width: Math.max(320, parent.clientWidth || 1280),
     height: Math.max(240, parent.clientHeight || 720),
-    backgroundColor: "#120c10",
+    backgroundColor: "#0c1816",
     scale: { mode: Phaser.Scale.RESIZE },
     scene: [SwarmPlayScene],
     disableContextMenu: true,

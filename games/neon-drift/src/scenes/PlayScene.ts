@@ -137,7 +137,7 @@ export class DriftPlayScene extends Phaser.Scene {
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hud = this.add
-      .text(24, 148, "", { fontFamily: "ui-sans-serif, system-ui, sans-serif", fontSize: "18px", color: "#f3f1ec" })
+      .text(24, 148, "", { fontFamily: "ui-sans-serif, system-ui, sans-serif", fontSize: "18px", color: "#f2ead4" })
       .setScrollFactor(0)
       .setDepth(21);
     this.deltaTxt = this.add
@@ -572,9 +572,9 @@ export class DriftPlayScene extends Phaser.Scene {
       ? `\n${(1000 / Math.max(1, this.game.loop.actualFps)).toFixed?.(0) ?? ""} ${this.game.loop.actualFps | 0}fps  slip ${(this.car.slip * 57.3).toFixed(0)}°  ${this.car.driftAmount.toFixed(2)}`
       : "";
     this.hud.setText(
-      `BANKED  ${banked.toLocaleString()}\nLIVE    ${live > 0 ? `+${live}` : "—"}\nCOMBO   ×${combo.toFixed(1)}\n${this.def.name}   lap ${this.lap}/${NEON.lapsToFinish}   ${elapsed}s${dbg}`,
+      `BANK  ${banked.toLocaleString()}   LIVE ${live > 0 ? `+${live}` : "—"}\n×${combo.toFixed(1)}  ${this.def.name.toUpperCase()}  L${this.lap}/${NEON.lapsToFinish}  ${elapsed}s${dbg}`,
     );
-    this.hud.setColor(this.car.drifting ? "#ffd6ea" : this.comboBreakFlash > 0 ? "#ff8aa0" : "#f3f1ec");
+    this.hud.setColor(this.car.drifting ? "#f0d48a" : this.comboBreakFlash > 0 ? "#ff8aa0" : "#f2ead4");
     if (this.tutorialStep !== "done") this.hint.setText(this.hintCopy());
     this.hint.setAlpha(this.shownHint || this.comboBreakFlash > 0 ? 0.92 : 0);
     this.hint.setColor(this.comboBreakFlash > 0 ? "#ff8aa0" : this.bankFlash > 0 ? "#8dffc1" : "#f3f1ec");

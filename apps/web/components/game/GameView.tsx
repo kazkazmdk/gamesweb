@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
 import { boardModeFromPlayIndex, resolvePlayIndex } from "@/lib/platform/modes";
+import { zeroResultCopy } from "@/lib/platform/format";
 import { formatScore } from "@/lib/player-store";
 import { arcadeStore } from "@/lib/social/arcade-store";
 import { PauseOverlay } from "@/components/game/PauseOverlay";
@@ -652,7 +653,7 @@ function Results({
         <p className="meta text-white/50">{result}</p>
         {hollow ? (
           <>
-            <p className="display mt-3 text-[48px] leading-none text-white md:text-[72px]">No score banked</p>
+            <p className="display mt-3 text-[48px] leading-none text-white md:text-[72px]">{zeroResultCopy(gameId)}</p>
             {gameId === "neon-drift" ? (
               <p className="mt-5 text-[15px] tracking-[0.08em] text-white/80">HOLD DRIFT → COMBO → BANK IT</p>
             ) : (

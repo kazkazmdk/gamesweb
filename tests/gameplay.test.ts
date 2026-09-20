@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NEON } from "../games/neon-drift/src/config.ts";
 import { driftGain } from "../games/neon-drift/src/systems/scoring.ts";
 import { TRACKS, buildTrack, queryTrack, startPose } from "../games/neon-drift/src/systems/track.ts";
 import { readDriveInput } from "../games/neon-drift/src/systems/input.ts";
@@ -15,6 +16,13 @@ import {
   recommendBuild,
   UPGRADES,
 } from "../games/swarm-protocol/src/systems/sim.ts";
+
+describe("neon tutorial migration", () => {
+  it("uses a v2 key so returning players see HOLD → COMBO → BANK", () => {
+    expect(NEON.tutorialKey).toBe("gw:neon-tutorial-v2");
+    expect(NEON.tutorialKey).not.toBe("gw:neon-tutorial");
+  });
+});
 
 describe("neon drift scoring", () => {
   it("rewards angle and speed together", () => {
