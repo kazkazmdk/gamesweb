@@ -36,8 +36,8 @@ export default function FriendsPage() {
             heading="h1"
             slug="neon-drift"
             kicker="Social"
-            title="Invite a rival"
-            body="No friends yet. Presence only appears when they are actually here — this page stays quiet until then."
+            title="Friends"
+            body="No friends yet. Invite someone to chase a score. Presence only appears when they are actually here."
             action={<InviteWidget />}
           />
           <div className="px-5 py-8 md:px-10">

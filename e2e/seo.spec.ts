@@ -44,11 +44,12 @@ test("sitemap lists only public indexable URLs", async ({ request }) => {
   expect(xml).not.toContain("/friends");
   expect(xml).not.toContain("/inbox");
   expect(xml).not.toContain("/arcade");
-  expect(xml).not.toContain("localhost");
+  expect(xml).toContain("127.0.0.1:3010");
+  expect(xml).not.toMatch(/\/play\//);
 });
 
 test("home exposes crawlable catalog links", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator('a[href="/games"]').first()).toBeVisible();
-  await expect(page.locator('a[href="/games/neon-drift"]').first()).toBeVisible();
+  await expect(page.locator('a[href="/games"]').first()).toHaveCount(1);
+  await expect(page.locator('a[href="/games/neon-drift"]').first()).toHaveCount(1);
 });

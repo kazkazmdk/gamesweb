@@ -4,11 +4,15 @@ const CONTENT_STAMP = "2026-09-20";
 
 export const CONTENT_UPDATED = CONTENT_STAMP;
 
-export function publicOrigin(): string {
+export function publicOrigin(requestHost?: string | null, requestProto?: string | null): string {
   const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (explicit) return explicit.replace(/\/$/, "");
   const vercel = process.env.VERCEL_URL?.trim();
   if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`;
+  if (requestHost) {
+    const proto = requestProto === "https" ? "https" : "http";
+    return `${proto}://${requestHost.replace(/\/$/, "")}`;
+  }
   return "http://localhost:3000";
 }
 
