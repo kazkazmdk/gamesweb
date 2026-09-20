@@ -171,34 +171,63 @@ export class PocketScene extends Phaser.Scene {
   }
 
   private drawFurniture(g: Phaser.GameObjects.Graphics, theme: Layout["theme"]) {
-    g.fillStyle(0xf0c060, 0.22);
-    g.fillCircle(80, 36, 46);
+    const w = this.layout.w;
+    const h = this.layout.h;
+    g.fillStyle(0xf0c060, 0.2);
+    g.fillCircle(72, 28, 52);
     g.fillStyle(0x6a4a28, 1);
-    g.fillRect(68, 8, 8, 28);
-    g.fillStyle(0xffe08a, 0.9);
-    g.fillCircle(72, 8, 10);
-    g.fillStyle(0xf2e6d0, 1);
-    g.fillRoundedRect(28, 54, 36, 22, 3);
-    g.fillStyle(0xc45c3a, 1);
-    g.fillRect(32, 58, 12, 14);
+    g.fillRect(64, 2, 9, 32);
+    g.fillStyle(0xffe08a, 0.95);
+    g.fillCircle(68, 4, 11);
+    g.fillStyle(0x3a2414, 1);
+    g.fillRoundedRect(w - 118, 22, 86, 36, 5);
+    g.fillStyle(theme === "arcade" ? 0xff6ad5 : 0xffd166, 1);
+    g.fillRoundedRect(w - 112, 26, 74, 28, 4);
+    g.fillStyle(0x2a1a10, 1);
+    g.fillRect(w - 104, 32, 18, 16);
+    g.fillRect(w - 80, 32, 18, 16);
+    g.fillRect(w - 56, 32, 14, 16);
     if (theme === "workshop") {
-      g.fillStyle(0x8a6a40, 0.7);
-      g.fillRect(40, 40, 54, 16);
-      g.fillRect(630, 40, 54, 16);
-      for (let i = 40; i < 680; i += 70) g.fillRect(i, 36, 10, 4);
+      g.fillStyle(0x8a6a40, 0.85);
+      g.fillRect(28, 34, 64, 14);
+      g.fillRect(w - 200, 34, 56, 14);
+      for (let i = 40; i < w - 140; i += 64) g.fillRect(i, 32, 12, 5);
+      g.fillStyle(0xc4a070, 1);
+      g.fillRoundedRect(22, h - 70, 40, 28, 3);
+      g.fillStyle(0x6a4a28, 1);
+      g.fillRect(30, h - 78, 8, 16);
+      g.fillStyle(0xf2e6d0, 1);
+      g.fillRoundedRect(70, h - 58, 28, 18, 2);
+      g.fillStyle(0xc45c3a, 1);
+      g.fillRect(74, h - 54, 10, 12);
     } else if (theme === "garden") {
-      g.fillStyle(0x3a7a44, 0.7);
-      g.fillCircle(70, 70, 20);
-      g.fillCircle(650, 70, 16);
-      g.fillCircle(70, 410, 14);
-      g.fillCircle(650, 410, 18);
+      g.fillStyle(0x3a7a44, 0.85);
+      g.fillCircle(48, 58, 16);
+      g.fillCircle(w - 56, 54, 14);
+      g.fillCircle(42, h - 52, 15);
+      g.fillCircle(w - 48, h - 56, 17);
+      g.fillStyle(0xc45c3a, 1);
+      g.fillRect(44, 68, 8, 10);
+      g.fillRect(w - 60, 64, 8, 10);
+      g.fillStyle(0xf2e6d0, 1);
+      g.fillRoundedRect(72, h - 56, 26, 16, 2);
+      g.fillStyle(0x3a7a44, 1);
+      g.fillRect(76, h - 52, 10, 10);
     } else {
-      g.fillStyle(0xc45c3a, 0.28);
-      g.fillRect(40, 40, 80, 8);
-      g.fillRect(600, 40, 80, 8);
-      g.fillStyle(0x3a6a88, 0.22);
-      g.fillRect(40, 430, 80, 8);
-      g.fillRect(600, 430, 80, 8);
+      g.fillStyle(0xff6ad5, 0.4);
+      g.fillRect(28, 34, 70, 10);
+      g.fillRect(w - 210, 34, 70, 10);
+      g.fillStyle(0x3a6a88, 0.4);
+      g.fillRect(28, h - 48, 70, 10);
+      g.fillRect(w - 98, h - 48, 70, 10);
+      g.fillStyle(0x1a1028, 1);
+      g.fillRoundedRect(20, h - 78, 36, 24, 3);
+      g.fillStyle(0x7dffc3, 0.7);
+      g.fillRect(26, h - 72, 24, 6);
+      g.fillStyle(0xf2e6d0, 1);
+      g.fillRoundedRect(64, h - 56, 24, 16, 2);
+      g.fillStyle(0xff6ad5, 1);
+      g.fillRect(68, h - 52, 10, 10);
     }
   }
 
@@ -312,31 +341,29 @@ export class PocketScene extends Phaser.Scene {
     });
     g.save();
     g.scaleCanvas(this.scaleX, this.scaleY);
+    g.fillStyle(0x4a2c14, 1);
+    g.fillRoundedRect(-6, -6, this.layout.w + 12, this.layout.h + 12, 26);
     g.fillStyle(0x5a3a1c, 1);
     g.fillRoundedRect(0, 0, this.layout.w, this.layout.h, 22);
     g.fillStyle(rail, 1);
     g.fillRoundedRect(8, 8, this.layout.w - 16, this.layout.h - 16, 16);
+    g.fillStyle(0xc48a48, 1);
+    g.fillRect(10, 10, this.layout.w - 20, 16);
+    g.fillRect(10, this.layout.h - 26, this.layout.w - 20, 16);
+    g.fillRect(10, 10, 16, this.layout.h - 20);
+    g.fillRect(this.layout.w - 26, 10, 16, this.layout.h - 20);
     g.fillStyle(felt, 1);
-    g.fillRoundedRect(24, 24, this.layout.w - 48, this.layout.h - 48, 12);
-    g.fillStyle(0xa06a38, 1);
-    g.fillRect(12, 12, this.layout.w - 24, 14);
-    g.fillRect(12, this.layout.h - 26, this.layout.w - 24, 14);
-    g.fillRect(12, 12, 14, this.layout.h - 24);
-    g.fillRect(this.layout.w - 26, 12, 14, this.layout.h - 24);
+    g.fillRoundedRect(26, 26, this.layout.w - 52, this.layout.h - 52, 12);
     this.drawFurniture(g, theme);
-    g.fillStyle(theme === "arcade" ? 0xff6ad5 : 0xc4b48a, 0.34);
+    g.fillStyle(theme === "arcade" ? 0xff6ad5 : 0xc4b48a, 0.4);
     for (let i = 0; i < 10; i += 1) {
-      g.fillCircle(28 + i * 70, 18, 3.4);
-      g.fillCircle(28 + i * 70, this.layout.h - 18, 3.4);
+      g.fillCircle(30 + i * 70, 18, 3.8);
+      g.fillCircle(30 + i * 70, this.layout.h - 18, 3.8);
     }
     for (let i = 0; i < 6; i += 1) {
-      g.fillCircle(16, 48 + i * 64, 2.6);
-      g.fillCircle(this.layout.w - 16, 48 + i * 64, 2.6);
+      g.fillCircle(18, 52 + i * 64, 3);
+      g.fillCircle(this.layout.w - 18, 52 + i * 64, 3);
     }
-    g.fillStyle(0x2a2018, 0.9);
-    g.fillRect(this.layout.w - 92, 28, 64, 18);
-    g.fillStyle(theme === "arcade" ? 0xff6ad5 : 0xffd166, 0.8);
-    g.fillRect(this.layout.w - 86, 33, 18, 8);
     g.fillStyle(theme === "workshop" ? 0x2a1c12 : theme === "arcade" ? 0x1a1028 : 0x0f2418, 1);
     for (const w of this.layout.walls) {
       if (w.x === 0 || w.y === 0 || w.w >= this.layout.w - 2 || w.h >= this.layout.h - 2) continue;

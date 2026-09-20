@@ -33,7 +33,7 @@ export const MAPS: MapDef[] = [
     width: 2800,
     height: 720,
     env: "factory",
-    theme: { sky: 0x87c8ea, ground: 0xffd24a, accent: 0xff6b4a, danger: 0xff3b6a },
+    theme: { sky: 0xf2c878, ground: 0xffd24a, accent: 0xff6b4a, danger: 0xff3b6a },
     solids: [
       { x: 40, y: 580, w: 40, h: 40, kind: "spawn" },
       plat(20, 620, 280),
@@ -58,7 +58,7 @@ export const MAPS: MapDef[] = [
     width: 1600,
     height: 2200,
     env: "factory",
-    theme: { sky: 0x9ad4f0, ground: 0x4ad4e8, accent: 0xff6b4a, danger: 0xff4d62 },
+    theme: { sky: 0xf4b070, ground: 0xffd24a, accent: 0xff6b4a, danger: 0xff4d62 },
     solids: [
       { x: 80, y: 2040, w: 40, h: 40, kind: "spawn" },
       plat(40, 2080, 320),
@@ -140,7 +140,7 @@ export const MAPS: MapDef[] = [
     width: 2600,
     height: 800,
     env: "signal",
-    theme: { sky: 0x8ec8e8, ground: 0x4ad4e8, accent: 0xffd166, danger: 0xff5a6e },
+    theme: { sky: 0xf0a868, ground: 0xffd24a, accent: 0xffd166, danger: 0xff5a6e },
     solids: [
       { x: 50, y: 640, w: 40, h: 40, kind: "spawn" },
       plat(20, 680, 280),
@@ -209,7 +209,7 @@ export const MAPS: MapDef[] = [
     width: 3400,
     height: 780,
     env: "signal",
-    theme: { sky: 0xa8d8f0, ground: 0x7ad4e8, accent: 0xff6b4a, danger: 0xff5570 },
+    theme: { sky: 0xf2b878, ground: 0xffc85a, accent: 0xff6b4a, danger: 0xff5570 },
     solids: [
       { x: 40, y: 620, w: 40, h: 40, kind: "spawn" },
       plat(20, 660, 260),

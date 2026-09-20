@@ -26,11 +26,15 @@ export function drawRibbon(
   pulse = 1,
 ) {
   if (pts.length < 2) return;
-  g.lineStyle(7 * pulse, color, 0.22);
+  g.lineStyle(14 * pulse, color, 0.42);
   for (let i = 1; i < pts.length; i += 1) g.lineBetween(pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y);
-  g.lineStyle(3.2 * pulse, 0xffffff, 0.75);
+  g.lineStyle(8 * pulse, color, 0.78);
+  for (let i = 1; i < pts.length; i += 1) g.lineBetween(pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y);
+  g.lineStyle(4.4 * pulse, 0xffffff, 0.94);
   for (let i = 1; i < pts.length; i += 1) g.lineBetween(pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y);
   const last = pts[pts.length - 1];
-  g.fillStyle(color, 0.85);
-  g.fillCircle(last.x, last.y, 4.5 * pulse);
+  g.fillStyle(0xffffff, 0.95);
+  g.fillCircle(last.x, last.y, 6.2 * pulse);
+  g.fillStyle(color, 0.9);
+  g.fillCircle(last.x, last.y, 3.6 * pulse);
 }

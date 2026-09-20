@@ -48,6 +48,9 @@ export type GwDebugCommands = {
   stackTo?: (n: number) => void;
   exposeTrail?: () => void;
   closeLoop?: () => void;
+  seekGate?: () => void;
+  seedPeak?: () => void;
+  setCourse?: (id: string) => void;
 };
 
 type GwDebugWindow = Window & {

@@ -326,8 +326,8 @@ export class SkyStackScene extends Phaser.Scene {
   }
 
   private colorFor(i: number) {
-    const mats = [0xe8c8b0, 0xd0c8bc, 0xc8d4dc, 0xf0d8a8, 0xe0d0e8];
-    const band = this.floors < 10 ? 0 : this.floors < 25 ? 1 : this.floors < 40 ? 2 : this.floors < 60 ? 3 : 4;
+    const mats = [0xe8c8b0, 0xd4c8bc, 0xc8d0dc, 0xf0d0b0, 0xd8c8e4];
+    const band = this.floors < 8 ? 0 : this.floors < 18 ? 1 : 4;
     const base = mats[(band + this.theme) % mats.length];
     const h = (this.hue + i * 7) % 360;
     const s = this.fever ? 70 : 38;
@@ -342,11 +342,9 @@ export class SkyStackScene extends Phaser.Scene {
     const w = this.scale.width;
     const h = this.scale.height;
     const alt = this.floors;
-    const skyTop =
-      alt < 10 ? 0xf2c8a8 : alt < 25 ? 0x8ec4e8 : alt < 40 ? 0xf0b060 : alt < 60 ? 0xc8a8e0 : 0xb090d0;
-    const mid =
-      alt < 10 ? 0xf0d8c0 : alt < 25 ? 0xb8d8ee : alt < 40 ? 0xf0c888 : alt < 60 ? 0xd4c0e8 : 0xc4b0dc;
-    const bottom = alt < 40 ? 0xe8d8c8 : 0xd8c8e0;
+    const skyTop = alt < 8 ? 0xf4c4a4 : alt < 18 ? 0xf2b888 : 0xc4a0dc;
+    const mid = alt < 8 ? 0xf2d4b8 : alt < 18 ? 0xf0c898 : 0xb8a0d4;
+    const bottom = alt < 8 ? 0xe8d0bc : alt < 18 ? 0xe8c8a8 : 0xd0c0dc;
     fillBackdrop(
       g,
       w,
@@ -355,30 +353,46 @@ export class SkyStackScene extends Phaser.Scene {
         top: skyTop,
         mid,
         bottom,
-        grain: 0.045,
+        grain: 0.04,
         blobs: [
-          { color: alt < 40 ? 0xffc38a : 0xa0c8ff, x: 0.16, y: 0.18, r: 52, alpha: 0.14, parallax: 0.04 },
-          { color: 0x7ec8ff, x: 0.72, y: 0.12, r: 80, alpha: alt < 25 ? 0.12 : 0.06, parallax: 0.06 },
+          { color: alt < 20 ? 0xffc38a : 0xc8b0e8, x: 0.16, y: 0.16, r: 58, alpha: 0.16, parallax: 0.04 },
+          { color: alt < 20 ? 0xffe0b0 : 0xa090d0, x: 0.74, y: 0.1, r: 88, alpha: alt < 20 ? 0.18 : 0.12, parallax: 0.06 },
         ],
       },
       { y: this.camY },
     );
-    g.fillStyle(mixColor(bottom, 0xc4b090, 0.35), 1);
-    g.fillTriangle(-40, h, w * 0.28, h * 0.62 + this.camY * 0.04, w * 0.55, h);
-    g.fillTriangle(w * 0.4, h, w * 0.72, h * 0.58 + this.camY * 0.04, w + 40, h);
+    g.fillStyle(mixColor(bottom, alt < 20 ? 0xc4b090 : 0xa090c0, 0.35), 1);
+    g.fillTriangle(-60, h + 20, w * 0.3, h * 0.66 + this.camY * 0.05, w * 0.58, h + 20);
+    g.fillStyle(mixColor(bottom, alt < 20 ? 0xb8a080 : 0x9080b8, 0.28), 1);
+    g.fillTriangle(w * 0.32, h + 20, w * 0.7, h * 0.6 + this.camY * 0.07, w + 60, h + 20);
+    g.fillStyle(mixColor(bottom, 0xffffff, 0.08), 0.7);
+    g.fillRect(0, h * 0.78 + this.camY * 0.03, w, 8);
     for (const c of this.clouds) {
-      g.fillStyle(0xffffff, c.a * (alt < 40 ? 1.15 : 0.7));
-      g.fillCircle(c.x, c.y + this.camY * 0.12, c.r);
-      g.fillCircle(c.x + c.r * 0.55, c.y + 8 + this.camY * 0.12, c.r * 0.7);
+      g.fillStyle(alt < 20 ? 0xfff4e8 : 0xf0e8ff, c.a * (alt < 20 ? 1.2 : 0.75));
+      g.fillCircle(c.x, c.y + this.camY * 0.14, c.r);
+      g.fillCircle(c.x + c.r * 0.55, c.y + 8 + this.camY * 0.14, c.r * 0.7);
     }
     const ox = this.shake * (Math.random() - 0.5);
     for (let i = 0; i < this.stack.length; i += 1) {
       const s = this.stack[i];
       const y = s.y + this.camY + ox;
-      g.fillStyle(this.colorFor(i), 1);
-      g.fillRoundedRect(s.x, y, s.w, SLAB_H - 4, 7);
-      g.fillStyle(0xffffff, 0.28);
-      g.fillRoundedRect(s.x + 5, y + 3, Math.max(8, s.w - 18), 6, 3);
+      const mat = i < 8 ? "ceramic" : i < 22 ? "stone" : "glass";
+      g.fillStyle(this.colorFor(i), mat === "glass" ? 0.82 : 1);
+      g.fillRoundedRect(s.x, y, s.w, SLAB_H - 4, mat === "stone" ? 3 : 8);
+      if (mat === "ceramic") {
+        g.fillStyle(0xffffff, 0.34);
+        g.fillRoundedRect(s.x + 5, y + 3, Math.max(8, s.w - 18), 6, 3);
+      } else if (mat === "stone") {
+        g.fillStyle(0x000000, 0.08);
+        g.fillRect(s.x + 8, y + 8, 4, 3);
+        g.fillRect(s.x + s.w * 0.4, y + 12, 5, 3);
+        g.fillRect(s.x + s.w * 0.7, y + 7, 4, 3);
+      } else {
+        g.fillStyle(0xffffff, 0.22);
+        g.fillRect(s.x + 4, y + 2, 3, SLAB_H - 10);
+        g.fillStyle(0xc8d8f0, 0.18);
+        g.fillRoundedRect(s.x + 8, y + 4, Math.max(6, s.w - 20), 5, 2);
+      }
       g.fillStyle(0x000000, 0.06);
       g.fillRect(s.x + 6, y + SLAB_H - 10, s.w - 12, 3);
     }
@@ -398,8 +412,10 @@ export class SkyStackScene extends Phaser.Scene {
       g.restore();
     }
     if (!this.ended) {
-      g.fillStyle(0xeaf6ff, 0.95);
-      g.fillRoundedRect(this.moving.x, this.moving.y + this.camY, this.moving.w, SLAB_H - 4, 6);
+      g.fillStyle(alt < 18 ? 0xf6e6d4 : 0xe8e0f4, 0.95);
+      g.fillRoundedRect(this.moving.x, this.moving.y + this.camY, this.moving.w, SLAB_H - 4, 7);
+      g.fillStyle(0xffffff, 0.28);
+      g.fillRoundedRect(this.moving.x + 5, this.moving.y + this.camY + 3, Math.max(8, this.moving.w - 18), 5, 3);
     }
     drawParticles(g, this.parts, 0, this.camY);
     fillVignette(g, w, h, 0.08 + Math.min(0.08, alt / 120));

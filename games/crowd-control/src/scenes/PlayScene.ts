@@ -10,7 +10,6 @@ import {
   createGameKeyboard,
   drawParticles,
   drawMiniPerson,
-  drawGateArch,
   fillBackdrop,
   fillVignette,
   type GameKeyboard,
@@ -60,6 +59,7 @@ export class CrowdScene extends Phaser.Scene {
   private levelIndex = 0;
   private viewZoom = 1.62;
   private viewCy = 0.68;
+  private gateSqueeze = 1;
 
   constructor() {
     super("crowd-play");
@@ -173,6 +173,7 @@ export class CrowdScene extends Phaser.Scene {
         this.hitSet.add(seg.z);
         this.touch(seg);
       }
+      this.stepGateSqueeze(dt);
       this.flock(dt);
       if (this.clash) {
         this.clash.t -= dt;
@@ -205,14 +206,42 @@ export class CrowdScene extends Phaser.Scene {
     this.publishDebug();
   }
 
+  private nearestGate() {
+    let best: Segment | null = null;
+    let bestAbs = 1e9;
+    for (const s of this.segs) {
+      if (s.type !== "gate" && s.type !== "finish") continue;
+      const d = Math.abs(s.z - this.z);
+      if (d < bestAbs) {
+        bestAbs = d;
+        best = s;
+      }
+    }
+    return best;
+  }
+
+  private stepGateSqueeze(dt: number) {
+    const gate = this.nearestGate();
+    const dist = gate ? gate.z - this.z : 999;
+    let target = 1;
+    if (gate && dist > -28 && dist < 55) {
+      const t = Math.abs(dist) / 55;
+      target = 0.16 + t * 0.28;
+    } else if (gate && dist <= -28 && dist > -110) {
+      target = 1.55;
+    }
+    this.gateSqueeze += (target - this.gateSqueeze) * Math.min(1, dt * 7);
+  }
+
   private flock(dt: number) {
     this.syncPack();
     const n = this.members.length;
-    const spread = 0.018 + Math.min(0.11, n * 0.0016);
+    const squeeze = this.gateSqueeze;
+    const spread = (0.018 + Math.min(0.11, n * 0.0016)) * (0.35 + squeeze * 0.65);
     for (let i = 0; i < n; i += 1) {
       const m = this.members[i];
-      let ax = -m.ox * 3.4;
-      let ay = -m.oy * 2.6;
+      let ax = -m.ox * (3.4 + (1 - squeeze) * 8);
+      let ay = -m.oy * (2.6 + (1 - squeeze) * 6);
       for (let j = 0; j < n; j += 1) {
         if (i === j) continue;
         const o = this.members[j];
@@ -229,9 +258,10 @@ export class CrowdScene extends Phaser.Scene {
       m.vy += ay * dt;
       m.vx *= 0.86;
       m.vy *= 0.86;
-      const packSpread = 0.22 + Math.min(0.46, this.pack * 0.005);
+      const packSpread = (0.22 + Math.min(0.46, this.pack * 0.005)) * squeeze;
+      const yCap = 22 + 36 * squeeze;
       m.ox = Phaser.Math.Clamp(m.ox + m.vx * dt + Math.sin(this.time.now / 180 + m.phase) * 0.0008, -packSpread, packSpread);
-      m.oy = Phaser.Math.Clamp(m.oy + m.vy * dt + Math.cos(this.time.now / 160 + m.phase) * 0.4, -58, 48);
+      m.oy = Phaser.Math.Clamp(m.oy + m.vy * dt + Math.cos(this.time.now / 160 + m.phase) * 0.4, -yCap, yCap * 0.85);
     }
   }
 
@@ -319,11 +349,38 @@ export class CrowdScene extends Phaser.Scene {
     });
   }
 
+  private drawDecisionGate(
+    g: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    color: number,
+    finish = false,
+  ) {
+    g.fillStyle(0x2a2018, 1);
+    g.fillRect(x + 6, y + 10, 18, h);
+    g.fillRect(x + w - 24, y + 10, 18, h);
+    g.fillStyle(color, 1);
+    g.fillRoundedRect(x, y, w, 54, 10);
+    g.fillStyle(0xffffff, 0.22);
+    g.fillRoundedRect(x + 10, y + 8, w - 20, 38, 8);
+    g.fillStyle(0x1a1410, 0.35);
+    g.fillRoundedRect(x + 16, y + 12, w - 32, 30, 6);
+    g.fillStyle(color, 0.92);
+    g.fillRect(x + 22, y + 54, 12, h - 54);
+    g.fillRect(x + w - 34, y + 54, 12, h - 54);
+    g.fillStyle(0xffd166, finish ? 0.95 : 0.55);
+    g.fillRect(x + 8, y - 16, w - 16, 14);
+    g.fillStyle(0xffffff, 0.5);
+    g.fillTriangle(x + w * 0.5, y + h - 8, x + w * 0.42, y + h - 28, x + w * 0.58, y + h - 28);
+  }
+
   private labelAt(i: number, x: number, y: number, text: string, color: string) {
     let t = this.labels[i];
     if (!t) {
       t = this.add
-        .text(x, y, text, { fontFamily: "ui-sans-serif, system-ui", fontSize: "15px", color, fontStyle: "700" })
+        .text(x, y, text, { fontFamily: "ui-sans-serif, system-ui", fontSize: "28px", color, fontStyle: "800" })
         .setOrigin(0.5)
         .setDepth(16);
       this.labels[i] = t;
@@ -401,20 +458,20 @@ export class CrowdScene extends Phaser.Scene {
       if (s.type === "gate" || s.type === "finish") {
         const leftC = s.left?.kind === "mul" || s.left?.kind === "add" ? 0x2db36a : 0xe23a4a;
         const rightC = s.right?.kind === "mul" || s.right?.kind === "add" ? 0x2db36a : 0xe23a4a;
-        drawGateArch(g, w * 0.18, y - 48, w * 0.28, 78, leftC);
-        drawGateArch(g, w * 0.54, y - 48, w * 0.28, 78, rightC);
+        this.drawDecisionGate(g, w * 0.175, y - 118, w * 0.3, 128, leftC, s.type === "finish");
+        this.drawDecisionGate(g, w * 0.525, y - 118, w * 0.3, 128, rightC, s.type === "finish");
         if (s.type === "finish") {
           g.fillStyle(0x2a2018, 1);
-          g.fillRect(w * 0.4, y - 150, w * 0.2, 150);
-          g.fillStyle(0xffd166, 0.85 + (this.payoff > 0 ? 0.15 : 0));
-          g.fillRect(w * 0.43, y - 140, w * 0.14, 110);
-          g.fillRect(w * 0.38, y - 160, w * 0.24, 18);
-          g.fillStyle(0xff8a4a, 0.55);
-          g.fillCircle(w * 0.5, y - 170, 16 + Math.min(28, this.pack * 0.15));
+          g.fillRect(w * 0.38, y - 196, w * 0.24, 78);
+          g.fillStyle(0xffd166, 0.95);
+          g.fillRect(w * 0.4, y - 188, w * 0.2, 62);
+          g.fillRect(w * 0.36, y - 208, w * 0.28, 22);
+          g.fillStyle(0xff8a4a, 0.7);
+          g.fillCircle(w * 0.5, y - 220, 22 + Math.min(28, this.pack * 0.15));
         }
-        this.labelAt(labelN, w * 0.33, y - 18, opLabel(s.left), "#fff4ea");
+        this.labelAt(labelN, w * 0.325, y - 62, opLabel(s.left), "#fff8ee");
         labelN += 1;
-        this.labelAt(labelN, w * 0.67, y - 18, opLabel(s.right), "#fff4ea");
+        this.labelAt(labelN, w * 0.675, y - 62, opLabel(s.right), "#fff8ee");
         labelN += 1;
       } else if (s.type === "enemy") {
         const n = this.clash && Math.abs(s.z - this.z) < 40 ? Math.max(2, Math.round(this.clash.right * (this.clash.t / 0.85))) : 10;
@@ -459,8 +516,8 @@ export class CrowdScene extends Phaser.Scene {
     const cy = h * view.cy;
     const shown = this.qualityMembers();
     const person = view.person;
-    const massW = 160 + this.pack * 6.4 * view.zoom;
-    const massH = 40 + this.pack * 0.9;
+    const massW = (160 + this.pack * 6.4 * view.zoom) * this.gateSqueeze;
+    const massH = (40 + this.pack * 0.9) * (0.55 + this.gateSqueeze * 0.45);
     const crowdPalette = [0xff6a4a, 0xffd166, 0x4ad4e8, 0xff8ad4, 0x7d5fff, 0x3ad48a];
     g.fillStyle(0x2a2018, 0.12 + Math.min(0.22, this.pack * 0.003));
     g.fillEllipse(cx, cy + 22, massW, massH);
@@ -510,6 +567,13 @@ export class CrowdScene extends Phaser.Scene {
           const snap = this.targetFraming();
           this.viewZoom = snap.zoom;
           this.viewCy = snap.cy;
+        },
+        seekGate: () => {
+          const next = this.segs.find((s) => (s.type === "gate" || s.type === "finish") && s.z > this.z + 8);
+          const target = next ?? this.segs.find((s) => s.type === "gate" || s.type === "finish");
+          if (!target) return;
+          this.z = Math.max(0, target.z - 72);
+          this.gateSqueeze = 0.85;
         },
         hideHud: () => {
           this.hud.setVisible(false);

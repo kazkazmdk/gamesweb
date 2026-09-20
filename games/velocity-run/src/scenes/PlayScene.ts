@@ -488,64 +488,129 @@ export class VelocityPlayScene extends Phaser.Scene {
     const g = this.gfx;
     const th = this.course.theme;
     g.clear();
+    const world = this.course.world;
     fillBackdrop(
       g,
       this.course.width,
       this.course.height,
-      {
-        top: mixColor(th.sky, 0xffffff, 0.18),
-        mid: th.sky,
-        bottom: mixColor(th.bg, th.ground, 0.35),
-        grain: 0.02,
-        blobs: [
-          { color: 0xfff4d0, x: 0.78, y: 0.12, r: 90, alpha: 0.35, parallax: 0.02 },
-          { color: 0xffffff, x: 0.22, y: 0.18, r: 70, alpha: 0.12, parallax: 0.03 },
-        ],
-      },
+      world === "training"
+        ? {
+            top: mixColor(th.sky, 0xffffff, 0.22),
+            mid: th.sky,
+            bottom: mixColor(th.bg, th.ground, 0.4),
+            grain: 0.025,
+            blobs: [
+              { color: 0xfff4d0, x: 0.8, y: 0.1, r: 70, alpha: 0.28, parallax: 0.02 },
+              { color: 0xffffff, x: 0.2, y: 0.2, r: 50, alpha: 0.1, parallax: 0.03 },
+            ],
+          }
+        : world === "transit"
+          ? {
+              top: mixColor(th.sky, 0xffffff, 0.08),
+              mid: th.sky,
+              bottom: mixColor(th.bg, 0x1a2a38, 0.25),
+              grain: 0.03,
+              blobs: [
+                { color: 0x8ec8ff, x: 0.7, y: 0.12, r: 80, alpha: 0.16, parallax: 0.02 },
+                { color: 0xffffff, x: 0.18, y: 0.16, r: 40, alpha: 0.08, parallax: 0.03 },
+              ],
+            }
+          : {
+              top: mixColor(th.sky, 0xffe0b0, 0.18),
+              mid: th.sky,
+              bottom: mixColor(th.bg, 0x8a5030, 0.2),
+              grain: 0.02,
+              blobs: [
+                { color: 0xffd090, x: 0.82, y: 0.1, r: 96, alpha: 0.4, parallax: 0.02 },
+                { color: 0xfff0d0, x: 0.24, y: 0.18, r: 48, alpha: 0.16, parallax: 0.03 },
+              ],
+            },
       { x: this.camX, y: this.camY },
     );
-    g.fillStyle(mixColor(th.bg, 0x3a5a78, 0.35), 1);
-    for (let i = 0; i < 16; i += 1) {
-      const x = i * 280 + this.camX * 0.42;
-      const bh = 180 + (i % 4) * 56;
-      g.fillRect(x, this.course.height - bh - 20, 78 + (i % 3) * 16, bh);
-      g.fillStyle(0xffffff, 0.18);
-      g.fillRect(x + 10, this.course.height - bh + 18, 10, 14);
-      g.fillRect(x + 30, this.course.height - bh + 46, 10, 14);
-      g.fillRect(x + 50, this.course.height - bh + 30, 10, 14);
-      g.fillStyle(mixColor(th.bg, 0x3a5a78, 0.35), 1);
+    if (world === "training") {
+      g.fillStyle(mixColor(th.bg, 0x8aa090, 0.25), 1);
+      for (let i = 0; i < 12; i += 1) {
+        const x = i * 300 + this.camX * 0.2;
+        g.fillRect(x, this.course.height - 240, 120, 80);
+        g.fillStyle(0xffffff, 0.12);
+        g.fillRect(x + 10, this.course.height - 226, 16, 12);
+        g.fillStyle(mixColor(th.bg, 0x8aa090, 0.25), 1);
+      }
+      g.fillStyle(0xc8d0c4, 1);
+      g.fillRect(0, this.course.height - 40, this.course.width, 40);
+      g.fillStyle(0x8a9090, 0.35);
+      for (let x = 0; x < this.course.width; x += 36) g.fillRect(x, this.course.height - 40, 18, 5);
+    } else if (world === "transit") {
+      g.fillStyle(mixColor(th.bg, 0x1a3048, 0.2), 1);
+      for (let i = 0; i < 14; i += 1) {
+        const x = i * 260 + this.camX * 0.38;
+        const bh = 260 + (i % 4) * 80;
+        g.fillRect(x, this.course.height - bh, 52 + (i % 2) * 18, bh);
+        g.fillStyle(0x8ec8ff, 0.22);
+        g.fillRect(x + 8, this.course.height - bh + 20, 12, bh - 40);
+        g.fillStyle(mixColor(th.bg, 0x1a3048, 0.2), 1);
+      }
+      g.fillStyle(0x6a7380, 1);
+      g.fillRect(0, this.course.height - 28, this.course.width, 28);
+    } else {
+      g.fillStyle(mixColor(th.bg, 0x6a3a28, 0.2), 1);
+      for (let i = 0; i < 10; i += 1) {
+        const x = i * 420 + this.camX * 0.3;
+        const bh = 320 + (i % 3) * 90;
+        g.fillRect(x, this.course.height - bh, 88, bh);
+        g.fillStyle(0xffe0b0, 0.12);
+        g.fillRect(x + 16, this.course.height - bh + 24, 14, 18);
+        g.fillRect(x + 48, this.course.height - bh + 56, 14, 18);
+        g.fillStyle(mixColor(th.bg, 0x6a3a28, 0.2), 1);
+      }
+      g.fillStyle(0xd8c4a8, 1);
+      g.fillRect(0, this.course.height - 32, this.course.width, 32);
     }
-    g.fillStyle(0xc4d0c8, 1);
-    g.fillRect(0, this.course.height - 36, this.course.width, 36);
     g.fillStyle(th.accent, 0.18);
     for (let x = 0; x < this.course.width; x += 48) g.fillRect(x, this.course.height - 36, 16, 6);
     const startPad = this.course.solids.find((s) => s.kind === "start");
     if (startPad) {
-      drawGateArch(g, startPad.x - 24, startPad.y - 92, 88, 132, 0xf7f2ea, th.accent);
-      drawHvac(g, startPad.x + 96, startPad.y - 8, 46, 28);
+      drawGateArch(g, startPad.x - 24, startPad.y - 92, 88, 132, world === "ascent" ? 0xf0c090 : 0xf7f2ea, th.accent);
+      if (world === "training") drawHvac(g, startPad.x + 96, startPad.y - 8, 46, 28);
     }
 
-    if (this.course.world === "training") {
-      for (let i = 0; i < 10; i += 1) {
-        drawHvac(g, 180 + i * 310 + this.camX * 0.12, this.course.height - 210 - (i % 3) * 18, 52, 30, i % 2 ? 0xe8e2d8 : 0xd4d0c8);
+    if (world === "training") {
+      for (let i = 0; i < 12; i += 1) {
+        drawHvac(g, 140 + i * 270 + this.camX * 0.1, this.course.height - 200 - (i % 3) * 16, 56, 32, i % 2 ? 0xe8e2d8 : 0xd4d0c8);
+      }
+      g.fillStyle(0xc8c4bc, 1);
+      for (let i = 0; i < 8; i += 1) {
+        g.fillRect(220 + i * 380, this.course.height - 168, 70, 18);
+        g.fillStyle(0x6a7074, 1);
+        for (let k = 6; k < 64; k += 8) g.fillRect(224 + i * 380 + k, this.course.height - 164, 3, 10);
+        g.fillStyle(0xc8c4bc, 1);
       }
       drawBillboard(g, 640, 220, 110, 48, 0xff6a32);
       drawBillboard(g, 1680, 180, 90, 40, 0x2a6a88);
-    } else if (this.course.world === "transit") {
-      drawCrane(g, 420 + this.camX * 0.08, this.course.height - 40, 260, 0xff6a32);
-      drawCrane(g, 1480 + this.camX * 0.08, this.course.height - 40, 220, 0xd8d2c8);
-      g.fillStyle(0x6a7380, 0.35);
-      for (let i = 0; i < 8; i += 1) g.fillRect(i * 360 + 80, 70, 14, this.course.height);
-      g.fillStyle(0xffe08a, 0.55);
-      for (let i = 0; i < 10; i += 1) g.fillCircle(160 + i * 240, 86, 10);
+    } else if (world === "transit") {
+      drawCrane(g, 420 + this.camX * 0.08, this.course.height - 28, 280, 0xff6a32);
+      drawCrane(g, 1480 + this.camX * 0.08, this.course.height - 28, 240, 0xd8d2c8);
+      drawCrane(g, 2480 + this.camX * 0.08, this.course.height - 28, 200, 0xff8a4a);
+      g.fillStyle(0x8ec8ff, 0.16);
+      for (let i = 0; i < 10; i += 1) g.fillRect(i * 360 + 40 + this.camX * 0.12, 40, 90, this.course.height);
+      g.fillStyle(0x6a7380, 0.45);
+      for (let i = 0; i < 8; i += 1) g.fillRect(i * 360 + 80, 40, 16, this.course.height);
+      g.fillStyle(0xffe08a, 0.6);
+      for (let i = 0; i < 10; i += 1) g.fillCircle(160 + i * 240, 70, 11);
     } else {
-      g.fillStyle(0x6a8090, 1);
-      for (let i = 0; i < 6; i += 1) g.fillRect(i * 420 + 90, 24, 8, 120);
-      g.fillStyle(0xffffff, 0.55);
-      for (let i = 0; i < 6; i += 1) g.fillCircle(i * 420 + 94, 20, 10);
-      drawBillboard(g, 980, 80, 140, 54, 0xff7a20);
-      g.fillStyle(0x2a4a68, 0.18);
-      for (let i = 0; i < 8; i += 1) g.fillTriangle(i * 520, this.course.height, i * 520 + 180, this.course.height - 180, i * 520 + 380, this.course.height);
+      g.fillStyle(0x8a6a50, 1);
+      for (let i = 0; i < 7; i += 1) {
+        g.fillRect(i * 400 + 70, 18, 10, 150);
+        g.fillStyle(0xd8d0c4, 1);
+        g.fillCircle(i * 400 + 75, 14, 16);
+        g.fillStyle(0xff7a20, 0.55);
+        g.fillCircle(i * 400 + 75, 14, 6);
+        g.fillStyle(0x8a6a50, 1);
+        g.fillRect(i * 400 + 40, 40, 70, 8);
+      }
+      drawBillboard(g, 980, 70, 150, 56, 0xff7a20);
+      g.fillStyle(0x6a4030, 0.22);
+      for (let i = 0; i < 8; i += 1) g.fillTriangle(i * 520, this.course.height, i * 520 + 180, this.course.height - 220, i * 520 + 380, this.course.height);
     }
     for (const s of this.course.solids) {
       const live = this.liveHazard(s);
@@ -739,6 +804,10 @@ export class VelocityPlayScene extends Phaser.Scene {
           this.hud.setVisible(false);
           this.overlay.setVisible(false);
         },
+        setCourse: (id: string) => {
+          const i = COURSES.findIndex((c) => c.id === id);
+          if (i >= 0) this.switchCourse(i);
+        },
       },
     );
   }
@@ -758,7 +827,7 @@ export function mountVelocityRun(parent: HTMLElement, platform: PlatformSDK, cou
     parent,
     width: Math.max(320, parent.clientWidth || 1280),
     height: Math.max(240, parent.clientHeight || 720),
-    backgroundColor: "#9ad4f0",
+    backgroundColor: "#d4e2d6",
     scale: { mode: Phaser.Scale.RESIZE },
     scene: [VelocityPlayScene],
     disableContextMenu: true,
