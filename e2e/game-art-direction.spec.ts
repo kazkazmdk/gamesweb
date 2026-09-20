@@ -116,16 +116,18 @@ test("catalog contact sheets", async ({ page }) => {
   await stabilizeVisual(page, { width: 1440, height: 900 });
   mkdirSync(OUT, { recursive: true });
   for (const state of ["open", "peak"] as const) {
-    const cells = GAMES.map(
-      (slug) =>
-        `<figure><img src="${slug}-${state}-1440.png" alt="" /><figcaption></figcaption></figure>`,
-    ).join("");
+    const src = (slug: (typeof GAMES)[number]) => {
+      if (state === "peak" && slug === "neon-drift") return "neon-drift-combo-1440.png";
+      if (state === "peak" && slug === "territory-rush") return "territory-rush-fill-1440.png";
+      return `${slug}-${state}-1440.png`;
+    };
+    const cells = GAMES.map((slug) => `<figure><img src="${src(slug)}" alt="" /></figure>`).join("");
     writeFileSync(
       `${OUT}/contact-${state}.html`,
       `<!doctype html><html><head><style>
-        body{margin:0;background:#111;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:8px}
-        figure{margin:0;background:#000}
-        img{width:100%;height:220px;object-fit:cover;display:block}
+        body{margin:0;background:#0c0c0e;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:6px}
+        figure{margin:0}
+        img{width:100%;height:200px;object-fit:cover;display:block}
       </style></head><body>${cells}</body></html>`,
     );
     await page.goto(`file://${process.cwd()}/${OUT}/contact-${state}.html`);
