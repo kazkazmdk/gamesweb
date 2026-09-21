@@ -342,11 +342,9 @@ export class SkyStackScene extends Phaser.Scene {
     const w = this.scale.width;
     const h = this.scale.height;
     const alt = this.floors;
-    const skyTop =
-      alt < 10 ? 0xf2c8a8 : alt < 25 ? 0x8ec4e8 : alt < 40 ? 0xf0b060 : alt < 60 ? 0xc8a8e0 : 0xb090d0;
-    const mid =
-      alt < 10 ? 0xf0d8c0 : alt < 25 ? 0xb8d8ee : alt < 40 ? 0xf0c888 : alt < 60 ? 0xd4c0e8 : 0xc4b0dc;
-    const bottom = alt < 40 ? 0xe8d8c8 : 0xd8c8e0;
+    const skyTop = alt < 6 ? 0xf4c4a8 : alt < 14 ? 0xf0c8b8 : alt < 24 ? 0xc8b8e0 : alt < 36 ? 0xa090d0 : 0x8a78c4;
+    const mid = alt < 6 ? 0xf2d4bc : alt < 14 ? 0xe8c8c4 : alt < 24 ? 0xd4c0e0 : alt < 36 ? 0xb8a8d8 : 0x9c8ccc;
+    const bottom = alt < 14 ? 0xe8d0b8 : alt < 28 ? 0xdcc8d4 : 0xc8b8d8;
     fillBackdrop(
       g,
       w,
@@ -355,19 +353,25 @@ export class SkyStackScene extends Phaser.Scene {
         top: skyTop,
         mid,
         bottom,
-        grain: 0.045,
+        grain: 0.04,
         blobs: [
-          { color: alt < 40 ? 0xffc38a : 0xa0c8ff, x: 0.16, y: 0.18, r: 52, alpha: 0.14, parallax: 0.04 },
-          { color: 0x7ec8ff, x: 0.72, y: 0.12, r: 80, alpha: alt < 25 ? 0.12 : 0.06, parallax: 0.06 },
+          { color: alt < 14 ? 0xffc38a : 0xc8b0e8, x: 0.16, y: 0.16, r: 56, alpha: alt < 14 ? 0.18 : 0.1, parallax: 0.04 },
+          { color: alt < 14 ? 0xffe0b0 : 0xb0a0d8, x: 0.78, y: 0.1, r: 70, alpha: 0.1, parallax: 0.05 },
         ],
       },
       { y: this.camY },
     );
-    g.fillStyle(mixColor(bottom, 0xc4b090, 0.35), 1);
-    g.fillTriangle(-40, h, w * 0.28, h * 0.62 + this.camY * 0.04, w * 0.55, h);
-    g.fillTriangle(w * 0.4, h, w * 0.72, h * 0.58 + this.camY * 0.04, w + 40, h);
+    const horizon = h * (0.68 + Math.min(0.08, alt * 0.002)) + this.camY * 0.03;
+    g.fillStyle(mixColor(bottom, alt < 14 ? 0xc4b090 : 0xa890c0, 0.4), 1);
+    g.fillRect(0, horizon, w, h - horizon + 8);
+    g.fillStyle(mixColor(bottom, 0xc4b090, 0.28), 1);
+    g.fillTriangle(-40, h, w * 0.28, horizon - 18, w * 0.55, h);
+    g.fillTriangle(w * 0.4, h, w * 0.72, horizon - 28, w + 40, h);
+    g.fillStyle(mixColor(skyTop, 0xffffff, 0.2), 0.35);
+    g.fillRect(0, horizon - 4, w, 6);
     for (const c of this.clouds) {
-      g.fillStyle(0xffffff, c.a * (alt < 40 ? 1.15 : 0.7));
+      if (alt > 30) continue;
+      g.fillStyle(0xffffff, c.a * (alt < 16 ? 1.1 : 0.55));
       g.fillCircle(c.x, c.y + this.camY * 0.12, c.r);
       g.fillCircle(c.x + c.r * 0.55, c.y + 8 + this.camY * 0.12, c.r * 0.7);
     }

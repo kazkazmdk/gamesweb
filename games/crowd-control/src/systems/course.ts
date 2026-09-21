@@ -16,12 +16,27 @@ export function applyOp(pack: number, op?: GateOp) {
   return Math.max(0, Math.floor(pack / op.n));
 }
 
+export function gateFamily(op?: GateOp): "add" | "mul" | "tax" | "none" {
+  if (!op) return "none";
+  if (op.kind === "add") return "add";
+  if (op.kind === "mul") return "mul";
+  return "tax";
+}
+
 export function opLabel(op?: GateOp) {
   if (!op) return "";
   if (op.kind === "add") return `+${op.n}`;
-  if (op.kind === "mul") return `x${op.n}`;
-  if (op.kind === "sub") return `-${op.n}`;
-  return `/${op.n}`;
+  if (op.kind === "mul") return `×${op.n}`;
+  if (op.kind === "sub") return `TAX −${op.n}`;
+  return `TAX ÷${op.n}`;
+}
+
+export function gateColors(op?: GateOp): { face: number; trim: number; ink: string } {
+  const family = gateFamily(op);
+  if (family === "add") return { face: 0x1fd46a, trim: 0x0a6a32, ink: "#f4fff4" };
+  if (family === "mul") return { face: 0xffb020, trim: 0x8a3a08, ink: "#2a1408" };
+  if (family === "tax") return { face: 0xff2a6a, trim: 0x5a0824, ink: "#fff4f8" };
+  return { face: 0x2db36a, trim: 0x144028, ink: "#fff4ea" };
 }
 
 export function buildCourse(seed: string): Segment[] {

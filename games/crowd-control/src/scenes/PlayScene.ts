@@ -10,13 +10,12 @@ import {
   createGameKeyboard,
   drawParticles,
   drawMiniPerson,
-  drawGateArch,
   fillBackdrop,
   fillVignette,
   type GameKeyboard,
 } from "@gamesweb/game-core";
 import { crowdControlManifest, readRunContext, type PlatformSDK } from "@gamesweb/game-sdk";
-import { applyOp, buildCourse, opLabel, type Segment } from "../systems/course";
+import { applyOp, buildCourse, gateColors, gateFamily, opLabel, type GateOp, type Segment } from "../systems/course";
 import { finishMultiplier, resolveCrowdClash, stepBossFight } from "../systems/combat";
 import { LEVELS } from "../levels/levels";
 
@@ -132,8 +131,21 @@ export class CrowdScene extends Phaser.Scene {
     void this.synth.resume();
   }
 
+  private gateSqueeze() {
+    let squeeze = 1;
+    for (const s of this.segs) {
+      if (s.type !== "gate" && s.type !== "finish") continue;
+      const d = s.z - this.z;
+      if (d > -40 && d < 92) {
+        const t = d > 0 ? 1 - d / 92 : 1 - Math.abs(d) / 40;
+        squeeze = Math.min(squeeze, 0.26 + (1 - Math.max(0, t)) * 0.74);
+      }
+    }
+    return squeeze;
+  }
+
   private syncPack(scatter = false) {
-    const n = Math.max(1, Math.min(96, Math.round(this.pack)));
+    const n = Math.max(1, Math.min(120, Math.round(this.pack)));
     while (this.members.length < n) {
       this.members.push({
         ox: scatter ? (Math.random() - 0.5) * 0.42 : 0,
@@ -229,9 +241,10 @@ export class CrowdScene extends Phaser.Scene {
       m.vy += ay * dt;
       m.vx *= 0.86;
       m.vy *= 0.86;
-      const packSpread = 0.22 + Math.min(0.46, this.pack * 0.005);
+      const squeeze = this.gateSqueeze();
+      const packSpread = (0.22 + Math.min(0.52, this.pack * 0.0052)) * squeeze;
       m.ox = Phaser.Math.Clamp(m.ox + m.vx * dt + Math.sin(this.time.now / 180 + m.phase) * 0.0008, -packSpread, packSpread);
-      m.oy = Phaser.Math.Clamp(m.oy + m.vy * dt + Math.cos(this.time.now / 160 + m.phase) * 0.4, -58, 48);
+      m.oy = Phaser.Math.Clamp(m.oy + m.vy * dt + Math.cos(this.time.now / 160 + m.phase) * 0.4, -58 * squeeze, 48 * squeeze);
     }
   }
 
@@ -284,7 +297,7 @@ export class CrowdScene extends Phaser.Scene {
   }
 
   private qualityMembers() {
-    const cap = this.sys.game.device.input.touch ? 56 : 72;
+    const cap = this.sys.game.device.input.touch ? 64 : 88;
     if (this.members.length <= cap) return this.members;
     const step = Math.ceil(this.members.length / cap);
     return this.members.filter((_, i) => i % step === 0);
@@ -319,21 +332,21 @@ export class CrowdScene extends Phaser.Scene {
     });
   }
 
-  private labelAt(i: number, x: number, y: number, text: string, color: string) {
+  private labelAt(i: number, x: number, y: number, text: string, color: string, size = 15) {
     let t = this.labels[i];
     if (!t) {
       t = this.add
-        .text(x, y, text, { fontFamily: "ui-sans-serif, system-ui", fontSize: "15px", color, fontStyle: "700" })
+        .text(x, y, text, { fontFamily: "ui-sans-serif, system-ui", fontSize: `${size}px`, color, fontStyle: "700" })
         .setOrigin(0.5)
         .setDepth(16);
       this.labels[i] = t;
     }
-    t.setPosition(x, y).setText(text).setColor(color).setVisible(true).setAlpha(1);
+    t.setPosition(x, y).setText(text).setColor(color).setFontSize(size).setVisible(true).setAlpha(1);
   }
 
   private targetFraming() {
     const pack = this.pack;
-    let zoom = pack < 16 ? 1.68 : pack < 28 ? 1.42 : pack < 48 ? 1.2 : pack < 72 ? 1.06 : 0.96;
+    let zoom = pack < 16 ? 1.68 : pack < 28 ? 1.42 : pack < 48 ? 1.2 : pack < 80 ? 1.04 : pack < 110 ? 0.92 : 0.84;
     if (this.clash) zoom *= 0.94;
     if (this.payoff > 0) zoom = 1.52;
     const cy = this.payoff > 0 ? 0.64 : pack < 20 ? 0.67 : pack < 48 ? 0.7 : 0.73;
@@ -347,6 +360,43 @@ export class CrowdScene extends Phaser.Scene {
     this.viewZoom += (target.zoom - this.viewZoom) * 0.14;
     this.viewCy += (target.cy - this.viewCy) * 0.14;
     return { zoom: this.viewZoom, cy: this.viewCy, depth: target.depth, person: target.person };
+  }
+
+  private drawGateSign(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number, op?: GateOp) {
+    const family = gateFamily(op);
+    const pal = gateColors(op);
+    g.fillStyle(0x2a2018, 1);
+    g.fillRect(x + 10, y + 18, 16, h);
+    g.fillRect(x + w - 26, y + 18, 16, h);
+    g.fillStyle(pal.trim, 1);
+    g.fillRoundedRect(x - 6, y - 8, w + 12, 78, 10);
+    g.fillStyle(pal.face, 1);
+    g.fillRoundedRect(x + 4, y, w - 8, 62, 8);
+    g.fillStyle(0xffffff, family === "tax" ? 0.12 : 0.22);
+    g.fillRoundedRect(x + 10, y + 6, w - 20, 18, 4);
+    if (family === "add") {
+      g.fillStyle(0xffffff, 0.92);
+      g.fillRect(x + w * 0.5 - 5, y + 22, 10, 28);
+      g.fillRect(x + w * 0.5 - 16, y + 31, 32, 10);
+    } else if (family === "mul") {
+      g.fillStyle(0x2a1408, 0.85);
+      g.save();
+      g.translateCanvas(x + w * 0.18, y + 36);
+      g.rotateCanvas(0.7);
+      g.fillRect(-3, -14, 6, 28);
+      g.rotateCanvas(-1.4);
+      g.fillRect(-3, -14, 6, 28);
+      g.restore();
+      g.fillStyle(0xfff4c8, 0.55);
+      g.fillCircle(x + w * 0.82, y + 16, 10);
+    } else if (family === "tax") {
+      g.fillStyle(0x2a0810, 0.9);
+      g.fillRoundedRect(x + 14, y + 40, w - 28, 14, 3);
+      g.fillStyle(0xffffff, 0.8);
+      g.fillTriangle(x + w * 0.18, y + 18, x + w * 0.28, y + 36, x + w * 0.08, y + 36);
+    }
+    g.fillStyle(pal.trim, 0.95);
+    g.fillRect(x + 8, y + 64, w - 16, 8);
   }
 
   private draw() {
@@ -399,10 +449,8 @@ export class CrowdScene extends Phaser.Scene {
       const y = h * (0.58 + view.zoom * 0.06) - (s.z - this.z) * depth;
       if (y < -50 || y > h + 50) continue;
       if (s.type === "gate" || s.type === "finish") {
-        const leftC = s.left?.kind === "mul" || s.left?.kind === "add" ? 0x2db36a : 0xe23a4a;
-        const rightC = s.right?.kind === "mul" || s.right?.kind === "add" ? 0x2db36a : 0xe23a4a;
-        drawGateArch(g, w * 0.18, y - 48, w * 0.28, 78, leftC);
-        drawGateArch(g, w * 0.54, y - 48, w * 0.28, 78, rightC);
+        this.drawGateSign(g, w * 0.175, y - 118, w * 0.3, 132, s.left);
+        this.drawGateSign(g, w * 0.525, y - 118, w * 0.3, 132, s.right);
         if (s.type === "finish") {
           g.fillStyle(0x2a2018, 1);
           g.fillRect(w * 0.4, y - 150, w * 0.2, 150);
@@ -412,9 +460,11 @@ export class CrowdScene extends Phaser.Scene {
           g.fillStyle(0xff8a4a, 0.55);
           g.fillCircle(w * 0.5, y - 170, 16 + Math.min(28, this.pack * 0.15));
         }
-        this.labelAt(labelN, w * 0.33, y - 18, opLabel(s.left), "#fff4ea");
+        const leftInk = gateColors(s.left).ink;
+        const rightInk = gateColors(s.right).ink;
+        this.labelAt(labelN, w * 0.325, y - 62, opLabel(s.left), leftInk, 34);
         labelN += 1;
-        this.labelAt(labelN, w * 0.67, y - 18, opLabel(s.right), "#fff4ea");
+        this.labelAt(labelN, w * 0.675, y - 62, opLabel(s.right), rightInk, 34);
         labelN += 1;
       } else if (s.type === "enemy") {
         const n = this.clash && Math.abs(s.z - this.z) < 40 ? Math.max(2, Math.round(this.clash.right * (this.clash.t / 0.85))) : 10;
@@ -459,8 +509,9 @@ export class CrowdScene extends Phaser.Scene {
     const cy = h * view.cy;
     const shown = this.qualityMembers();
     const person = view.person;
-    const massW = 160 + this.pack * 6.4 * view.zoom;
-    const massH = 40 + this.pack * 0.9;
+    const squeeze = this.ended ? 1 : this.gateSqueeze();
+    const massW = (160 + this.pack * 6.4 * view.zoom) * (0.42 + squeeze * 0.58);
+    const massH = (40 + this.pack * 0.9) * (0.7 + squeeze * 0.3);
     const crowdPalette = [0xff6a4a, 0xffd166, 0x4ad4e8, 0xff8ad4, 0x7d5fff, 0x3ad48a];
     g.fillStyle(0x2a2018, 0.12 + Math.min(0.22, this.pack * 0.003));
     g.fillEllipse(cx, cy + 22, massW, massH);
@@ -505,11 +556,17 @@ export class CrowdScene extends Phaser.Scene {
       {
         finishRun: () => this.finish(),
         setPack: (n: number) => {
-          this.pack = Math.max(1, Math.min(96, n));
+          this.pack = Math.max(1, Math.min(120, n));
           this.syncPack(true);
           const snap = this.targetFraming();
           this.viewZoom = snap.zoom;
           this.viewCy = snap.cy;
+        },
+        seekGate: () => {
+          const next = this.segs.find((s) => (s.type === "gate" || s.type === "finish") && s.z > this.z + 8);
+          if (!next) return;
+          this.z = next.z - 72;
+          this.x = 0.28;
         },
         hideHud: () => {
           this.hud.setVisible(false);

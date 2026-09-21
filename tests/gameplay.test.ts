@@ -11,11 +11,15 @@ import {
   applyUpgrade,
   BASE_BUILD,
   chainDamage,
+  desiredCount,
   pickUpgrades,
   phaseFor,
   recommendBuild,
   UPGRADES,
 } from "../games/swarm-protocol/src/systems/sim.ts";
+import { authoredCaptureLoop } from "../games/territory-rush/src/systems/render.ts";
+import { gateFamily, opLabel } from "../games/crowd-control/src/systems/course.ts";
+import { readFileSync } from "node:fs";
 
 describe("neon tutorial migration", () => {
   it("uses a v2 key so returning players see HOLD → COMBO → BANK", () => {
@@ -200,5 +204,44 @@ describe("swarm upgrades", () => {
     expect(phaseFor(120)).toBe("build");
     expect(phaseFor(240)).toBe("pressure");
     expect(phaseFor(400)).toBe("boss");
+  });
+
+  it("escalates open → mid → peak density", () => {
+    expect(desiredCount(20)).toBeLessThan(desiredCount(120));
+    expect(desiredCount(120)).toBeLessThan(desiredCount(240));
+    expect(desiredCount(240)).toBeLessThan(desiredCount(360));
+    expect(desiredCount(360)).toBeGreaterThanOrEqual(48);
+  });
+});
+
+describe("territory authored fill", () => {
+  it("closes a large loop covering about 35–50% of the 48×28 map", () => {
+    const loop = authoredCaptureLoop(48, 28);
+    expect(loop.length).toBeGreaterThan(80);
+    const xs = loop.map((p) => p.x);
+    const ys = loop.map((p) => p.y);
+    const w = Math.max(...xs) - Math.min(...xs) + 1;
+    const h = Math.max(...ys) - Math.min(...ys) + 1;
+    const interior = (w - 2) * (h - 2);
+    expect(w).toBeGreaterThanOrEqual(20);
+    expect(h).toBeGreaterThanOrEqual(16);
+    expect(interior / (48 * 28)).toBeGreaterThan(0.3);
+    expect(interior / (48 * 28)).toBeLessThan(0.55);
+  });
+});
+
+describe("crowd gate copy", () => {
+  it("labels add, multiply, and tax distinctly", () => {
+    expect(opLabel({ kind: "add", n: 8 })).toBe("+8");
+    expect(opLabel({ kind: "mul", n: 2 })).toBe("×2");
+    expect(opLabel({ kind: "sub", n: 6 })).toMatch(/TAX/);
+    expect(gateFamily({ kind: "div", n: 2 })).toBe("tax");
+  });
+});
+
+describe("neon track export", () => {
+  it("re-exports TRACKS from the game entry", () => {
+    const src = readFileSync(new URL("../games/neon-drift/src/index.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/export\s*\{\s*TRACKS\s*\}/);
   });
 });

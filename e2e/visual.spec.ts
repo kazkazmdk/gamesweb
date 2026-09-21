@@ -14,6 +14,8 @@ test.describe("visual regression", () => {
   test("Games Home Velocity 1440", async ({ page }) => {
     await stabilizeVisual(page, { width: 1440, height: 900 });
     await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1, name: "Neon Drift" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Play|Continue/ }).first()).toBeVisible();
     await page.keyboard.press("ArrowRight");
     await expect(page.getByRole("heading", { level: 1, name: "Velocity Run" })).toBeVisible();
     await page.screenshot({ path: "test-results/visual-home-velocity-1440.png", fullPage: false });
@@ -23,6 +25,8 @@ test.describe("visual regression", () => {
   test("Games Home Swarm 1440", async ({ page }) => {
     await stabilizeVisual(page, { width: 1440, height: 900 });
     await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1, name: "Neon Drift" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Play|Continue/ }).first()).toBeVisible();
     await page.keyboard.press("ArrowRight");
     await expect(page.getByRole("heading", { level: 1, name: "Velocity Run" })).toBeVisible();
     await page.keyboard.press("ArrowRight");

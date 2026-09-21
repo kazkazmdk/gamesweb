@@ -1,10 +1,12 @@
-import { brand } from "@gamesweb/config";
 import { GAME_MANIFESTS, getManifest } from "@gamesweb/game-sdk";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { GameHub } from "@/components/game/GameHub";
-import { gameSeoTitle, INDEX, videoGameJsonLd } from "@/lib/seo";
+import { GameHubEditorial } from "@/components/game/GameHubEditorial";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { SeoLandingView } from "@/components/seo/SeoAnalytics";
+import { editorialFor, seoPageByPath } from "@/content";
+import { breadcrumbJsonLd, metadataForPath, videoGameJsonLd } from "@/lib/seo";
 
 export function generateStaticParams() {
   return GAME_MANIFESTS.map((g) => ({ slug: g.slug }));
@@ -12,41 +14,37 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const game = getManifest(slug);
-  if (!game) return { title: "Game" };
-  const title = gameSeoTitle(game.title, game.genre);
-  const url = `/games/${game.slug}`;
-  const image = game.hero;
-  return {
-    title: { absolute: `${title} | ${brand.productName}` },
-    description: game.description,
-    alternates: { canonical: url },
-    ...INDEX,
-    openGraph: {
-      title: `${title} | ${brand.productName}`,
-      description: game.description,
-      url,
-      images: [{ url: image, alt: game.title }],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: `${title} | ${brand.productName}`,
-      description: game.description,
-      images: [image],
-    },
-  };
+  return metadataForPath(`/games/${slug}`);
 }
 
 export default async function GameHubPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const game = getManifest(slug);
-  if (!game) notFound();
-  const jsonLd = videoGameJsonLd(game);
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const page = seoPageByPath(`/games/${slug}`);
+  if (!game || !page) notFound();
+  const ed = editorialFor(slug);
+  const crumbs = [
+    { name: "Home", path: "/" },
+    { name: "Games", path: "/games" },
+    { name: game.title, path: page.path },
+  ];
   return (
     <>
-      <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <JsonLd
+        data={[
+          videoGameJsonLd({
+            title: game.title,
+            description: ed.hubDescription,
+            genre: game.genre,
+            slug: game.slug,
+            hero: game.hero,
+          }),
+          breadcrumbJsonLd(crumbs),
+        ]}
+      />
+      <SeoLandingView path={page.path} kind="hub" />
       <GameHub game={game} />
+      <GameHubEditorial slug={game.slug} />
     </>
   );
 }

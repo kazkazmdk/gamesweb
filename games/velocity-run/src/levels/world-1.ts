@@ -1,6 +1,6 @@
 import { C, F, K, S, T, type Course } from "../systems/types";
 
-const theme = { sky: 0x9ad4f0, ground: 0xf0ebe2, accent: 0xff6a32, danger: 0xe83a4a, bg: 0xc8e6f4 };
+const theme = { sky: 0xf0e6d4, ground: 0xf4efe6, accent: 0xff6a32, danger: 0xe83a4a, bg: 0xe8d8c0 };
 
 export const WORLD_1: Course[] = [
   {

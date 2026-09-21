@@ -253,8 +253,10 @@ test("a finished run opens the result screen and the score reaches the server", 
   await expect(overlay).toBeVisible({ timeout: 5_000 });
 
   // A tap still in the play rhythm must not dismiss the recap.
-  // Assert this immediately: waiting for Saved first burns the 450ms grace.
-  await page.keyboard.press("Space");
+  // Dispatch in-page so Playwright IPC cannot burn the 800ms grace.
+  await page.evaluate(() => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+  });
   await expect(overlay).toBeVisible();
 
   const res = await scoreReq;
@@ -265,7 +267,7 @@ test("a finished run opens the result screen and the score reaches the server", 
   await expect(page.getByRole("button", { name: /Share challenge|Challenge a friend/i })).toBeVisible();
   await expect(page.getByText(/^Saved$|Score under review/)).toBeVisible({ timeout: 5_000 });
 
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(900);
   await page.keyboard.press("Space");
   await expect(overlay).toBeHidden({ timeout: 3_000 });
   await expect.poll(async () => (await debugOf(page))?.runState).toBe("playing");

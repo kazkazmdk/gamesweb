@@ -28,7 +28,7 @@ import { ChamferButton } from "@/components/visual/ChamferButton";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import type Phaser from "phaser";
 
-const RESULT_INPUT_GRACE_MS = 450;
+const RESULT_INPUT_GRACE_MS = 800;
 
 export function GameView({ slug }: { slug: string }) {
   const game = getManifest(slug);
