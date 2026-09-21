@@ -33,3 +33,5 @@ Existing retry, result grace, Escape pause, blur-to-pause remain. Five games no 
 ## Known limits
 
 No new gameplay features. No global art redesign. Visual stills for the three Neon environments were not recaptured in this pass; first-read claims are from code + prior QA folders.
+
+Gameplay e2e: neon steer/pause/retry, velocity, swarm, sky, knockout, Territory result+score — passed on this branch.

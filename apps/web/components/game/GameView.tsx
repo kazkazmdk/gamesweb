@@ -716,7 +716,7 @@ function Results({
               {copied ? "Link copied" : action.label}
             </ChamferButton>
           ) : null}
-          {!wonChallenge ? (
+          {!wonChallenge && action.type !== "challenge_friend" ? (
             <ChamferButton tone="quiet" cue={false} onClick={makeChallenge}>
               Share challenge
             </ChamferButton>

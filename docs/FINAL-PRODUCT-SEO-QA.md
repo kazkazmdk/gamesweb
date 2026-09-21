@@ -50,3 +50,26 @@ Territory still uses a board grid (houses are now faint context). Crowd boulevar
 ## Policy
 
 No new thin SEO URLs. Indexable band stays 50–70 (target 65). No fake users, presence, or crew members.
+
+## Tests run (this pass)
+
+| Command | Result |
+| --- | --- |
+| `pnpm test` | 119 passed |
+| `pnpm typecheck` | pass (cleared stale `.next/types` from another URL model) |
+| `pnpm lint` | pass + existing `GameArt` img warning |
+| `pnpm --filter @gamesweb/web build` | pass, 112 static pages |
+| `e2e/social.spec.ts` | 2 passed (two-context party + challenge/inbox) |
+| `e2e/smoke.spec.ts` | 12 passed |
+| `e2e/seo.spec.ts` | 7 passed |
+| `e2e/platform.spec.ts` | 16 passed |
+| `e2e/gameplay.spec.ts` | 9 passed after Results CTA de-dupe |
+
+Visual/mobile contact-sheet recapture was **not** run this pass. Compare against `docs/qa-final-closeout/`.
+
+## Known limitations
+
+- Social objects live in `globalThis.__gw_social_arcade` on one Next instance. Multi-instance production needs `0006_social_arcade.sql`.
+- Crew is a local-preview house, not a shared team.
+- Daily / Grand Prix remain local.
+- No production deploy. No Vercel preview.

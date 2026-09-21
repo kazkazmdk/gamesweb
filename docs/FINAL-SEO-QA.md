@@ -33,3 +33,7 @@ Hubs expose Guide / How to play / Controls / Strategy / Tracks|Courses|Scoring /
 ## Production caveats
 
 Canonicals still depend on `publicOrigin()`. Preview hosts must not be used as production canonicals. Challenge and party codes stay noindex.
+
+## Count
+
+`indexablePages().length` stays in the 50–70 band (registry 65). Sitemap parity holds in `tests/seo.test.ts` and `e2e/seo.spec.ts`. Noindex families: `/play/*`, `/arcade`, social/account (`/friends`, `/inbox`, `/party`, `/c/*`, `/me`, `/auth`, `/settings`).
