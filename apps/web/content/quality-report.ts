@@ -1,7 +1,10 @@
+import { GAME_MANIFESTS, getManifest } from "@gamesweb/game-sdk";
 import { editorialFor } from "./editorial";
 import { COLLECTIONS } from "./collections";
 import { indexablePages } from "./registry";
-import type { SeoPage } from "./types";
+import type { SeoPage, SeoTopic } from "./types";
+
+const UTILITY: SeoTopic[] = ["home", "catalog", "guides-index", "collections-index", "legal"];
 
 export type SeoContentRow = {
   url: string;
@@ -40,14 +43,26 @@ function jaccard(a: Set<string>, b: Set<string>) {
 
 function bodyFor(page: SeoPage) {
   const parts = [page.title, page.h1, page.description];
+  if (page.topic === "home" || page.topic === "catalog") {
+    parts.push(...GAME_MANIFESTS.map((g) => `${g.title} ${g.tagline} ${g.genre}`));
+  }
+  if (page.topic === "guides-index") {
+    parts.push(...GAME_MANIFESTS.map((g) => `${g.title} guide ${editorialFor(g.slug).guideLead}`));
+  }
+  if (page.topic === "collections-index") {
+    parts.push(...COLLECTIONS.map((c) => `${c.h1} ${c.rationale} ${c.audience} ${c.pick}`));
+  }
   if (page.gameSlug) {
+    const game = getManifest(page.gameSlug);
     const ed = editorialFor(page.gameSlug);
     if (page.topic === "hub") parts.push(ed.hubDescription, ed.whyDistinct, ...ed.run);
     if (page.topic === "guide") parts.push(ed.guideLead, ed.whyDistinct);
-    if (page.topic === "how-to-play") parts.push(ed.howToLead, ...ed.run);
-    if (page.topic === "controls") parts.push(ed.controlsLead);
+    if (page.topic === "how-to-play") parts.push(ed.howToLead, ...(game?.howToPlay ?? []), ...ed.run);
+    if (page.topic === "controls") parts.push(ed.controlsLead, ...(game?.controls.map((c) => `${c.input} ${c.action}`) ?? []));
     if (page.topic === "strategy") parts.push(...ed.strategy);
-    if (page.topic === "achievements") parts.push(ed.whyDistinct);
+    if (page.topic === "achievements") {
+      parts.push(ed.whyDistinct, ...(game?.achievements.map((a) => `${a.name} ${a.description}`) ?? []));
+    }
     if (page.topic === "tracks" && ed.tracks) parts.push(...ed.tracks.map((t) => `${t.name} ${t.subtitle} ${t.note}`));
     if (page.topic === "courses" && ed.courses) parts.push(...ed.courses.map((c) => `${c.name} ${c.world} ${c.subtitle}`));
     if (page.topic === "scoring" && ed.scoring) parts.push(ed.scoring.lead, ...ed.scoring.rules);
@@ -76,7 +91,8 @@ export function buildSeoContentReport(): SeoContentRow[] {
         nearestPath = other.page.path;
       }
     }
-    const thin = row.words.length < 40;
+    const utility = UTILITY.includes(row.page.topic);
+    const thin = !utility && row.words.length < 40;
     const near = nearestSimilarity >= 0.82;
     return {
       url: row.page.path,

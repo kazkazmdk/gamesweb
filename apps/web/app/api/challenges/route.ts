@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     score?: number;
     code?: string;
     playerName?: string;
-    trust?: "verified" | "unverified" | "flagged";
+    trust?: "verified" | "unverified" | "practice";
     durationMs?: number;
   };
   const identity = await getIdentity();

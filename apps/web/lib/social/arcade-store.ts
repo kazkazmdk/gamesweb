@@ -318,15 +318,15 @@ class ArcadeStore {
       trust: attempt.trust,
       durationMs: typeof attempt.metadata?.durationMs === "number" ? attempt.metadata.durationMs : 0,
     });
-    if (remote.ok && "challenge" in remote.data && remote.data.challenge) {
-      const applied = remote.data as { challenge: ChallengeRecord; outcome: "win" | "loss" | "draw" | "pending"; duplicate: boolean };
+    if (remote.ok && remote.data.challenge) {
+      const applied = remote.data;
       this.rememberChallenge(applied.challenge);
       if (!applied.duplicate && applied.outcome !== "pending") {
         this.touchRival(applied.challenge.challengerId, applied.challenge.challengerName, applied.outcome);
       }
       void this.hydrateRemote();
       this.emit();
-      return { ok: true as const, ...applied };
+      return { ok: true as const, challenge: applied.challenge, outcome: applied.outcome, duplicate: applied.duplicate };
     }
     if (payload) {
       const share = decodeChallengePayload(payload);

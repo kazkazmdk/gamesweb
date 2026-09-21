@@ -178,7 +178,13 @@ export const playerApi = {
     return parse<{ challenge: import("@gamesweb/game-sdk").ChallengeRecord; persistence: string }>(await fetch(`/api/challenges?${q}`));
   },
   async attemptChallenge(input: Record<string, unknown>) {
-    return parse(await fetch("/api/challenges", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "attempt", ...input }) }));
+    return parse<{
+      ok: true;
+      challenge: import("@gamesweb/game-sdk").ChallengeRecord;
+      outcome: "win" | "loss" | "draw" | "pending";
+      duplicate: boolean;
+      persistence: string;
+    }>(await fetch("/api/challenges", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "attempt", ...input }) }));
   },
   async inbox() {
     return parse<{ items: Array<{ id: string; type: string; title: string; body: string; href: string; at: number; read: boolean }> }>(await fetch("/api/inbox"));
