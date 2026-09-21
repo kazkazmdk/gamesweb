@@ -1,5 +1,21 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { settleVisual, shot, stabilizeVisual } from "./visual-helpers";
+
+async function stepCarousel(page: Page) {
+  const before = ((await page.locator("h1").first().textContent()) ?? "").trim();
+  for (let i = 0; i < 5; i += 1) {
+    await page.keyboard.press("ArrowRight");
+    try {
+      await expect
+        .poll(async () => ((await page.locator("h1").first().textContent()) ?? "").trim(), { timeout: 2_000 })
+        .not.toBe(before);
+      return;
+    } catch {
+      /* The home key listener attaches after hydration. A press before that is ignored. */
+    }
+  }
+  throw new Error(`carousel stayed on ${before}`);
+}
 
 test.describe("visual regression", () => {
   test("Games Home Neon 1440", async ({ page }) => {
@@ -16,7 +32,7 @@ test.describe("visual regression", () => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1, name: "Neon Drift" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Play|Continue/ }).first()).toBeVisible();
-    await page.keyboard.press("ArrowRight");
+    await stepCarousel(page);
     await expect(page.getByRole("heading", { level: 1, name: "Velocity Run" })).toBeVisible();
     await page.screenshot({ path: "test-results/visual-home-velocity-1440.png", fullPage: false });
     await expect(page).toHaveScreenshot("home-velocity-1440.png", shot);
@@ -27,9 +43,9 @@ test.describe("visual regression", () => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1, name: "Neon Drift" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Play|Continue/ }).first()).toBeVisible();
-    await page.keyboard.press("ArrowRight");
+    await stepCarousel(page);
     await expect(page.getByRole("heading", { level: 1, name: "Velocity Run" })).toBeVisible();
-    await page.keyboard.press("ArrowRight");
+    await stepCarousel(page);
     await expect(page.getByRole("heading", { level: 1, name: "Swarm Protocol" })).toBeVisible();
     await settleVisual(page);
     await page.screenshot({ path: "test-results/visual-home-swarm-1440.png", fullPage: false });

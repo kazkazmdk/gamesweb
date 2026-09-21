@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-09-21T10:46:09.114Z",
+  "generatedAt": "2026-09-21T20:55:21.157Z",
   "rows": [
     {
       "url": "/",
       "status": 200,
       "title": "Gamesweb — Play first. Keep going.",
       "description": "Instant browser games bound by one player identity — XP, records, challenges, friends.",
-      "canonical": "http://localhost:3000",
+      "canonical": "https://gamesweb.example",
       "robots": "index, follow",
       "h1": "Neon Drift",
       "h2s": [
@@ -31,7 +31,6 @@
         "Me"
       ],
       "jsonld": [
-        "WebApplication",
         "WebApplication"
       ],
       "playCta": true,
@@ -64,7 +63,7 @@
       "status": 200,
       "title": "Free Browser Games Catalog | Gamesweb",
       "description": "The public Gamesweb catalog: eight first-party browser games with hubs, guides, controls, and curated collections.",
-      "canonical": "http://localhost:3000/games",
+      "canonical": "https://gamesweb.example/games",
       "robots": "index, follow",
       "h1": "Browser games",
       "h2s": [
@@ -127,7 +126,7 @@
       "status": 200,
       "title": "Game Guides | Gamesweb",
       "description": "How each Gamesweb game actually plays — controls, scoring, strategy, and trophies taken from the live manifests.",
-      "canonical": "http://localhost:3000/guides",
+      "canonical": "https://gamesweb.example/guides",
       "robots": "index, follow",
       "h1": "Guides",
       "h2s": [
@@ -210,7 +209,7 @@
       "status": 200,
       "title": "Game Collections | Gamesweb",
       "description": "Curated Gamesweb shelves where at least three real games share a session shape: quick, skill, score-attack, keyboard, mobile, competitive, arcade.",
-      "canonical": "http://localhost:3000/collections",
+      "canonical": "https://gamesweb.example/collections",
       "robots": "index, follow",
       "h1": "Collections",
       "h2s": [
@@ -260,7 +259,7 @@
       "status": 200,
       "title": "Quick Browser Games | Gamesweb",
       "description": "Gamesweb sessions that resolve in about a minute: Sky Stack, Pocket Striker, Crowd Control, and Velocity Run.",
-      "canonical": "http://localhost:3000/collections/quick-games",
+      "canonical": "https://gamesweb.example/collections/quick-games",
       "robots": "index, follow",
       "h1": "Quick browser games",
       "h2s": [],
@@ -306,7 +305,7 @@
       "status": 200,
       "title": "Skill Browser Games | Gamesweb",
       "description": "Input-heavy Gamesweb titles where a missed timing is the whole story: Neon Drift, Velocity Run, Knockout Circuit, and Swarm Protocol.",
-      "canonical": "http://localhost:3000/collections/skill-games",
+      "canonical": "https://gamesweb.example/collections/skill-games",
       "robots": "index, follow",
       "h1": "Skill browser games",
       "h2s": [],
@@ -352,7 +351,7 @@
       "status": 200,
       "title": "Score-Attack Browser Games | Gamesweb",
       "description": "Higher-is-better Gamesweb runs: Neon Drift banks, Sky Stack floors, Swarm survival, Territory fills, and Crowd packs.",
-      "canonical": "http://localhost:3000/collections/score-attack-games",
+      "canonical": "https://gamesweb.example/collections/score-attack-games",
       "robots": "index, follow",
       "h1": "Score-attack browser games",
       "h2s": [],
@@ -400,7 +399,7 @@
       "status": 200,
       "title": "Keyboard Browser Games | Gamesweb",
       "description": "Gamesweb titles with a real WASD or arrow map: Neon, Velocity, Swarm, Knockout, Territory, and Crowd.",
-      "canonical": "http://localhost:3000/collections/keyboard-games",
+      "canonical": "https://gamesweb.example/collections/keyboard-games",
       "robots": "index, follow",
       "h1": "Keyboard browser games",
       "h2s": [],
@@ -450,7 +449,7 @@
       "status": 200,
       "title": "Mobile Browser Games | Gamesweb",
       "description": "Touch-ready Gamesweb games with on-screen controls: Sky Stack, Crowd Control, Pocket Striker, and Neon Drift.",
-      "canonical": "http://localhost:3000/collections/mobile-games",
+      "canonical": "https://gamesweb.example/collections/mobile-games",
       "robots": "index, follow",
       "h1": "Mobile browser games",
       "h2s": [],
@@ -496,7 +495,7 @@
       "status": 200,
       "title": "Competitive Browser Games | Gamesweb",
       "description": "Gamesweb games built for ghosts, same-seed challenges, and rival boards: Velocity Run, Knockout Circuit, Neon Drift, and Territory Rush.",
-      "canonical": "http://localhost:3000/collections/competitive-games",
+      "canonical": "https://gamesweb.example/collections/competitive-games",
       "robots": "index, follow",
       "h1": "Competitive browser games",
       "h2s": [],
@@ -542,7 +541,7 @@
       "status": 200,
       "title": "Arcade Browser Games | Gamesweb",
       "description": "Short authored arcade loops on Gamesweb: Neon Drift, Sky Stack, Crowd Control, and Knockout Circuit.",
-      "canonical": "http://localhost:3000/collections/arcade-games",
+      "canonical": "https://gamesweb.example/collections/arcade-games",
       "robots": "index, follow",
       "h1": "Arcade browser games",
       "h2s": [],
@@ -588,7 +587,7 @@
       "status": 200,
       "title": "Neon Drift — Free Online Drift Game | Gamesweb",
       "description": "Arcade drift score-attack on three authored circuits. Hold the slide, skim the apex, and cash the combo before the grip comes back.",
-      "canonical": "http://localhost:3000/games/neon-drift",
+      "canonical": "https://gamesweb.example/games/neon-drift",
       "robots": "index, follow",
       "h1": "Neon Drift",
       "h2s": [
@@ -684,7 +683,7 @@
       "status": 200,
       "title": "Neon Drift Guide | Gamesweb",
       "description": "Neon Drift is a two-lap arcade slide, not a sim. The useful skill is keeping the car sideways through authored sectors so the combo never resets. Session 60–90 sec runs.",
-      "canonical": "http://localhost:3000/games/neon-drift/guide",
+      "canonical": "https://gamesweb.example/games/neon-drift/guide",
       "robots": "index, follow",
       "h1": "Neon Drift guide",
       "h2s": [
@@ -750,7 +749,7 @@
       "status": 200,
       "title": "How to Play Neon Drift | Gamesweb",
       "description": "Accelerate into the first corner, hold the slide, then countersteer so the angle stays alive through the apex. Accelerate into the first corner and hold a slide.",
-      "canonical": "http://localhost:3000/games/neon-drift/how-to-play",
+      "canonical": "https://gamesweb.example/games/neon-drift/how-to-play",
       "robots": "index, follow",
       "h1": "How to play Neon Drift",
       "h2s": [
@@ -813,7 +812,7 @@
       "status": 200,
       "title": "Neon Drift Controls | Gamesweb",
       "description": "Keyboard or on-screen stick. Space is a handbrake, not a boost — it dumps grip so the next corner can enter drift. W / ↑: Accelerate · S / ↓: Brake · A D / ← →: Steer · Space: Handbrake · 1 2 3: Switch track · G: Toggle ghost · R: Restart",
-      "canonical": "http://localhost:3000/games/neon-drift/controls",
+      "canonical": "https://gamesweb.example/games/neon-drift/controls",
       "robots": "index, follow",
       "h1": "Neon Drift controls",
       "h2s": [
@@ -876,7 +875,7 @@
       "status": 200,
       "title": "Neon Drift Strategy | Gamesweb",
       "description": "Enter Harbour Loop wide, then tighten on the inner curb. The near-miss multiplier (1.48×) is worth more than a safe middle line.",
-      "canonical": "http://localhost:3000/games/neon-drift/strategy",
+      "canonical": "https://gamesweb.example/games/neon-drift/strategy",
       "robots": "index, follow",
       "h1": "Neon Drift strategy",
       "h2s": [
@@ -939,7 +938,7 @@
       "status": 200,
       "title": "Neon Drift Achievements | Gamesweb",
       "description": "Neon Drift tracks 10 trophies, from First Slide to Evening Line.",
-      "canonical": "http://localhost:3000/games/neon-drift/achievements",
+      "canonical": "https://gamesweb.example/games/neon-drift/achievements",
       "robots": "index, follow",
       "h1": "Neon Drift achievements",
       "h2s": [
@@ -1002,7 +1001,7 @@
       "status": 200,
       "title": "Neon Drift Tracks | Gamesweb",
       "description": "Neon Drift ships 3 authored circuits: Harbour Loop, Hairpin District, Ridge Sweep.",
-      "canonical": "http://localhost:3000/games/neon-drift/tracks",
+      "canonical": "https://gamesweb.example/games/neon-drift/tracks",
       "robots": "index, follow",
       "h1": "Neon Drift tracks",
       "h2s": [
@@ -1068,7 +1067,7 @@
       "status": 200,
       "title": "Neon Drift Scoring | Gamesweb",
       "description": "Score is a live drift bank, not a lap timer. Higher is better. Two laps close the circuit.",
-      "canonical": "http://localhost:3000/games/neon-drift/scoring",
+      "canonical": "https://gamesweb.example/games/neon-drift/scoring",
       "robots": "index, follow",
       "h1": "Neon Drift scoring",
       "h2s": [
@@ -1131,7 +1130,7 @@
       "status": 200,
       "title": "Velocity Run — Free Online Parkour Game | Gamesweb",
       "description": "Twelve authored rooftop courses across HVAC training, crane transit, and comms ascent. Coyote time, jump buffering, and a restart that never argues.",
-      "canonical": "http://localhost:3000/games/velocity-run",
+      "canonical": "https://gamesweb.example/games/velocity-run",
       "robots": "index, follow",
       "h1": "Velocity Run",
       "h2s": [
@@ -1225,7 +1224,7 @@
       "status": 200,
       "title": "Velocity Run Guide | Gamesweb",
       "description": "Velocity Run is millisecond parkour on ivory/cobalt rooftops. The sport is routing — safe, fast, or expert — not surviving a clock that keeps running after a death. Session 30–90 sec.",
-      "canonical": "http://localhost:3000/games/velocity-run/guide",
+      "canonical": "https://gamesweb.example/games/velocity-run/guide",
       "robots": "index, follow",
       "h1": "Velocity Run guide",
       "h2s": [
@@ -1291,7 +1290,7 @@
       "status": 200,
       "title": "How to Play Velocity Run | Gamesweb",
       "description": "Move, jump, and fast-fall to the beacon. First finishes usually land bronze or silver. Gold needs a line. Platinum is a clean ghost. Reach the beacon. Faster is better.",
-      "canonical": "http://localhost:3000/games/velocity-run/how-to-play",
+      "canonical": "https://gamesweb.example/games/velocity-run/how-to-play",
       "robots": "index, follow",
       "h1": "How to play Velocity Run",
       "h2s": [
@@ -1354,7 +1353,7 @@
       "status": 200,
       "title": "Velocity Run Controls | Gamesweb",
       "description": "A/D or arrows move. Space or Up jumps with coyote time and jump buffering. Down fast-falls. R is the real verb. A D / ← →: Move · Space / ↑: Jump · S / ↓: Fast fall · 1 2 3: Switch course · G: Toggle ghost · R: Restart",
-      "canonical": "http://localhost:3000/games/velocity-run/controls",
+      "canonical": "https://gamesweb.example/games/velocity-run/controls",
       "robots": "index, follow",
       "h1": "Velocity Run controls",
       "h2s": [
@@ -1417,7 +1416,7 @@
       "status": 200,
       "title": "Velocity Run Strategy | Gamesweb",
       "description": "Learn Gate A on the safe low ledges, then take the high fast pads. The expert skip at the mid gap is the platinum tell.",
-      "canonical": "http://localhost:3000/games/velocity-run/strategy",
+      "canonical": "https://gamesweb.example/games/velocity-run/strategy",
       "robots": "index, follow",
       "h1": "Velocity Run strategy",
       "h2s": [
@@ -1480,7 +1479,7 @@
       "status": 200,
       "title": "Velocity Run Achievements | Gamesweb",
       "description": "Velocity Run tracks 10 trophies, from Beacon to Split Hunter.",
-      "canonical": "http://localhost:3000/games/velocity-run/achievements",
+      "canonical": "https://gamesweb.example/games/velocity-run/achievements",
       "robots": "index, follow",
       "h1": "Velocity Run achievements",
       "h2s": [
@@ -1543,7 +1542,7 @@
       "status": 200,
       "title": "Velocity Run Courses | Gamesweb",
       "description": "Velocity Run has 12 authored courses across training, transit, ascent.",
-      "canonical": "http://localhost:3000/games/velocity-run/courses",
+      "canonical": "https://gamesweb.example/games/velocity-run/courses",
       "robots": "index, follow",
       "h1": "Velocity Run courses",
       "h2s": [
@@ -1618,7 +1617,7 @@
       "status": 200,
       "title": "Velocity Run Scoring | Gamesweb",
       "description": "Lower time is better. Medals are authored per course, not a global curve.",
-      "canonical": "http://localhost:3000/games/velocity-run/scoring",
+      "canonical": "https://gamesweb.example/games/velocity-run/scoring",
       "robots": "index, follow",
       "h1": "Velocity Run scoring",
       "h2s": [
@@ -1681,7 +1680,7 @@
       "status": 200,
       "title": "Swarm Protocol — Free Online Survival Game | Gamesweb",
       "description": "Compact arena survival with auto-fire, readable silhouettes, and upgrades that rewrite the sixth minute. The Core ends the run.",
-      "canonical": "http://localhost:3000/games/swarm-protocol",
+      "canonical": "https://gamesweb.example/games/swarm-protocol",
       "robots": "index, follow",
       "h1": "Swarm Protocol",
       "h2s": [
@@ -1768,7 +1767,7 @@
       "status": 200,
       "title": "Swarm Protocol Guide | Gamesweb",
       "description": "Swarm Protocol is a six-minute arena. Skill lives in positioning, dash timing, and which three-of-many upgrades you stack — not in aiming. Session 6–8 min.",
-      "canonical": "http://localhost:3000/games/swarm-protocol/guide",
+      "canonical": "https://gamesweb.example/games/swarm-protocol/guide",
       "robots": "index, follow",
       "h1": "Swarm Protocol guide",
       "h2s": [
@@ -1832,7 +1831,7 @@
       "status": 200,
       "title": "How to Play Swarm Protocol | Gamesweb",
       "description": "WASD to move, Shift to dash. Auto-fire handles the rest so you can read silhouettes and leave a contrast pocket around the player. Move. The weapon tracks the nearest hostiles.",
-      "canonical": "http://localhost:3000/games/swarm-protocol/how-to-play",
+      "canonical": "https://gamesweb.example/games/swarm-protocol/how-to-play",
       "robots": "index, follow",
       "h1": "How to play Swarm Protocol",
       "h2s": [
@@ -1893,7 +1892,7 @@
       "status": 200,
       "title": "Swarm Protocol Controls | Gamesweb",
       "description": "Move and dash are the only in-run verbs. 1/2/3 pick an upgrade when a core levels you. R restarts after death. WASD / arrows: Move · Shift: Dash · 1 2 3: Pick upgrade · Esc: Pause · R: Restart after death",
-      "canonical": "http://localhost:3000/games/swarm-protocol/controls",
+      "canonical": "https://gamesweb.example/games/swarm-protocol/controls",
       "robots": "index, follow",
       "h1": "Swarm Protocol controls",
       "h2s": [
@@ -1954,7 +1953,7 @@
       "status": 200,
       "title": "Swarm Protocol Strategy | Gamesweb",
       "description": "First two minutes are density, not damage. Take Magnetic Core or Protocol Tempo so cores and fire rate keep the pocket clear.",
-      "canonical": "http://localhost:3000/games/swarm-protocol/strategy",
+      "canonical": "https://gamesweb.example/games/swarm-protocol/strategy",
       "robots": "index, follow",
       "h1": "Swarm Protocol strategy",
       "h2s": [
@@ -2015,7 +2014,7 @@
       "status": 200,
       "title": "Swarm Protocol Achievements | Gamesweb",
       "description": "Swarm Protocol tracks 10 trophies, from First Blood to Cascade.",
-      "canonical": "http://localhost:3000/games/swarm-protocol/achievements",
+      "canonical": "https://gamesweb.example/games/swarm-protocol/achievements",
       "robots": "index, follow",
       "h1": "Swarm Protocol achievements",
       "h2s": [
@@ -2076,7 +2075,7 @@
       "status": 200,
       "title": "Sky Stack — Free Online Stacking Game | Gamesweb",
       "description": "One-thumb climbing. Place the moving slab, keep the overlap, ride fever. A miss ends the climb.",
-      "canonical": "http://localhost:3000/games/sky-stack",
+      "canonical": "https://gamesweb.example/games/sky-stack",
       "robots": "index, follow",
       "h1": "Sky Stack",
       "h2s": [
@@ -2161,7 +2160,7 @@
       "status": 200,
       "title": "Sky Stack Guide | Gamesweb",
       "description": "Sky Stack is a portrait climb. The only decision is when to place. Perfects keep width; misses are instant retries. Session 20–90 sec.",
-      "canonical": "http://localhost:3000/games/sky-stack/guide",
+      "canonical": "https://gamesweb.example/games/sky-stack/guide",
       "robots": "index, follow",
       "h1": "Sky Stack guide",
       "h2s": [
@@ -2221,7 +2220,7 @@
       "status": 200,
       "title": "How to Play Sky Stack | Gamesweb",
       "description": "Watch the slab pass over the tower and place it. Perfects are full overlaps. Fever is a long perfect streak, not a separate mode. Tap, click, or press Space to place the moving slab.",
-      "canonical": "http://localhost:3000/games/sky-stack/how-to-play",
+      "canonical": "https://gamesweb.example/games/sky-stack/how-to-play",
       "robots": "index, follow",
       "h1": "How to play Sky Stack",
       "h2s": [
@@ -2278,7 +2277,7 @@
       "status": 200,
       "title": "Sky Stack Controls | Gamesweb",
       "description": "One action: Space, click, or tap places the slab. R retries. That is the whole map. Space / click / tap: Place · R: Retry",
-      "canonical": "http://localhost:3000/games/sky-stack/controls",
+      "canonical": "https://gamesweb.example/games/sky-stack/controls",
       "robots": "index, follow",
       "h1": "Sky Stack controls",
       "h2s": [
@@ -2335,7 +2334,7 @@
       "status": 200,
       "title": "Sky Stack Achievements | Gamesweb",
       "description": "Sky Stack tracks 5 trophies, from Placed to Sixty Seven.",
-      "canonical": "http://localhost:3000/games/sky-stack/achievements",
+      "canonical": "https://gamesweb.example/games/sky-stack/achievements",
       "robots": "index, follow",
       "h1": "Sky Stack achievements",
       "h2s": [
@@ -2392,7 +2391,7 @@
       "status": 200,
       "title": "Knockout Circuit — Free Online Obstacle Game | Gamesweb",
       "description": "Eight modular obstacle maps across Factory, Skyworks, and Signal Core. Move, jump, dash. Ghosts are recorded rivals, not live players.",
-      "canonical": "http://localhost:3000/games/knockout-circuit",
+      "canonical": "https://gamesweb.example/games/knockout-circuit",
       "robots": "index, follow",
       "h1": "Knockout Circuit",
       "h2s": [
@@ -2480,7 +2479,7 @@
       "status": 200,
       "title": "Knockout Circuit Guide | Gamesweb",
       "description": "Knockout Circuit is an obstacle race with eight authored maps. The verb set is move, jump, dash — and taking the expert shortcut when the ghost already committed. Session 45–120 sec.",
-      "canonical": "http://localhost:3000/games/knockout-circuit/guide",
+      "canonical": "https://gamesweb.example/games/knockout-circuit/guide",
       "robots": "index, follow",
       "h1": "Knockout Circuit guide",
       "h2s": [
@@ -2542,7 +2541,7 @@
       "status": 200,
       "title": "How to Play Knockout Circuit | Gamesweb",
       "description": "Sprint to the finish banner. Dash (Shift) is a burst, not i-frames. A hazard hit costs time; Untouched is finishing without one. Reach the banner. Faster is better.",
-      "canonical": "http://localhost:3000/games/knockout-circuit/how-to-play",
+      "canonical": "https://gamesweb.example/games/knockout-circuit/how-to-play",
       "robots": "index, follow",
       "h1": "How to play Knockout Circuit",
       "h2s": [
@@ -2601,7 +2600,7 @@
       "status": 200,
       "title": "Knockout Circuit Controls | Gamesweb",
       "description": "Same move/jump grammar as Velocity, plus Shift dash. The dash is why the two games still play differently on similar keys. A D / ← →: Move · Space / ↑: Jump · Shift: Dash · 1 2 3: Switch first maps · R: Retry",
-      "canonical": "http://localhost:3000/games/knockout-circuit/controls",
+      "canonical": "https://gamesweb.example/games/knockout-circuit/controls",
       "robots": "index, follow",
       "h1": "Knockout Circuit controls",
       "h2s": [
@@ -2660,7 +2659,7 @@
       "status": 200,
       "title": "Knockout Circuit Strategy | Gamesweb",
       "description": "Starter Gates is a read of hammer / mover / inflate. Wait the inflate, then dash the landing — do not jump into a rising gate.",
-      "canonical": "http://localhost:3000/games/knockout-circuit/strategy",
+      "canonical": "https://gamesweb.example/games/knockout-circuit/strategy",
       "robots": "index, follow",
       "h1": "Knockout Circuit strategy",
       "h2s": [
@@ -2719,7 +2718,7 @@
       "status": 200,
       "title": "Knockout Circuit Achievements | Gamesweb",
       "description": "Knockout Circuit tracks 4 trophies, from Through to Greedy.",
-      "canonical": "http://localhost:3000/games/knockout-circuit/achievements",
+      "canonical": "https://gamesweb.example/games/knockout-circuit/achievements",
       "robots": "index, follow",
       "h1": "Knockout Circuit achievements",
       "h2s": [
@@ -2778,7 +2777,7 @@
       "status": 200,
       "title": "Pocket Striker — Free Online Physics Sports Game | Gamesweb",
       "description": "Eighteen authored tables across Workshop, Garden, and Arcade Lab. Pull back to aim, release to strike. Fewer strokes win.",
-      "canonical": "http://localhost:3000/games/pocket-striker",
+      "canonical": "https://gamesweb.example/games/pocket-striker",
       "robots": "index, follow",
       "h1": "Pocket Striker",
       "h2s": [
@@ -2864,7 +2863,7 @@
       "status": 200,
       "title": "Pocket Striker Guide | Gamesweb",
       "description": "Pocket Striker is a short physics table. You do not time a gate or hold a drift — you pick a vector and live with the cushions. Session 30–90 sec.",
-      "canonical": "http://localhost:3000/games/pocket-striker/guide",
+      "canonical": "https://gamesweb.example/games/pocket-striker/guide",
       "robots": "index, follow",
       "h1": "Pocket Striker guide",
       "h2s": [
@@ -2926,7 +2925,7 @@
       "status": 200,
       "title": "How to Play Pocket Striker | Gamesweb",
       "description": "Pull back, release, watch the bank. Retry is instant because the interesting decision is the next stroke, not a long life bar. Drag back from the striker to aim. Release to shoot.",
-      "canonical": "http://localhost:3000/games/pocket-striker/how-to-play",
+      "canonical": "https://gamesweb.example/games/pocket-striker/how-to-play",
       "robots": "index, follow",
       "h1": "How to play Pocket Striker",
       "h2s": [
@@ -2985,7 +2984,7 @@
       "status": 200,
       "title": "Pocket Striker Controls | Gamesweb",
       "description": "Pointer only for the shot: drag to aim and set power, release to strike. R retries the table. Keyboard is not a movement map. Drag / pointer: Aim and power · Release: Strike · R: Retry",
-      "canonical": "http://localhost:3000/games/pocket-striker/controls",
+      "canonical": "https://gamesweb.example/games/pocket-striker/controls",
       "robots": "index, follow",
       "h1": "Pocket Striker controls",
       "h2s": [
@@ -3044,7 +3043,7 @@
       "status": 200,
       "title": "Pocket Striker Strategy | Gamesweb",
       "description": "Bench Bank is a two-stroke par. The first shot should set a cushion; chasing a hero ace here is how you go three over.",
-      "canonical": "http://localhost:3000/games/pocket-striker/strategy",
+      "canonical": "https://gamesweb.example/games/pocket-striker/strategy",
       "robots": "index, follow",
       "h1": "Pocket Striker strategy",
       "h2s": [
@@ -3103,7 +3102,7 @@
       "status": 200,
       "title": "Pocket Striker Achievements | Gamesweb",
       "description": "Pocket Striker tracks 4 trophies, from Drop to Table Manners.",
-      "canonical": "http://localhost:3000/games/pocket-striker/achievements",
+      "canonical": "https://gamesweb.example/games/pocket-striker/achievements",
       "robots": "index, follow",
       "h1": "Pocket Striker achievements",
       "h2s": [
@@ -3162,7 +3161,7 @@
       "status": 200,
       "title": "Territory Rush — Free Online Territory Game | Gamesweb",
       "description": "A 90-second geometric arena. Leave a trail, close the loop, claim the fill. Bots are seeded opponents with tells — never fake humans.",
-      "canonical": "http://localhost:3000/games/territory-rush",
+      "canonical": "https://gamesweb.example/games/territory-rush",
       "robots": "index, follow",
       "h1": "Territory Rush",
       "h2s": [
@@ -3249,7 +3248,7 @@
       "status": 200,
       "title": "Territory Rush Guide | Gamesweb",
       "description": "Territory Rush is a paint-the-floor arena. The useful screenshot is a closed loop turning into owned color — not a toy city grid. Session ~90 sec.",
-      "canonical": "http://localhost:3000/games/territory-rush/guide",
+      "canonical": "https://gamesweb.example/games/territory-rush/guide",
       "robots": "index, follow",
       "h1": "Territory Rush guide",
       "h2s": [
@@ -3313,7 +3312,7 @@
       "status": 200,
       "title": "How to Play Territory Rush | Gamesweb",
       "description": "Leave your color, draw a loop, come home. Small safe bites early. Larger claims when bots are committed to their own trails. Move. Your trail is a claim in progress.",
-      "canonical": "http://localhost:3000/games/territory-rush/how-to-play",
+      "canonical": "https://gamesweb.example/games/territory-rush/how-to-play",
       "robots": "index, follow",
       "h1": "How to play Territory Rush",
       "h2s": [
@@ -3374,7 +3373,7 @@
       "status": 200,
       "title": "Territory Rush Controls | Gamesweb",
       "description": "WASD or stick moves the claimant. There is no jump, dash, or aim. R retries the 90-second arena. WASD / stick: Move · R: Retry",
-      "canonical": "http://localhost:3000/games/territory-rush/controls",
+      "canonical": "https://gamesweb.example/games/territory-rush/controls",
       "robots": "index, follow",
       "h1": "Territory Rush controls",
       "h2s": [
@@ -3435,7 +3434,7 @@
       "status": 200,
       "title": "Territory Rush Strategy | Gamesweb",
       "description": "First claims should be shallow U-turns along your own border. Long diagonals across mid are how bots cut you.",
-      "canonical": "http://localhost:3000/games/territory-rush/strategy",
+      "canonical": "https://gamesweb.example/games/territory-rush/strategy",
       "robots": "index, follow",
       "h1": "Territory Rush strategy",
       "h2s": [
@@ -3496,7 +3495,7 @@
       "status": 200,
       "title": "Territory Rush Achievements | Gamesweb",
       "description": "Territory Rush tracks 3 trophies, from Stake to Majority.",
-      "canonical": "http://localhost:3000/games/territory-rush/achievements",
+      "canonical": "https://gamesweb.example/games/territory-rush/achievements",
       "robots": "index, follow",
       "h1": "Territory Rush achievements",
       "h2s": [
@@ -3557,7 +3556,7 @@
       "status": 200,
       "title": "Crowd Control — Free Online Crowd Runner | Gamesweb",
       "description": "A skill runner with a living count. Steer the pack through +N, ×N, and TAX gates, then cash a finish multiplier.",
-      "canonical": "http://localhost:3000/games/crowd-control",
+      "canonical": "https://gamesweb.example/games/crowd-control",
       "robots": "index, follow",
       "h1": "Crowd Control",
       "h2s": [
@@ -3646,7 +3645,7 @@
       "status": 200,
       "title": "Crowd Control Guide | Gamesweb",
       "description": "Crowd Control is a one-thumb runner whose score is the pack. The decision is which saturated gate you enter, not a lane of coins. Session 45–75 sec.",
-      "canonical": "http://localhost:3000/games/crowd-control/guide",
+      "canonical": "https://gamesweb.example/games/crowd-control/guide",
       "robots": "index, follow",
       "h1": "Crowd Control guide",
       "h2s": [
@@ -3710,7 +3709,7 @@
       "status": 200,
       "title": "How to Play Crowd Control | Gamesweb",
       "description": "Steer into the gate you can afford. A ×4 on ten bodies beats a +30 on three. A TAX gate you cannot pay empties the parade. The pack runs forward. You steer.",
-      "canonical": "http://localhost:3000/games/crowd-control/how-to-play",
+      "canonical": "https://gamesweb.example/games/crowd-control/how-to-play",
       "robots": "index, follow",
       "h1": "How to play Crowd Control",
       "h2s": [
@@ -3771,7 +3770,7 @@
       "status": 200,
       "title": "Crowd Control Controls | Gamesweb",
       "description": "A/D or drag steers. Shift dashes. There is no jump. R retries the 45–75s rush. A D / drag: Steer · Shift: Dash · R: Retry",
-      "canonical": "http://localhost:3000/games/crowd-control/controls",
+      "canonical": "https://gamesweb.example/games/crowd-control/controls",
       "robots": "index, follow",
       "h1": "Crowd Control controls",
       "h2s": [
@@ -3832,7 +3831,7 @@
       "status": 200,
       "title": "Crowd Control Strategy | Gamesweb",
       "description": "Read the sign, not the road. Huge +N / ×N / TAX art is the composition — if you need the HUD, you are already late.",
-      "canonical": "http://localhost:3000/games/crowd-control/strategy",
+      "canonical": "https://gamesweb.example/games/crowd-control/strategy",
       "robots": "index, follow",
       "h1": "Crowd Control strategy",
       "h2s": [
@@ -3893,7 +3892,7 @@
       "status": 200,
       "title": "Crowd Control Achievements | Gamesweb",
       "description": "Crowd Control tracks 4 trophies, from Through the gate to Parade.",
-      "canonical": "http://localhost:3000/games/crowd-control/achievements",
+      "canonical": "https://gamesweb.example/games/crowd-control/achievements",
       "robots": "index, follow",
       "h1": "Crowd Control achievements",
       "h2s": [
@@ -3954,7 +3953,7 @@
       "status": 200,
       "title": "About | Gamesweb",
       "description": "Gamesweb is a browser arcade with one player identity across instant games.",
-      "canonical": "http://localhost:3000/about",
+      "canonical": "https://gamesweb.example/about",
       "robots": "index, follow",
       "h1": "About",
       "h2s": [],
@@ -3989,7 +3988,7 @@
       "status": 200,
       "title": "Privacy | Gamesweb",
       "description": "How Gamesweb stores guest progress, optional accounts, and analytics.",
-      "canonical": "http://localhost:3000/privacy",
+      "canonical": "https://gamesweb.example/privacy",
       "robots": "index, follow",
       "h1": "Privacy",
       "h2s": [],
@@ -4022,7 +4021,7 @@
       "status": 200,
       "title": "Terms | Gamesweb",
       "description": "Terms for playing Gamesweb in the browser.",
-      "canonical": "http://localhost:3000/terms",
+      "canonical": "https://gamesweb.example/terms",
       "robots": "index, follow",
       "h1": "Terms",
       "h2s": [],
