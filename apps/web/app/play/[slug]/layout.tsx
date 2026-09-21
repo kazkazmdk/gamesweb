@@ -1,10 +1,17 @@
+import { getManifest } from "@gamesweb/game-sdk";
 import type { Metadata } from "next";
-import { NOINDEX } from "@/lib/seo";
+import { NOINDEX_FOLLOW } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Play",
-  ...NOINDEX,
-};
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const game = getManifest(slug);
+  return {
+    title: game ? `Play ${game.title}` : "Play",
+    description: game?.description,
+    alternates: { canonical: game ? `/games/${game.slug}` : undefined },
+    ...NOINDEX_FOLLOW,
+  };
+}
 
 export default function PlayGameLayout({ children }: { children: React.ReactNode }) {
   return children;

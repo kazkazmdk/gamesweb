@@ -2,6 +2,7 @@
 
 import { GAME_MANIFESTS, type GameManifest } from "@gamesweb/game-sdk";
 import { useEffect, useState } from "react";
+import { analytics } from "@gamesweb/analytics";
 import { PlayButton } from "@/components/game/GameCard";
 import {
   AchievementStrip,
@@ -64,7 +65,9 @@ export function GameHub({ game }: { game: GameManifest }) {
             <p className="mt-2 text-[13px] text-[var(--accent)]">{ctx.daily.done ? "Daily cleared" : `Daily · ${ctx.daily.label}`}</p>
           ) : null}
           <div className="mt-7 flex flex-wrap items-center gap-4">
-            <PlayButton href={`/play/${game.slug}`}>{played ? "Continue" : "Play"}</PlayButton>
+            <span onClick={() => analytics.track("game_hub_to_play", { gameId: game.id })}>
+              <PlayButton href={`/play/${game.slug}`}>{played ? "Continue" : "Play"}</PlayButton>
+            </span>
             <a href="#board" className="home-secondary">
               Leaderboard ›
             </a>
@@ -200,55 +203,11 @@ export function GameHub({ game }: { game: GameManifest }) {
         </aside>
       </div>
 
-      <details className="border-t border-white/8 px-5 py-8 md:px-10">
-        <summary className="cursor-pointer text-white/45">
-          <h2 className="meta inline">The game</h2>
-          <span className="ml-3 text-[12px] tracking-[0.12em] uppercase">how it plays</span>
-        </summary>
-        <div className="mt-6 max-w-2xl space-y-8">
-          <section>
-            <p className="mt-3 text-[15px] text-[var(--text-dim)]">{game.description}</p>
-          </section>
-          <section>
-            <h2 className="meta">Features</h2>
-            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-[var(--text-dim)]">
-              {game.tags.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-              <li>{game.sessionHint}</li>
-              <li>{game.supportedDevices.join(" · ")}</li>
-            </ul>
-          </section>
-          <section>
-            <h2 className="meta">How to play</h2>
-            <ul className="mt-3 space-y-2 text-[15px] text-[var(--text-dim)]">
-              {game.howToPlay.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-            </ul>
-          </section>
-          <section>
-            <h2 className="meta">Controls</h2>
-            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[14px]">
-              {game.controls.map((c) => (
-                <div key={c.input} className="border-t border-[var(--line)] pt-2">
-                  <dt className="meta">{c.input}</dt>
-                  <dd>{c.action}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-          <section>
-            <h2 className="meta">FAQ</h2>
-            {game.faq.map((f) => (
-              <div key={f.q} className="mt-3 border-t border-[var(--line)] pt-3">
-                <p className="text-[14px]">{f.q}</p>
-                <p className="text-[13px] text-[var(--text-dim)]">{f.a}</p>
-              </div>
-            ))}
-          </section>
-        </div>
-      </details>
+      <p className="sr-only">
+        <a href={`/games/${game.slug}/guide`}>Guide</a>
+        <a href={`/games/${game.slug}/controls`}>Controls</a>
+        <a href="/games">Catalog</a>
+      </p>
     </article>
   );
 }

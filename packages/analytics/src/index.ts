@@ -75,6 +75,11 @@ export const ANALYTICS_EVENTS = [
   "home_rail_scrolled",
   "home_event_opened",
   "home_social_action",
+  "seo_landing_view",
+  "game_hub_to_play",
+  "guide_to_play",
+  "collection_to_game",
+  "related_game_click",
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];

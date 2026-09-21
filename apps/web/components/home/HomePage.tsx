@@ -264,6 +264,16 @@ export default function HomePage() {
         challenges={openChallenges}
         you={{ name: player.displayName || "You", avatar: player.avatar }}
       />
+      <nav className="sr-only" aria-label="Public catalog">
+        <Link href="/games">Browser games catalog</Link>
+        <Link href="/guides">Guides</Link>
+        <Link href="/collections">Collections</Link>
+        {GAME_MANIFESTS.map((g) => (
+          <Link key={g.slug} href={`/games/${g.slug}`}>
+            {g.title}
+          </Link>
+        ))}
+      </nav>
     </div>
   );
 }

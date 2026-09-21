@@ -15,8 +15,19 @@ export function isVercelProduction(): boolean {
   return read("VERCEL_ENV") === "production";
 }
 
+export function publicOrigin(): string {
+  const explicit = read("NEXT_PUBLIC_APP_URL");
+  if (explicit) return explicit.replace(/\/$/, "");
+  const vercel = read("VERCEL_URL");
+  if (vercel) {
+    const host = vercel.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    return `https://${host}`;
+  }
+  return "http://localhost:3000";
+}
+
 export function appUrl(): string {
-  return (read("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000").replace(/\/$/, "");
+  return publicOrigin();
 }
 
 export function supabaseUrl(): string | undefined {
