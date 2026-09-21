@@ -52,10 +52,11 @@ test("neon harbour / hairpin / ridge are visually distinct at 1440", async ({ pa
   for (const track of TRACKS) {
     await waitTrack(page, track.index);
     for (const [i, moment] of MOMENTS.entries()) {
-      if (i === 0) await page.waitForTimeout(400);
+      if (i === 0) await page.waitForTimeout(500);
       if (i > 0) {
-        await cmd(page, "setDrive", 1, i === 2 ? 0.35 : 0.15, i === 3);
-        await page.waitForTimeout(900 + i * 400);
+        await cmd(page, "setDrive", 0.7, i === 2 ? 0.22 : 0.08, false);
+        await page.waitForTimeout(650 + i * 220);
+        await cmd(page, "setDrive", 0, 0, false);
       }
       const labeled = `${OUT}/${track.id}-${moment}-1440.png`;
       const unlabeled = `${OUT}/${track.id}-${moment}-unlabeled-1440.png`;

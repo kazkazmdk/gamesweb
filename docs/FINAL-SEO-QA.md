@@ -1,39 +1,25 @@
 # Final SEO QA
 
-Base: `cursor/final-platform-games-seo-c08e` @ `f24d352`  
-Head: `cursor/final-product-seo-qa-032a`
+Base: `cursor/final-product-seo-qa-032a` @ `d7a22e3`  
+Head: `cursor/production-social-closure-032a`
 
-## Matrix kept
+## Counts
 
-- Indexable band 50–70. Registry still drives sitemap.
-- No new topic URLs.
-- `/play/*` noindex follow + hub canonical.
-- `/arcade`, social, account: noindex follow.
-- No fake FAQ / AggregateRating / VideoObject.
-- Collections still ≥3 real games.
+- Indexable URLs: **65** (band 50–70)
+- No new topic / per-level / city / generated pages
+- Sitemap omits `/play/*`, `/arcade`, `/friends`, `/inbox`, `/party/*`, `/c/*`
 
-## Content QA
+## Two QA systems
 
-`apps/web/content/quality-report.ts` + `tests/seo.test.ts` "SEO content quality":
+1. Source lint (kept): `apps/web/content/quality-report.ts` + `tests/seo.test.ts`
+2. Rendered DOM (new): `e2e/rendered-seo.spec.ts` → `docs/RENDERED-SEO-QA.md` + `docs/qa-production-closure/rendered-seo.json`
 
-For each indexable URL: intent, title, H1, word count of registry+editorial body, unique tokens, nearest-page Jaccard, internal links, game entities, source, index/canonical, quality gate.
+Rendered gate uses `main` (or article) text, intent-specific word/link rules, and Jaccard on visible tokens. 65/65 pass. Max similarity 0.602.
 
-Gate fails on thin (<40 words of authored body) or near-duplicate (Jaccard ≥ 0.82 against another indexable page).
+## Claims provenance
 
-Collections gained `audience` + `pick` so they explain why the shelf exists and how to choose.
+`apps/web/content/claims.ts` points mechanical numbers at source files (`860`, `1.48`, `comboMax: 12`, Velocity `COURSES`, Pocket `l18`).
 
-## Maillage
+## Legal pages
 
-Hubs expose Guide / How to play / Controls / Strategy / Tracks|Courses|Scoring / Achievements / Catalog as designed chips.
-
-## Play metadata
-
-`apps/web/app/play/[slug]/layout.tsx` now sets Twitter card fields to the play title/description/hero instead of inheriting the root brand card.
-
-## Production caveats
-
-Canonicals still depend on `publicOrigin()`. Preview hosts must not be used as production canonicals. Challenge and party codes stay noindex.
-
-## Count
-
-`indexablePages().length` stays in the 50–70 band (registry 65). Sitemap parity holds in `tests/seo.test.ts` and `e2e/seo.spec.ts`. Noindex families: `/play/*`, `/arcade`, social/account (`/friends`, `/inbox`, `/party`, `/c/*`, `/me`, `/auth`, `/settings`).
+About / Privacy / Terms now include in-main internal links so they are not content orphans.

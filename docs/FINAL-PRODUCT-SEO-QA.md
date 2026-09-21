@@ -1,22 +1,22 @@
 # Final product + SEO QA
 
-Base branch: `cursor/final-platform-games-seo-c08e`  
-Base HEAD: `f24d352` (documented closeout SHA `8377639` plus later CI/Vercel-policy commits)  
-Work branch: `cursor/final-product-seo-qa-032a`  
-PR target: `cursor/final-platform-games-seo-c08e`  
+Base branch: `cursor/final-product-seo-qa-032a`  
+Base HEAD: `d7a22e3`  
+Work branch: `cursor/production-social-closure-032a`  
+PR target: `cursor/final-product-seo-qa-032a`  
 Not merged. No production deploy. No Vercel preview.
 
-## Source-of-truth matrix (after this pass)
+## Source-of-truth matrix (after production closure)
 
 | Feature | Current source of truth | Target | Guest | Auth | Cross-device | Multi-user |
 | --- | --- | --- | --- | --- | --- | --- |
 | Friends | `/api/friends` + DB/memory | keep | cannot send | real | yes | yes |
 | Presence | `/api/presence` | keep | no heartbeat | real | yes | friends only |
 | Scores / sessions | `/api/score` + trust | keep | cookie guest | profile | auth yes | leaderboards |
-| Challenges | process store `globalThis.__gw_social_arcade` + `/api/challenges` | same until 0006 | play via code | same + inbox | same instance | yes on one instance |
-| Party | same process store + `/api/parties` | same until 0006 | cookie identity | same | same instance | yes on one instance |
-| Inbox | `/api/inbox` keyed by actor | same until 0006 | cookie identity | persist | same instance | writer → reader |
-| Rivals | local ledger of challenge outcomes | cache | local | local | no | derived |
+| Challenges | `BackendStore` via `runId` | keep | cookie actor | same + inbox | yes on backend | yes |
+| Party | `BackendStore` host/round machine | keep | cookie actor | same | yes on backend | yes |
+| Inbox | backend notifications | keep | cookie actor | persist | yes on backend | writer → owner |
+| Rivals | derived from completed challenges | keep | cookie actor | same | yes on backend | derived |
 | Crew | explicit local-preview house only | preview | empty until user starts one | same | no | no |
 | Daily arcade / GP | local | keep local + honest copy | local | local | no | no |
 
