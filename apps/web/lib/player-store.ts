@@ -93,6 +93,7 @@ export type PlayerSnapshot = {
   backend: "local" | "supabase";
   pendingInvite: string | null;
   syncStatus: "idle" | "saving" | "saved" | "offline" | "review";
+  lastScoreId: string | null;
 };
 
 const defaultAudio: AudioSettings = { master: 0.8, music: 0.45, sfx: 0.7, muted: false };
@@ -158,6 +159,7 @@ function emptyPlayer(id?: string): PlayerSnapshot {
     backend: "local",
     pendingInvite: null,
     syncStatus: "idle",
+    lastScoreId: null,
   };
 }
 
@@ -191,6 +193,7 @@ export const SSR_PLAYER: PlayerSnapshot = {
   backend: "local",
   pendingInvite: null,
   syncStatus: "idle",
+  lastScoreId: null,
 };
 
 type Listener = () => void;
@@ -436,6 +439,10 @@ class PlayerStore {
             localSessionId: sessionId,
             idempotencyKey: `score-offline:${sessionId}`,
           });
+          if (retry.ok && retry.data.scoreId) {
+            row.id = retry.data.scoreId;
+            this.snapshot.lastScoreId = retry.data.scoreId;
+          }
           if (retry.ok && retry.data.verification) {
             row.verified = retry.data.verification.status as VerifiedStatus;
             if (retry.data.progressionDiff) this.applyServerProgression(retry.data.progressionDiff);
@@ -447,6 +454,10 @@ class PlayerStore {
         this.persist();
         this.emit();
         return;
+      }
+      if (res.data.scoreId) {
+        row.id = res.data.scoreId;
+        this.snapshot.lastScoreId = res.data.scoreId;
       }
       if (!res.data.verification) {
         // Replayed idempotent submission: the server already holds this run.

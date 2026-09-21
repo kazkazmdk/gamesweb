@@ -2,6 +2,7 @@
 
 import { getManifest, PARTY_REACTIONS } from "@gamesweb/game-sdk";
 import { arcadeStore, type PartyState } from "@/lib/social/arcade-store";
+import { playerApi } from "@/lib/player-api";
 import { usePlayer } from "@/lib/player";
 import { SSR_PLAYER } from "@/lib/player-store";
 import { Avatar, useAccent } from "@/components/shell/AppShell";
@@ -16,6 +17,7 @@ export default function PartyPage() {
   const code = (params.code ?? "").toUpperCase();
   const [reaction, setReaction] = useState("");
   const [party, setParty] = useState<PartyState | null | undefined>(undefined);
+  const [you, setYou] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -24,10 +26,17 @@ export default function PartyPage() {
     async function sync() {
       const joined = await arcadeStore.joinParty(code, player.id, player.displayName || "Player");
       if (!live) return;
-      if (joined.ok) setParty(joined.party);
-      else {
+      if (joined.ok) {
+        setParty(joined.party);
+        const remote = await playerApi.getParty(code);
+        if (remote.ok && live) setYou(remote.data.you);
+      } else {
         const pulled = await arcadeStore.pullParty(code);
-        if (live) setParty(pulled);
+        const remote = await playerApi.getParty(code);
+        if (live) {
+          setParty(pulled);
+          if (remote.ok) setYou(remote.data.you);
+        }
       }
     }
     void sync();
@@ -82,7 +91,8 @@ export default function PartyPage() {
 
   const slots = Array.from({ length: 6 }, (_, i) => party.members[i] ?? null);
   const hostId = party.host;
-  const me = party.members.find((m) => m.id === player.id);
+  const selfId = you || player.id;
+  const me = party.members.find((m) => m.id === selfId);
 
   return (
     <div data-testid="party">
@@ -93,12 +103,15 @@ export default function PartyPage() {
             {party.persistence === "local" ? " · this device only" : " · shared lobby"}
           </p>
           <h1 className="display mt-2 text-[44px] text-white md:text-[68px]">{game?.title ?? "Lobby"}</h1>
-          <p className="mt-3 text-[14px] text-white/65">
-            Round {Math.min(party.round + 1, party.playlist.length)}/{party.playlist.length} · async playlist
+          <p className="mt-3 text-[14px] text-white/65" data-testid="party-state">
+            {party.state} · Round {Math.min(party.round + 1, party.playlist.length)}/{party.playlist.length}
+            {game ? ` · ${game.title} / ${round?.mode}` : ""}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            {game ? <ChamferButton href={`/play/${game.slug}?party=${party.code}`}>Play this round</ChamferButton> : null}
-            {me ? (
+            {party.state === "playing" && game ? (
+              <ChamferButton href={`/play/${game.slug}?party=${party.code}`}>Play this round</ChamferButton>
+            ) : null}
+            {party.state === "lobby" && me ? (
               <ChamferButton
                 tone="ghost"
                 cue={false}
@@ -109,6 +122,30 @@ export default function PartyPage() {
                 }}
               >
                 {me.ready ? "Unready" : "Ready"}
+              </ChamferButton>
+            ) : null}
+            {selfId === party.host && party.state === "lobby" ? (
+              <ChamferButton
+                data-testid="party-start"
+                onClick={() => {
+                  void arcadeStore.startParty(party.code).then((next) => {
+                    if (next) setParty(next);
+                  });
+                }}
+              >
+                Start round
+              </ChamferButton>
+            ) : null}
+            {selfId === party.host && party.state === "results" ? (
+              <ChamferButton
+                data-testid="party-advance"
+                onClick={() => {
+                  void arcadeStore.advanceParty(party.code).then((next) => {
+                    if (next) setParty(next);
+                  });
+                }}
+              >
+                Next round
               </ChamferButton>
             ) : null}
           </div>
@@ -128,7 +165,10 @@ export default function PartyPage() {
                       {m.name}
                       {m.id === hostId ? " · host" : ""}
                     </p>
-                    <p className="meta mt-1">{m.ready ? "Ready" : "Joined"}</p>
+                    <p className="meta mt-1" data-testid={`member-ready-${m.id}`}>
+                      {m.ready ? "Ready" : "Joined"}
+                      {party.submitted?.includes(m.id) ? " · submitted" : ""}
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -161,7 +201,7 @@ export default function PartyPage() {
         {party.standings.length ? (
           <div className="mt-10">
             <p className="meta text-white/40">Standings</p>
-            <ol className="mt-3 max-w-md space-y-2">
+            <ol className="mt-3 max-w-md space-y-2" data-testid="party-standings">
               {party.standings.map((s, i) => (
                 <li key={s.id} className="flex justify-between text-[15px]">
                   <span>

@@ -9,7 +9,6 @@ import {
   makePublicCode,
   nextBestAction,
   QUICK_PARTY_PLAYLIST,
-  rankScores,
   roundPoints,
   type ChallengeAttempt,
   type ChallengeRecord,
@@ -17,7 +16,6 @@ import {
   type ChallengeType,
   type NextAction,
 } from "@gamesweb/game-sdk";
-import { lowerIsBetter } from "@gamesweb/database";
 import { playerApi } from "@/lib/player-api";
 
 export type InboxItem = {
@@ -40,6 +38,8 @@ export type PartyState = {
   standings: Array<{ id: string; name: string; points: number }>;
   createdAt: number;
   persistence?: "server" | "local";
+  roundRoster?: string[];
+  submitted?: string[];
 };
 
 export type RivalRow = {
@@ -157,11 +157,11 @@ class ArcadeStore {
     try {
       const inbox = await playerApi.inbox();
       if (inbox.ok) {
-        const remote = inbox.data.items as InboxItem[];
-        const localOnly = this.snap.inbox.filter((item) => !remote.some((r) => r.id === item.id));
-        this.snap.inbox = [...remote, ...localOnly].slice(0, 60);
-        this.emit();
+        this.snap.inbox = (inbox.data.items as InboxItem[]).slice(0, 60);
       }
+      const rivals = await playerApi.rivals();
+      if (rivals.ok) this.snap.rivals = rivals.data.rows;
+      this.emit();
     } finally {
       this.hydrating = false;
     }
@@ -177,16 +177,15 @@ class ArcadeStore {
     score: number;
     trust?: ChallengeRecord["trust"];
     gameVersion?: string;
+    runId?: string | null;
   }): Promise<{ challenge: ChallengeRecord; url: string; persistence: "server" | "local" }> {
-    const remote = await playerApi.createChallenge({
-      gameId: input.gameId,
-      mode: input.mode,
-      seed: input.seed,
-      type: input.type,
-      challengerName: input.challengerName,
-      score: input.score,
-      trust: input.trust,
-    });
+    const remote = input.runId
+      ? await playerApi.createChallenge({
+          action: "create",
+          runId: input.runId,
+          challengeType: input.type,
+        })
+      : { ok: false as const };
     if (remote.ok && remote.data.challenge) {
       const challenge = remote.data.challenge;
       this.rememberChallenge(challenge);
@@ -231,7 +230,7 @@ class ArcadeStore {
       metadata: {},
       winnerId: null,
       targetScore: null,
-      trust: input.trust ?? "unverified",
+      trust: "unverified",
       gameVersion: input.gameVersion ?? getManifest(input.gameId)?.version ?? "1.0.0",
       attempts: [],
     };
@@ -277,7 +276,7 @@ class ArcadeStore {
       metadata: {},
       winnerId: null,
       targetScore: null,
-      trust: share.trust,
+      trust: "unverified",
       gameVersion: share.gameVersion,
       attempts: [],
     };
@@ -311,13 +310,12 @@ class ArcadeStore {
   }
 
   async completeChallenge(code: string, attempt: Omit<ChallengeAttempt, "challengeId">, payload?: string | null) {
-    const remote = await playerApi.attemptChallenge({
-      code,
-      score: attempt.score,
-      playerName: attempt.playerName,
-      trust: attempt.trust,
-      durationMs: typeof attempt.metadata?.durationMs === "number" ? attempt.metadata.durationMs : 0,
-    });
+    const remote = attempt.runId
+      ? await playerApi.attemptChallenge({
+          code,
+          runId: attempt.runId,
+        })
+      : { ok: false as const };
     if (remote.ok && remote.data.challenge) {
       const applied = remote.data;
       this.rememberChallenge(applied.challenge);
@@ -452,27 +450,37 @@ class ArcadeStore {
     return party ?? null;
   }
 
-  async scorePartyRound(code: string, rows: Array<{ id: string; name: string; score: number }>, gameId: string) {
-    const remote = await playerApi.scoreParty(code, gameId, rows);
+  async startParty(code: string) {
+    const remote = await playerApi.startParty(code);
+    if (remote.ok) {
+      const party = cacheParty(remote.data.party);
+      this.rememberParty(party);
+      this.emit();
+      return party;
+    }
+    return this.snap.parties.find((p) => p.code === code) ?? null;
+  }
+
+  async advanceParty(code: string) {
+    const remote = await playerApi.advanceParty(code);
+    if (remote.ok) {
+      const party = cacheParty(remote.data.party);
+      this.rememberParty(party);
+      this.emit();
+      return party;
+    }
+    return this.snap.parties.find((p) => p.code === code) ?? null;
+  }
+
+  async submitPartyRound(code: string, runId: string) {
+    const remote = await playerApi.submitPartyRound(code, runId);
     if (remote.ok && remote.data.party) {
       const party = cacheParty(remote.data.party);
       this.rememberParty(party);
       this.emit();
       return party;
     }
-    const party = this.snap.parties.find((p) => p.code === code);
-    if (!party) return null;
-    const ranked = rankScores(rows, lowerIsBetter(gameId));
-    for (const r of ranked) {
-      const m = party.standings.find((s) => s.id === r.id);
-      if (m) m.points += r.points;
-      else party.standings.push({ id: r.id, name: r.name, points: r.points });
-    }
-    party.round += 1;
-    party.state = party.round >= party.playlist.length ? "done" : "results";
-    analytics.track("party_round_finished", { code, round: party.round, persistence: "local" });
-    this.emit();
-    return party;
+    return this.snap.parties.find((p) => p.code === code) ?? null;
   }
 
   dailyProgress(day: string, eventKey: string, normalized: number) {

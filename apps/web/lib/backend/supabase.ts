@@ -8,11 +8,13 @@ import {
   type LeaderboardEntry,
   type VerifiedStatus,
 } from "@gamesweb/database";
-import { utcDayKey } from "@gamesweb/game-sdk";
+import { applyChallengeAttempt, getManifest, makePublicCode, QUICK_PARTY_PLAYLIST, rankScores, utcDayKey, type ChallengeRecord } from "@gamesweb/game-sdk";
+import { actorId } from "@/lib/api/actor";
 import type { Identity } from "@/lib/api/identity";
+import { competitiveTrust, loadCompetitiveRun } from "@/lib/backend/competitive-run";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { commitSha, APP_VERSION } from "@/lib/version";
-import type { BackendStore, OfflineRun, PublicPlayerPayload, ScoreWriteResult, StoredProfile, StoredSave, StoredSession, SubmitScoreInput } from "@/lib/backend/types";
+import type { BackendStore, OfflineRun, PublicPlayerPayload, ScoreWriteResult, StoredInbox, StoredParty, StoredProfile, StoredRival, StoredSave, StoredScore, StoredSession, SubmitScoreInput } from "@/lib/backend/types";
 
 function admin() {
   const client = createSupabaseAdmin();
@@ -858,6 +860,493 @@ export class SupabaseBackend implements BackendStore {
       achievements: (ach ?? []).map((a: { achievement_id: string }) => a.achievement_id),
       activity,
     };
+  }
+
+  async getScore(id: string): Promise<StoredScore | null> {
+    const sb = admin();
+    const { data } = await sb.from("scores").select("*").eq("id", id).maybeSingle();
+    if (!data) return null;
+    return {
+      id: data.id,
+      sessionId: data.session_id,
+      userId: data.user_id,
+      anonymousId: data.anonymous_id,
+      gameId: data.game_id,
+      mode: data.mode,
+      score: data.score,
+      metadata: data.metadata ?? {},
+      createdAt: new Date(data.created_at).getTime(),
+      verified: data.verified_status,
+      offlineSubmission: Boolean(data.offline_submission),
+      localSessionId: data.local_session_id ?? undefined,
+    };
+  }
+
+  private async assembleParty(row: {
+    id: string;
+    code: string;
+    host_actor: string | null;
+    host_id: string | null;
+    state: StoredParty["state"];
+    current_round: number;
+    playlist: Array<{ gameId: string; mode: string }>;
+    created_at: string;
+    standings?: Array<{ id: string; name: string; points: number }>;
+    round_roster?: string[];
+    submitted?: string[];
+  }): Promise<StoredParty> {
+    const sb = admin();
+    const { data: members } = await sb.from("party_members").select("*").eq("party_id", row.id);
+    return {
+      id: row.id,
+      code: row.code,
+      host: row.host_actor ?? row.host_id ?? "",
+      members: (members ?? []).map((m: {
+        actor_id?: string | null;
+        user_id?: string | null;
+        display_name?: string | null;
+        ready: boolean;
+        points: number;
+        joined_at?: string;
+      }) => ({
+        id: m.actor_id ?? m.user_id ?? "",
+        name: m.display_name ?? "Player",
+        ready: m.ready,
+        score: m.points,
+        joinedAt: m.joined_at ? new Date(m.joined_at).getTime() : Date.now(),
+      })),
+      playlist: row.playlist ?? [],
+      round: row.current_round ?? 0,
+      state: row.state,
+      standings: row.standings ?? [],
+      createdAt: new Date(row.created_at).getTime(),
+      persistence: "server",
+      roundRoster: row.round_roster ?? [],
+      submitted: row.submitted ?? [],
+    };
+  }
+
+  async createParty(identity: Identity, hostName: string): Promise<StoredParty> {
+    const sb = admin();
+    const host = actorId(identity);
+    const { data, error } = await sb
+      .from("parties")
+      .insert({
+        code: makePublicCode(),
+        host_id: identity.userId,
+        host_actor: host,
+        state: "lobby",
+        current_round: 0,
+        playlist: QUICK_PARTY_PLAYLIST.map((r) => ({ ...r })),
+        standings: [],
+        round_roster: [],
+        submitted: [],
+      })
+      .select("*")
+      .single();
+    if (error || !data) throw new Error("party_insert_failed");
+    await sb.from("party_members").insert({
+      party_id: data.id,
+      user_id: identity.userId,
+      actor_id: host,
+      display_name: hostName,
+      ready: true,
+      points: 0,
+    });
+    return this.assembleParty(data);
+  }
+
+  async getParty(code: string) {
+    const sb = admin();
+    const { data } = await sb.from("parties").select("*").eq("code", code.toUpperCase()).maybeSingle();
+    if (!data) return null;
+    return this.assembleParty(data);
+  }
+
+  async joinParty(identity: Identity, code: string, name: string) {
+    const party = await this.getParty(code);
+    if (!party) return { ok: false as const, error: "not_found" as const };
+    const id = actorId(identity);
+    if (party.members.some((m) => m.id === id)) return { ok: true as const, duplicate: true, party };
+    if (party.state !== "lobby") return { ok: false as const, error: "closed" as const };
+    if (party.members.length >= 6) return { ok: false as const, error: "full" as const };
+    const sb = admin();
+    await sb.from("party_members").insert({
+      party_id: party.id,
+      user_id: identity.userId,
+      actor_id: id,
+      display_name: name,
+      ready: false,
+      points: 0,
+    });
+    return { ok: true as const, duplicate: false, party: (await this.getParty(code))! };
+  }
+
+  async setPartyReady(identity: Identity, code: string, ready: boolean) {
+    const party = await this.getParty(code);
+    if (!party || !party.members.some((m) => m.id === actorId(identity))) return null;
+    const sb = admin();
+    await sb.from("party_members").update({ ready }).eq("party_id", party.id).eq("actor_id", actorId(identity));
+    return this.getParty(code);
+  }
+
+  async startParty(identity: Identity, code: string) {
+    const party = await this.getParty(code);
+    if (!party) return { error: "not_found" };
+    if (party.host !== actorId(identity)) return { error: "host_only" };
+    if (party.state !== "lobby" && party.state !== "results") return { error: "bad_state" };
+    const roster = party.members.filter((m) => m.ready);
+    if (!roster.length) return { error: "no_ready" };
+    const sb = admin();
+    await sb
+      .from("parties")
+      .update({ state: "playing", round_roster: roster.map((m) => m.id), submitted: [] })
+      .eq("id", party.id);
+    return (await this.getParty(code))!;
+  }
+
+  async advanceParty(identity: Identity, code: string) {
+    const party = await this.getParty(code);
+    if (!party) return { error: "not_found" };
+    if (party.host !== actorId(identity)) return { error: "host_only" };
+    if (party.state !== "results") return { error: "bad_state" };
+    const nextRound = party.round + 1;
+    const done = nextRound >= party.playlist.length;
+    const roster = party.members.filter((m) => m.ready).map((m) => m.id);
+    const sb = admin();
+    await sb
+      .from("parties")
+      .update({
+        current_round: nextRound,
+        state: done ? "done" : "playing",
+        submitted: [],
+        round_roster: done ? party.roundRoster : roster.length ? roster : party.members.map((m) => m.id),
+      })
+      .eq("id", party.id);
+    return (await this.getParty(code))!;
+  }
+
+  async submitPartyRound(identity: Identity, code: string, runId: string) {
+    const party = await this.getParty(code);
+    if (!party) return { error: "not_found" };
+    const id = actorId(identity);
+    if (!party.members.some((m) => m.id === id)) return { error: "not_member" };
+    if (party.state !== "playing") return { error: "bad_state" };
+    if (!party.roundRoster.includes(id)) return { error: "not_in_round" };
+    if (party.submitted.includes(id)) return { error: "duplicate" };
+    const run = await loadCompetitiveRun(this, identity, runId);
+    if ("error" in run) return { error: run.error };
+    const slot = party.playlist[party.round];
+    if (!slot || run.gameId !== slot.gameId) return { error: "game_mismatch" };
+    if (run.verificationStatus === "flagged") return { error: "invalid_score" };
+    const sb = admin();
+    const { error: attemptError } = await sb.from("party_round_attempts").insert({
+      party_id: party.id,
+      round_index: party.round,
+      actor_id: id,
+      run_id: run.runId,
+      score: run.score,
+      trust: competitiveTrust(run.verificationStatus),
+    });
+    if (attemptError) return { error: attemptError.code === "23505" ? "run_reuse" : "invalid_score" };
+    const ranked = rankScores([{ id, name: party.members.find((m) => m.id === id)?.name ?? "Player", score: run.score }], lowerIsBetter(run.gameId));
+    const standings = [...party.standings];
+    for (const r of ranked) {
+      const standing = standings.find((s) => s.id === r.id);
+      if (standing) standing.points += r.points;
+      else standings.push({ id: r.id, name: r.name, points: r.points });
+      await sb.from("party_members").update({ points: standings.find((s) => s.id === r.id)?.points ?? r.points }).eq("party_id", party.id).eq("actor_id", r.id);
+    }
+    const submitted = [...party.submitted, id];
+    const complete = party.roundRoster.every((rid) => submitted.includes(rid));
+    await sb
+      .from("parties")
+      .update({ standings, submitted, state: complete ? "results" : "playing" })
+      .eq("id", party.id);
+    return (await this.getParty(code))!;
+  }
+
+  private mapChallenge(row: Record<string, unknown>, attempts: ChallengeRecord["attempts"] = []): ChallengeRecord {
+    return {
+      id: String(row.id),
+      publicCode: String(row.public_code),
+      gameId: String(row.game_id),
+      mode: String(row.mode),
+      seed: String(row.seed),
+      type: row.type as ChallengeRecord["type"],
+      challengerId: String(row.challenger_actor ?? row.challenger_id ?? ""),
+      challengerName: String(row.challenger_name ?? "Player"),
+      targetId: (row.target_id as string | null) ?? null,
+      targetName: null,
+      challengerRunId: row.challenger_run_id ? String(row.challenger_run_id) : null,
+      challengerScore: Number(row.challenger_score),
+      challengerGhostId: null,
+      challengerMeta: {},
+      status: (row.status as ChallengeRecord["status"]) ?? "open",
+      createdAt: new Date(String(row.created_at)).getTime(),
+      expiresAt: new Date(String(row.expires_at)).getTime(),
+      metadata: (row.metadata as Record<string, number | string | boolean>) ?? {},
+      winnerId: row.winner_id ? String(row.winner_id) : null,
+      targetScore: null,
+      trust: (row.trust as ChallengeRecord["trust"]) ?? "unverified",
+      gameVersion: String(row.game_version ?? "1.0.0"),
+      attempts,
+    };
+  }
+
+  private async loadChallenge(code: string): Promise<ChallengeRecord | null> {
+    const sb = admin();
+    const { data } = await sb.from("challenges").select("*").eq("public_code", code.toUpperCase()).maybeSingle();
+    if (!data) return null;
+    const { data: attempts } = await sb.from("challenge_attempts").select("*").eq("challenge_id", data.id);
+    const mapped = this.mapChallenge(data, (attempts ?? []).map((a: Record<string, unknown>) => ({
+      id: String(a.id),
+      challengeId: String(a.challenge_id),
+      playerId: String(a.player_actor ?? a.player_id ?? ""),
+      playerName: String(a.player_name ?? "Player"),
+      score: Number(a.score),
+      runId: a.run_id ? String(a.run_id) : null,
+      trust: (a.trust as ChallengeRecord["trust"]) ?? "unverified",
+      createdAt: new Date(String(a.created_at)).getTime(),
+      metadata: (a.metadata as Record<string, number | string | boolean>) ?? {},
+    })));
+    if (mapped.expiresAt < Date.now() && mapped.status === "open") {
+      mapped.status = "expired";
+      await sb.from("challenges").update({ status: "expired" }).eq("id", data.id);
+    }
+    return mapped;
+  }
+
+  async createChallengeFromRun(identity: Identity, runId: string, type?: string) {
+    const run = await loadCompetitiveRun(this, identity, runId);
+    if ("error" in run) return { error: run.error };
+    const profile = await this.getOrCreateProfile(identity);
+    const publicCode = makePublicCode();
+    const sb = admin();
+    const { data, error } = await sb
+      .from("challenges")
+      .insert({
+        public_code: publicCode,
+        game_id: run.gameId,
+        mode: run.mode,
+        seed: `${run.gameId}:${run.runId}`,
+        type: type ?? "beat-score",
+        challenger_id: identity.userId,
+        challenger_actor: actorId(identity),
+        challenger_name: profile.displayName || "Player",
+        challenger_run_id: run.runId,
+        challenger_score: run.score,
+        status: "open",
+        trust: competitiveTrust(run.verificationStatus),
+        game_version: run.gameVersion,
+        metadata: { durationMs: run.durationMs },
+        expires_at: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+      })
+      .select("*")
+      .single();
+    if (error || !data) return { error: error?.code === "23505" ? "run_reuse" : "create_failed" };
+    return { challenge: this.mapChallenge(data), url: `/c/${publicCode}` };
+  }
+
+  async getChallenge(code: string) {
+    return this.loadChallenge(code);
+  }
+
+  async putChallenge(challenge: ChallengeRecord) {
+    const sb = admin();
+    const trust = challenge.trust === "verified" ? "unverified" : challenge.trust;
+    await sb.from("challenges").upsert({
+      id: challenge.id,
+      public_code: challenge.publicCode.toUpperCase(),
+      game_id: challenge.gameId,
+      mode: challenge.mode,
+      seed: challenge.seed,
+      type: challenge.type,
+      challenger_actor: challenge.challengerId,
+      challenger_name: challenge.challengerName,
+      challenger_score: challenge.challengerScore,
+      status: challenge.status,
+      trust,
+      game_version: challenge.gameVersion,
+      metadata: challenge.metadata,
+      expires_at: new Date(challenge.expiresAt).toISOString(),
+      created_at: new Date(challenge.createdAt).toISOString(),
+    });
+  }
+
+  async attemptChallengeFromRun(identity: Identity, code: string, runId: string) {
+    const current = await this.loadChallenge(code);
+    if (!current) return { ok: false as const, error: "not_found" };
+    if (current.expiresAt < Date.now()) return { ok: false as const, error: "expired" };
+    const run = await loadCompetitiveRun(this, identity, runId);
+    if ("error" in run) return { ok: false as const, error: run.error };
+    if (run.gameId !== current.gameId) return { ok: false as const, error: "game_mismatch" };
+    const profile = await this.getOrCreateProfile(identity);
+    const applied = applyChallengeAttempt(current, {
+      id: crypto.randomUUID(),
+      challengeId: current.id,
+      playerId: actorId(identity),
+      playerName: profile.displayName || "Player",
+      score: run.score,
+      runId: run.runId,
+      trust: competitiveTrust(run.verificationStatus),
+      createdAt: Date.now(),
+      metadata: { durationMs: run.durationMs },
+    });
+    const sb = admin();
+    const { error } = await sb.from("challenge_attempts").insert({
+      id: applied.challenge.attempts.at(-1)?.id,
+      challenge_id: current.id,
+      player_id: identity.userId,
+      player_actor: actorId(identity),
+      player_name: profile.displayName || "Player",
+      score: run.score,
+      trust: competitiveTrust(run.verificationStatus),
+      run_id: run.runId,
+      metadata: { durationMs: run.durationMs },
+    });
+    if (error) {
+      if (error.code === "23505") return { ok: true as const, challenge: current, outcome: "pending" as const, duplicate: true };
+      return { ok: false as const, error: "attempt_failed" };
+    }
+    await sb
+      .from("challenges")
+      .update({
+        status: applied.challenge.status,
+        winner_id: applied.challenge.winnerId,
+      })
+      .eq("id", current.id);
+    if (!applied.duplicate && applied.outcome !== "pending") {
+      await this.pushInbox(current.challengerId, {
+        type: "challenge",
+        title: applied.outcome === "win" ? `${profile.displayName || "Player"} beat your score` : applied.outcome === "draw" ? "Challenge draw" : `${profile.displayName || "Player"} tried your challenge`,
+        body: getManifest(current.gameId)?.title ?? current.gameId,
+        href: `/c/${code.toUpperCase()}`,
+      });
+      await this.pushInbox(actorId(identity), {
+        type: "challenge",
+        title: applied.outcome === "win" ? "You won the challenge" : applied.outcome === "draw" ? "Draw" : `${current.challengerName} still leads`,
+        body: getManifest(current.gameId)?.title ?? current.gameId,
+        href: `/c/${code.toUpperCase()}`,
+      });
+    }
+    return { ok: true as const, ...applied };
+  }
+
+  private async pushInbox(userId: string, item: Omit<StoredInbox, "id" | "at" | "read" | "userId">) {
+    const sb = admin();
+    await sb.from("notifications").insert({
+      actor_id: userId,
+      type: item.type,
+      title: item.title,
+      body: item.body,
+      href: item.href,
+    });
+  }
+
+  async listInbox(identity: Identity): Promise<StoredInbox[]> {
+    const sb = admin();
+    const { data } = await sb.from("notifications").select("*").eq("actor_id", actorId(identity)).order("created_at", { ascending: false }).limit(60);
+    return (data ?? []).map((row: {
+      id: string;
+      type: StoredInbox["type"];
+      title: string;
+      body: string;
+      href: string | null;
+      created_at: string;
+      read_at: string | null;
+    }) => ({
+      id: row.id,
+      userId: actorId(identity),
+      type: row.type,
+      title: row.title,
+      body: row.body,
+      href: row.href ?? "",
+      at: new Date(row.created_at).getTime(),
+      read: Boolean(row.read_at),
+    }));
+  }
+
+  async markInboxRead(identity: Identity, id: string) {
+    const sb = admin();
+    const { data } = await sb
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("actor_id", actorId(identity))
+      .select("*")
+      .maybeSingle();
+    if (!data) return null;
+    return {
+      id: data.id,
+      userId: actorId(identity),
+      type: data.type,
+      title: data.title,
+      body: data.body,
+      href: data.href ?? "",
+      at: new Date(data.created_at).getTime(),
+      read: true,
+    };
+  }
+
+  async listRivals(identity: Identity): Promise<StoredRival[]> {
+    const me = actorId(identity);
+    const inbox = await this.listInbox(identity);
+    void inbox;
+    const sb = admin();
+    const { data: mine } = await sb.from("challenges").select("*").eq("challenger_actor", me);
+    const { data: attempts } = await sb.from("challenge_attempts").select("*, challenges(*)").eq("player_actor", me);
+    const rows = new Map<string, StoredRival>();
+    for (const row of mine ?? []) {
+      for (const attempt of ((row as { challenge_attempts?: unknown[] }).challenge_attempts ?? []) as Array<{ player_actor?: string; player_name?: string; score: number }>) {
+        if (!attempt.player_actor || attempt.player_actor === me) continue;
+        const win = Number(attempt.score) > Number(row.challenger_score);
+        const key = attempt.player_actor;
+        const cur = rows.get(key) ?? {
+          selfId: me,
+          otherId: key,
+          otherName: attempt.player_name ?? "Player",
+          winsA: 0,
+          winsB: 0,
+          draws: 0,
+          totalMatches: 0,
+          lastMatch: Date.now(),
+          streak: 0,
+          rivalryScore: 0,
+        };
+        cur.totalMatches += 1;
+        if (win) cur.winsB += 1;
+        else if (Number(attempt.score) === Number(row.challenger_score)) cur.draws += 1;
+        else cur.winsA += 1;
+        cur.rivalryScore = cur.totalMatches * 10 + Math.abs(cur.winsA - cur.winsB);
+        rows.set(key, cur);
+      }
+    }
+    for (const attempt of attempts ?? []) {
+      const challenge = (attempt as { challenges?: { challenger_actor?: string; challenger_name?: string; challenger_score?: number } }).challenges;
+      if (!challenge?.challenger_actor || challenge.challenger_actor === me) continue;
+      const win = Number((attempt as { score: number }).score) > Number(challenge.challenger_score ?? 0);
+      const key = challenge.challenger_actor;
+      const cur = rows.get(key) ?? {
+        selfId: me,
+        otherId: key,
+        otherName: challenge.challenger_name ?? "Player",
+        winsA: 0,
+        winsB: 0,
+        draws: 0,
+        totalMatches: 0,
+        lastMatch: Date.now(),
+        streak: 0,
+        rivalryScore: 0,
+      };
+      cur.totalMatches += 1;
+      if (win) cur.winsA += 1;
+      else if (Number((attempt as { score: number }).score) === Number(challenge.challenger_score ?? 0)) cur.draws += 1;
+      else cur.winsB += 1;
+      cur.rivalryScore = cur.totalMatches * 10 + Math.abs(cur.winsA - cur.winsB);
+      rows.set(key, cur);
+    }
+    return [...rows.values()];
   }
 }
 

@@ -1,6 +1,36 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "@playwright/test";
 
-test("two browser contexts share a party roster", async ({ browser }) => {
+const origin = "http://127.0.0.1:3010";
+
+async function verifiedRun(request: APIRequestContext, gameId: string, mode: string, score: number) {
+  const sessionRes = await request.post("/api/session", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { gameId, gameVersion: "1.0.0" },
+  });
+  expect(sessionRes.ok(), await sessionRes.text()).toBeTruthy();
+  const session = (await sessionRes.json()) as { sessionId: string };
+  const durationMs = 8000;
+  const scoreRes = await request.post("/api/score", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: {
+      sessionId: session.sessionId,
+      gameId,
+      gameVersion: "1.0.0",
+      mode,
+      score,
+      durationMs,
+      startedAt: Date.now() - durationMs,
+      endedAt: Date.now(),
+      metadata: gameId === "neon-drift" ? { laps: 1, combo: 2, wallHits: 0 } : { floors: 4 },
+    },
+  });
+  expect(scoreRes.ok(), await scoreRes.text()).toBeTruthy();
+  const body = (await scoreRes.json()) as { scoreId?: string };
+  expect(body.scoreId).toBeTruthy();
+  return body.scoreId!;
+}
+
+test("two browser contexts complete a party round without advancing on the first score", async ({ browser }) => {
   const host = await browser.newContext();
   const guest = await browser.newContext();
   const pageA = await host.newPage();
@@ -19,46 +49,110 @@ test("two browser contexts share a party roster", async ({ browser }) => {
   await expect(pageA.getByText(/host/i).first()).toBeVisible();
   await expect(pageB.getByText(/Joined|Ready/).first()).toBeVisible();
 
+  await pageB.getByRole("button", { name: "Ready" }).click();
+  await expect(pageA.getByText("Ready").nth(1)).toBeVisible({ timeout: 8_000 });
+
+  await pageA.getByTestId("party-start").click();
+  await expect(pageA.getByTestId("party-state")).toContainText("playing");
+  await expect(pageB.getByTestId("party-state")).toContainText("playing", { timeout: 8_000 });
+  const stateA = await pageA.getByTestId("party-state").textContent();
+  const stateB = await pageB.getByTestId("party-state").textContent();
+  expect(stateA).toBe(stateB);
+
+  const hostRun = await verifiedRun(pageA.request, "sky-stack", "climb", 900);
+  const afterHost = await pageA.request.post("/api/parties", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { action: "submit-round", code, runId: hostRun },
+  });
+  expect(afterHost.ok(), await afterHost.text()).toBeTruthy();
+  const hostParty = (await afterHost.json()) as { party: { state: string; round: number } };
+  expect(hostParty.party.state).toBe("playing");
+  expect(hostParty.party.round).toBe(0);
+
+  const guestRun = await verifiedRun(pageB.request, "sky-stack", "climb", 1400);
+  const afterGuest = await pageB.request.post("/api/parties", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { action: "submit-round", code, runId: guestRun },
+  });
+  expect(afterGuest.ok(), await afterGuest.text()).toBeTruthy();
+  const guestParty = (await afterGuest.json()) as { party: { state: string; standings: Array<{ name: string; points: number }> } };
+  expect(guestParty.party.state).toBe("results");
+  expect(guestParty.party.standings.length).toBe(2);
+
+  await pageA.reload();
+  await pageB.reload();
+  await expect(pageA.getByTestId("party-standings")).toBeVisible();
+  await expect(pageB.getByTestId("party-standings")).toBeVisible();
+  await pageA.getByTestId("party-advance").click();
+  await expect(pageA.getByTestId("party-state")).toContainText(/playing|done/);
+
+  await pageB.reload();
+  await expect(pageB.getByTestId("party")).toBeVisible();
+  await expect(pageB.getByTestId("party-code")).toHaveText(code!);
+  await expect(pageB.getByTestId("party-state")).toContainText(/playing|done|results/);
+
   await guest.close();
   await host.close();
 });
 
-test("challenge created in one session opens in another without payload", async ({ browser }) => {
+test("challenge created from a run opens without payload and persists inbox", async ({ browser }) => {
   const a = await browser.newContext();
   const b = await browser.newContext();
   const pageA = await a.newPage();
   const pageB = await b.newPage();
+  await pageA.goto("/");
+  await pageB.goto("/");
 
+  const runA = await verifiedRun(pageA.request, "sky-stack", "climb", 2400);
   const created = await pageA.request.post("/api/challenges", {
-    data: {
-      action: "create",
-      gameId: "sky-stack",
-      mode: "climb",
-      seed: "e2e-social",
-      type: "beat-score",
-      challengerName: "Host",
-      score: 2400,
-    },
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { action: "create", runId: runA, challengeType: "beat-score" },
   });
-  expect(created.ok()).toBeTruthy();
-  const body = (await created.json()) as { challenge: { publicCode: string } };
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const body = (await created.json()) as { challenge: { publicCode: string; trust: string }; url: string };
+  expect(body.url).toBe(`/c/${body.challenge.publicCode}`);
+  expect(body.challenge.trust).not.toBeUndefined();
   const code = body.challenge.publicCode;
+
+  const forged = await pageA.request.post("/api/challenges", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { action: "create", score: 99999, trust: "verified", gameId: "sky-stack" },
+  });
+  expect(forged.status()).toBe(403);
 
   await pageB.goto(`/c/${code}`);
   await expect(pageB.getByTestId("challenge-magic")).toBeVisible({ timeout: 15_000 });
-  await expect(pageB.getByText("Host challenged you")).toBeVisible();
+  await expect(pageB.getByText(/challenged you/)).toBeVisible();
+  expect(pageB.url()).not.toContain("?p=");
 
-  const attempt = await pageB.request.post("/api/challenges", {
-    data: { action: "attempt", code, score: 4000, playerName: "Guest" },
+  const fake = await pageB.request.post("/api/challenges", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { action: "attempt", code, runId: "00000000-0000-4000-8000-000000000000" },
   });
-  expect(attempt.ok()).toBeTruthy();
+  expect(fake.ok()).toBeFalsy();
+
+  const runB = await verifiedRun(pageB.request, "sky-stack", "climb", 4000);
+  const attempt = await pageB.request.post("/api/challenges", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { action: "attempt", code, runId: runB },
+  });
+  expect(attempt.ok(), await attempt.text()).toBeTruthy();
 
   const inbox = await pageA.request.get("/api/inbox");
   expect(inbox.ok()).toBeTruthy();
   const items = (await inbox.json()) as { items: Array<{ title: string; read: boolean; id: string }> };
   expect(items.items.length).toBeGreaterThan(0);
-  const mark = await pageA.request.post("/api/inbox", { data: { id: items.items[0].id } });
+  await pageA.reload();
+  const inbox2 = await pageA.request.get("/api/inbox");
+  expect(((await inbox2.json()) as { items: Array<{ id: string }> }).items.length).toBeGreaterThan(0);
+  const mark = await pageA.request.post("/api/inbox", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { id: items.items[0].id },
+  });
   expect(mark.ok()).toBeTruthy();
+  await pageA.reload();
+  const inbox3 = (await (await pageA.request.get("/api/inbox")).json()) as { items: Array<{ id: string; read: boolean }> };
+  expect(inbox3.items.find((i) => i.id === items.items[0].id)?.read).toBe(true);
 
   await b.close();
   await a.close();

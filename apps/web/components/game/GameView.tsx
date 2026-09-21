@@ -500,6 +500,17 @@ function Results({
     applied.current = true;
     analytics.track("game_finished", { gameId, score });
     arcadeStore.contributeCrew();
+    if (daily) {
+      const event = dailyEvents.find((e) => e.gameId === gameId);
+      arcadeStore.dailyProgress(day, `${gameId}:${event?.mode ?? "daily"}`, normalizePerformance(gameId, score));
+    }
+    if (gpRound) arcadeStore.gpScore(Math.max(0, Number(metadata?.gpRound ?? 0)), 10);
+  }, [daily, day, dailyEvents, gameId, gpRound, metadata?.gpRound, score]);
+
+  const socialApplied = useRef(false);
+  useEffect(() => {
+    if (socialApplied.current || !player.lastScoreId) return;
+    socialApplied.current = true;
     if (challengeCode && challengeCode !== "NEW") {
       void arcadeStore
         .completeChallenge(
@@ -509,8 +520,8 @@ function Results({
             playerId: player.id,
             playerName: player.displayName || "Guest",
             score,
-            runId: null,
-            trust: player.syncStatus === "saved" ? "verified" : "unverified",
+            runId: player.lastScoreId,
+            trust: "unverified",
             createdAt: Date.now(),
             metadata: { durationMs },
           },
@@ -520,30 +531,10 @@ function Results({
           if (r.ok && r.outcome !== "pending") setChallengeOutcome(r.outcome);
         });
     }
-    if (daily) {
-      const event = dailyEvents.find((e) => e.gameId === gameId);
-      arcadeStore.dailyProgress(day, `${gameId}:${event?.mode ?? "daily"}`, normalizePerformance(gameId, score));
-    }
     if (partyCode) {
-      void arcadeStore.scorePartyRound(partyCode, [{ id: player.id, name: player.displayName || "You", score }], gameId);
+      void arcadeStore.submitPartyRound(partyCode, player.lastScoreId);
     }
-    if (gpRound) arcadeStore.gpScore(Math.max(0, Number(metadata?.gpRound ?? 0)), 10);
-  }, [
-    challengeCode,
-    daily,
-    day,
-    dailyEvents,
-    durationMs,
-    gameId,
-    gpRound,
-    metadata?.gpRound,
-    partyCode,
-    payload,
-    player.displayName,
-    player.id,
-    player.syncStatus,
-    score,
-  ]);
+  }, [challengeCode, durationMs, partyCode, payload, player.displayName, player.id, player.lastScoreId, score]);
 
   function makeChallenge() {
     const game = getManifest(gameId);
@@ -556,7 +547,7 @@ function Results({
         challengerId: player.id,
         challengerName: player.displayName || "Player",
         score,
-        trust: player.syncStatus === "saved" ? "verified" : "unverified",
+        runId: player.lastScoreId,
       })
       .then((made) => {
         void navigator.clipboard.writeText(`${window.location.origin}${made.url}`);

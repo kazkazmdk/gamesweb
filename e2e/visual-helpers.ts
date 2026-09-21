@@ -42,6 +42,7 @@ const GUEST = {
   backend: "local",
   pendingInvite: null,
   syncStatus: "idle",
+  lastScoreId: null,
 };
 
 const POPULATED = {

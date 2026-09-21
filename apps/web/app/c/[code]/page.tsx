@@ -41,9 +41,9 @@ export default function ChallengeMagicPage() {
       <div className="grid min-h-dvh place-items-center px-6">
         <div className="max-w-md text-center">
           <p className="meta text-white/45">Challenge</p>
-          <h1 className="display mt-3 text-4xl">Not on this instance</h1>
+          <h1 className="display mt-3 text-4xl">Challenge not found</h1>
           <p className="mt-3 text-white/60">
-            This code is not stored on the current server, and the link has no share payload. Ask for a fresh challenge.
+            This code is not on the server, and the link has no offline payload. Ask for a fresh challenge.
           </p>
           <Link href="/" className="mt-6 inline-block rounded-full bg-[var(--accent)] px-5 py-3 text-[#140d12]">
             Back to arcade

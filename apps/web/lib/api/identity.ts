@@ -40,3 +40,5 @@ export async function getIdentity(): Promise<Identity> {
 export function identityKey(id: Identity): string {
   return id.userId ?? `anon:${id.anonymousId}`;
 }
+
+export { actorId } from "@/lib/api/actor";

@@ -8,20 +8,28 @@ import {
   type LeaderboardEntry,
 } from "@gamesweb/database";
 import { utcDayKey } from "@gamesweb/game-sdk";
+import { actorId } from "@/lib/api/actor";
 import type { Identity } from "@/lib/api/identity";
+import { competitiveTrust, loadCompetitiveRun } from "@/lib/backend/competitive-run";
 import type {
   BackendStore,
   OfflineRun,
   PublicPlayerPayload,
   ScoreWriteResult,
   StoredFriend,
+  StoredInbox,
+  StoredParty,
   StoredPresence,
   StoredProfile,
+  StoredRival,
   StoredSave,
   StoredScore,
   StoredSession,
   SubmitScoreInput,
 } from "@/lib/backend/types";
+import { applyChallengeAttempt, getManifest, makePublicCode, QUICK_PARTY_PLAYLIST, rankScores, type ChallengeRecord } from "@gamesweb/game-sdk";
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 
 function utcDaySafeLocal(ms = Date.now()) {
   return new Date(ms).toISOString().slice(0, 10);
@@ -40,7 +48,13 @@ export class MemoryBackend implements BackendStore {
   migrations = new Map<string, string>();
   idempotency = new Map<string, { status: number; response: unknown }>();
   usernameIndex = new Map<string, string>();
+  parties = new Map<string, StoredParty>();
+  challenges = new Map<string, ChallengeRecord>();
+  inbox: StoredInbox[] = [];
+  rivals: StoredRival[] = [];
+  usedRuns = new Set<string>();
   private locks = new Map<string, Promise<void>>();
+  private persistPath = process.env.GAMESWEB_MEMORY_FILE ?? "";
 
   private async withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
     const prev = this.locks.get(key) ?? Promise.resolve();
@@ -271,7 +285,7 @@ export class MemoryBackend implements BackendStore {
       this.sessions.set(input.session.id, input.session);
     }
 
-    return {
+    const result = {
       score,
       alreadyApplied: false,
       progression: {
@@ -282,6 +296,8 @@ export class MemoryBackend implements BackendStore {
         questsCompleted: proposed.questsCompleted,
       },
     };
+    this.persist();
+    return result;
   }
 
   private rollDay(profile: StoredProfile) {
@@ -739,11 +755,322 @@ export class MemoryBackend implements BackendStore {
       activity,
     };
   }
+
+  async getScore(id: string) {
+    return this.scores.get(id) ?? null;
+  }
+
+  private persist() {
+    if (!this.persistPath) return;
+    try {
+      mkdirSync(dirname(this.persistPath), { recursive: true });
+      writeFileSync(
+        this.persistPath,
+        JSON.stringify({
+          sessions: [...this.sessions.entries()],
+          scores: [...this.scores.entries()],
+          profiles: [...this.profiles.entries()],
+          friends: this.friends,
+          parties: [...this.parties.entries()],
+          challenges: [...this.challenges.entries()],
+          inbox: this.inbox,
+          rivals: this.rivals,
+          usedRuns: [...this.usedRuns],
+        }),
+      );
+    } catch {
+      /* private / read-only */
+    }
+  }
+
+  hydrateFromFile(path = this.persistPath) {
+    if (!path || !existsSync(path)) return this;
+    try {
+      const raw = JSON.parse(readFileSync(path, "utf8")) as {
+        sessions?: Array<[string, StoredSession]>;
+        scores?: Array<[string, StoredScore]>;
+        profiles?: Array<[string, StoredProfile]>;
+        friends?: StoredFriend[];
+        parties?: Array<[string, StoredParty]>;
+        challenges?: Array<[string, ChallengeRecord]>;
+        inbox?: StoredInbox[];
+        rivals?: StoredRival[];
+        usedRuns?: string[];
+      };
+      this.sessions = new Map(raw.sessions ?? []);
+      this.scores = new Map(raw.scores ?? []);
+      this.profiles = new Map(raw.profiles ?? []);
+      this.friends = raw.friends ?? [];
+      this.parties = new Map(raw.parties ?? []);
+      this.challenges = new Map(raw.challenges ?? []);
+      this.inbox = raw.inbox ?? [];
+      this.rivals = raw.rivals ?? [];
+      this.usedRuns = new Set(raw.usedRuns ?? []);
+    } catch {
+      /* corrupt snapshot */
+    }
+    return this;
+  }
+
+  private pushInbox(userId: string, item: Omit<StoredInbox, "id" | "at" | "read" | "userId">) {
+    this.inbox.unshift({ id: crypto.randomUUID(), userId, at: Date.now(), read: false, ...item });
+    this.inbox = this.inbox.slice(0, 200);
+  }
+
+  private touchRival(selfId: string, otherId: string, otherName: string, outcome: "win" | "loss" | "draw") {
+    if (!otherId || otherId === selfId) return;
+    let row = this.rivals.find((r) => r.selfId === selfId && r.otherId === otherId);
+    if (!row) {
+      row = { selfId, otherId, otherName, winsA: 0, winsB: 0, draws: 0, totalMatches: 0, lastMatch: Date.now(), streak: 0, rivalryScore: 0 };
+      this.rivals.push(row);
+    }
+    row.totalMatches += 1;
+    row.lastMatch = Date.now();
+    if (outcome === "win") {
+      row.winsA += 1;
+      row.streak = row.streak >= 0 ? row.streak + 1 : 1;
+    } else if (outcome === "loss") {
+      row.winsB += 1;
+      row.streak = row.streak <= 0 ? row.streak - 1 : -1;
+    } else row.draws += 1;
+    row.rivalryScore = row.totalMatches * 10 + Math.abs(row.winsA - row.winsB);
+  }
+
+  async createParty(identity: Identity, hostName: string): Promise<StoredParty> {
+    const id = actorId(identity);
+    const party: StoredParty = {
+      id: crypto.randomUUID(),
+      code: makePublicCode(),
+      host: id,
+      members: [{ id, name: hostName, ready: true, score: 0, joinedAt: Date.now() }],
+      playlist: QUICK_PARTY_PLAYLIST.map((r) => ({ ...r })),
+      round: 0,
+      state: "lobby",
+      standings: [],
+      createdAt: Date.now(),
+      persistence: "server",
+      roundRoster: [],
+      submitted: [],
+    };
+    this.parties.set(party.code, party);
+    this.persist();
+    return structuredClone(party);
+  }
+
+  async getParty(code: string) {
+    const hit = this.parties.get(code.toUpperCase());
+    return hit ? structuredClone(hit) : null;
+  }
+
+  async joinParty(identity: Identity, code: string, name: string) {
+    const party = this.parties.get(code.toUpperCase());
+    if (!party) return { ok: false as const, error: "not_found" as const };
+    const id = actorId(identity);
+    if (party.members.some((m) => m.id === id)) return { ok: true as const, duplicate: true, party: structuredClone(party) };
+    if (party.state !== "lobby") return { ok: false as const, error: "closed" as const };
+    if (party.members.length >= 6) return { ok: false as const, error: "full" as const };
+    party.members.push({ id, name, ready: false, score: 0, joinedAt: Date.now() });
+    this.persist();
+    return { ok: true as const, duplicate: false, party: structuredClone(party) };
+  }
+
+  async setPartyReady(identity: Identity, code: string, ready: boolean) {
+    const party = this.parties.get(code.toUpperCase());
+    if (!party) return null;
+    const m = party.members.find((row) => row.id === actorId(identity));
+    if (!m) return null;
+    m.ready = ready;
+    this.persist();
+    return structuredClone(party);
+  }
+
+  async startParty(identity: Identity, code: string) {
+    const party = this.parties.get(code.toUpperCase());
+    if (!party) return { error: "not_found" };
+    if (party.host !== actorId(identity)) return { error: "host_only" };
+    if (party.state !== "lobby" && party.state !== "results") return { error: "bad_state" };
+    const roster = party.members.filter((m) => m.ready);
+    if (!roster.length) return { error: "no_ready" };
+    party.roundRoster = roster.map((m) => m.id);
+    party.submitted = [];
+    party.state = "playing";
+    this.persist();
+    return structuredClone(party);
+  }
+
+  async advanceParty(identity: Identity, code: string) {
+    const party = this.parties.get(code.toUpperCase());
+    if (!party) return { error: "not_found" };
+    if (party.host !== actorId(identity)) return { error: "host_only" };
+    if (party.state !== "results") return { error: "bad_state" };
+    party.round += 1;
+    if (party.round >= party.playlist.length) {
+      party.state = "done";
+    } else {
+      party.state = "playing";
+      party.submitted = [];
+      party.roundRoster = party.members.filter((m) => m.ready).map((m) => m.id);
+      if (!party.roundRoster.length) party.roundRoster = party.members.map((m) => m.id);
+    }
+    this.persist();
+    return structuredClone(party);
+  }
+
+  async submitPartyRound(identity: Identity, code: string, runId: string) {
+    const party = this.parties.get(code.toUpperCase());
+    if (!party) return { error: "not_found" };
+    const id = actorId(identity);
+    if (!party.members.some((m) => m.id === id)) return { error: "not_member" };
+    if (party.state !== "playing") return { error: "bad_state" };
+    if (!party.roundRoster.includes(id)) return { error: "not_in_round" };
+    if (party.submitted.includes(id)) return { error: "duplicate" };
+    const usedKey = `party:${party.code}:${party.round}:${runId}`;
+    if (this.usedRuns.has(usedKey) || this.usedRuns.has(`run:${runId}:party`)) return { error: "run_reuse" };
+    const run = await loadCompetitiveRun(this, identity, runId);
+    if ("error" in run) return { error: run.error };
+    const slot = party.playlist[party.round];
+    if (!slot || run.gameId !== slot.gameId) return { error: "game_mismatch" };
+    if (run.verificationStatus === "flagged") return { error: "invalid_score" };
+    const ranked = rankScores([{ id, name: party.members.find((m) => m.id === id)?.name ?? "Player", score: run.score }], lowerIsBetter(run.gameId));
+    for (const r of ranked) {
+      const standing = party.standings.find((s) => s.id === r.id);
+      if (standing) standing.points += r.points;
+      else party.standings.push({ id: r.id, name: r.name, points: r.points });
+      const member = party.members.find((m) => m.id === r.id);
+      if (member) member.score = r.score;
+    }
+    party.submitted.push(id);
+    this.usedRuns.add(usedKey);
+    this.usedRuns.add(`run:${runId}:party`);
+    if (party.roundRoster.every((rid) => party.submitted.includes(rid))) party.state = "results";
+    this.persist();
+    return structuredClone(party);
+  }
+
+  async createChallengeFromRun(identity: Identity, runId: string, type?: string) {
+    const run = await loadCompetitiveRun(this, identity, runId);
+    if ("error" in run) return { error: run.error };
+    const usedKey = `run:${runId}:challenge-create`;
+    if (this.usedRuns.has(usedKey)) return { error: "run_reuse" };
+    const profile = await this.getOrCreateProfile(identity);
+    const publicCode = makePublicCode();
+    const challenge: ChallengeRecord = {
+      id: crypto.randomUUID(),
+      publicCode,
+      gameId: run.gameId,
+      mode: run.mode,
+      seed: `${run.gameId}:${run.runId}`,
+      type: (type as ChallengeRecord["type"]) ?? "beat-score",
+      challengerId: actorId(identity),
+      challengerName: profile.displayName || "Player",
+      targetId: null,
+      targetName: null,
+      challengerRunId: run.runId,
+      challengerScore: run.score,
+      challengerGhostId: null,
+      challengerMeta: {},
+      status: "open",
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
+      metadata: { durationMs: run.durationMs },
+      winnerId: null,
+      targetScore: null,
+      trust: competitiveTrust(run.verificationStatus),
+      gameVersion: run.gameVersion,
+      attempts: [],
+    };
+    this.challenges.set(publicCode, challenge);
+    this.usedRuns.add(usedKey);
+    this.persist();
+    return { challenge: structuredClone(challenge), url: `/c/${publicCode}` };
+  }
+
+  async getChallenge(code: string) {
+    const hit = this.challenges.get(code.toUpperCase());
+    if (hit && hit.expiresAt < Date.now()) {
+      hit.status = "expired";
+    }
+    return hit ? structuredClone(hit) : null;
+  }
+
+  async putChallenge(challenge: ChallengeRecord) {
+    const next = { ...challenge, trust: challenge.trust === "verified" ? "unverified" : challenge.trust };
+    this.challenges.set(next.publicCode.toUpperCase(), next);
+    this.persist();
+  }
+
+  async attemptChallengeFromRun(identity: Identity, code: string, runId: string) {
+    const current = this.challenges.get(code.toUpperCase());
+    if (!current) return { ok: false as const, error: "not_found" };
+    if (current.expiresAt < Date.now()) {
+      current.status = "expired";
+      return { ok: false as const, error: "expired" };
+    }
+    const usedKey = `run:${runId}:challenge-attempt`;
+    if (this.usedRuns.has(usedKey)) return { ok: false as const, error: "run_reuse" };
+    const run = await loadCompetitiveRun(this, identity, runId);
+    if ("error" in run) return { ok: false as const, error: run.error };
+    if (run.gameId !== current.gameId) return { ok: false as const, error: "game_mismatch" };
+    const profile = await this.getOrCreateProfile(identity);
+    const applied = applyChallengeAttempt(current, {
+      id: crypto.randomUUID(),
+      challengeId: current.id,
+      playerId: actorId(identity),
+      playerName: profile.displayName || "Player",
+      score: run.score,
+      runId: run.runId,
+      trust: competitiveTrust(run.verificationStatus),
+      createdAt: Date.now(),
+      metadata: { durationMs: run.durationMs },
+    });
+    this.challenges.set(code.toUpperCase(), applied.challenge);
+    this.usedRuns.add(usedKey);
+    if (!applied.duplicate && applied.outcome !== "pending") {
+      this.pushInbox(current.challengerId, {
+        type: "challenge",
+        title: applied.outcome === "win" ? `${profile.displayName || "Player"} beat your score` : applied.outcome === "draw" ? "Challenge draw" : `${profile.displayName || "Player"} tried your challenge`,
+        body: getManifest(current.gameId)?.title ?? current.gameId,
+        href: `/c/${code.toUpperCase()}`,
+      });
+      this.pushInbox(actorId(identity), {
+        type: "challenge",
+        title: applied.outcome === "win" ? "You won the challenge" : applied.outcome === "draw" ? "Draw" : `${current.challengerName} still leads`,
+        body: getManifest(current.gameId)?.title ?? current.gameId,
+        href: `/c/${code.toUpperCase()}`,
+      });
+      this.touchRival(actorId(identity), current.challengerId, current.challengerName, applied.outcome);
+      const inverse = applied.outcome === "win" ? "loss" : applied.outcome === "loss" ? "win" : "draw";
+      this.touchRival(current.challengerId, actorId(identity), profile.displayName || "Player", inverse);
+    }
+    this.persist();
+    return { ok: true as const, ...applied };
+  }
+
+  async listInbox(identity: Identity) {
+    const id = actorId(identity);
+    return this.inbox.filter((i) => i.userId === id).map((i) => ({ ...i }));
+  }
+
+  async markInboxRead(identity: Identity, id: string) {
+    const hit = this.inbox.find((i) => i.id === id && i.userId === actorId(identity));
+    if (hit) hit.read = true;
+    this.persist();
+    return hit ? { ...hit } : null;
+  }
+
+  async listRivals(identity: Identity) {
+    const id = actorId(identity);
+    return this.rivals.filter((r) => r.selfId === id).map((r) => ({ ...r }));
+  }
 }
 
 export function memoryStore(): MemoryBackend {
   const g = globalThis as G;
-  if (!g.__gw_memory) g.__gw_memory = new MemoryBackend();
+  if (!g.__gw_memory) {
+    const store = new MemoryBackend();
+    store.hydrateFromFile();
+    g.__gw_memory = store;
+  }
   return g.__gw_memory;
 }
 
