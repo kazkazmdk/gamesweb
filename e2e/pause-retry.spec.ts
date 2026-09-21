@@ -84,7 +84,9 @@ for (const gameId of GAMES) {
     await page.waitForTimeout(1200);
     const still = await debugOf(page);
     expect(still?.paused).toBe(true);
-    expect(still?.tick ?? 0).toBe(frozen?.tick ?? 0);
+    expect(still?.score).toBe(frozen?.score);
+    expect(still?.playerX).toBe(frozen?.playerX);
+    expect(still?.timeMs ?? 0).toBe(frozen?.timeMs ?? 0);
 
     await page.getByRole("button", { name: "Resume" }).click();
     await expect(page.getByRole("button", { name: "Resume" })).toHaveCount(0);

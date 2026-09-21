@@ -22,8 +22,10 @@ export async function GET(req: Request) {
     const share = decodeChallengePayload(payload);
     if (
       share &&
+      typeof share.publicCode === "string" &&
       share.publicCode.toUpperCase() === code &&
       knownGame(share.gameId) &&
+      typeof share.expiresAt === "number" &&
       share.expiresAt > Date.now()
     ) {
       await putChallenge({

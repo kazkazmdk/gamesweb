@@ -28,11 +28,12 @@ test("rendered HTML SEO QA writes a DOM report for every indexable URL", async (
       .trim();
     const words = mainText.split(/\s+/).filter(Boolean);
     const tokens = tokenize(mainText);
-    const hrefs = await page.locator("main a[href]").evaluateAll((els) =>
-      els
-        .map((el) => (el as HTMLAnchorElement).getAttribute("href") ?? "")
-        .filter((h) => h.startsWith("/") && !h.startsWith("/play")),
-    );
+    const hrefs = await page.evaluate(() => {
+      const root = document.querySelector("main") ?? document.querySelector("article") ?? document.body;
+      return [...root.querySelectorAll("a[href]")]
+        .map((el) => el.getAttribute("href") ?? "")
+        .filter((h) => h.startsWith("/") && !h.startsWith("/play"));
+    });
     const breadcrumbs = await page.locator("nav a, [aria-label='Breadcrumb'] a").allTextContents();
     const jsonld = await page.locator('script[type="application/ld+json"]').allTextContents();
     const playCta = (await page.locator("main a[href*='/play/'], main a[href*='/games/']").count()) > 0;
@@ -74,6 +75,8 @@ test("rendered HTML SEO QA writes a DOM report for every indexable URL", async (
     expect(robots, seo.path).not.toMatch(/noindex/i);
     expect(h1.length, seo.path).toBeGreaterThan(2);
     expect(hrefs.length, seo.path).toBeGreaterThan(0);
+    const hasParent = seo.parents.some((p) => hrefs.includes(p) || hrefs.includes(`${p}/`) || p === "/");
+    if (seo.topic !== "home") expect(hasParent || hrefs.some((h) => h === "/" || h.startsWith("/games")), seo.path).toBeTruthy();
   }
 
   for (let i = 0; i < rows.length; i += 1) {
@@ -124,5 +127,8 @@ test("noindex surfaces stay out of the sitemap", async ({ page, request }) => {
     expect(robots, path).toMatch(/noindex/i);
   }
   const xml = await (await request.get("/sitemap.xml")).text();
-  expect(xml).not.toMatch(/\/play\/|\/arcade|\/friends|\/inbox|\/party|\/c\//);
+  const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname);
+  for (const path of locs) {
+    expect(path === "/arcade" || path.startsWith("/play/") || path.startsWith("/friends") || path.startsWith("/inbox") || path.startsWith("/party") || path.startsWith("/c/"), path).toBeFalsy();
+  }
 });

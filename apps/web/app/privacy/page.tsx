@@ -1,6 +1,8 @@
+import Link from "next/link";
+
 export default function PrivacyPage() {
   return (
-    <div className="mx-auto max-w-2xl px-5 py-12">
+    <main className="mx-auto max-w-2xl px-5 py-12">
       <h1 className="display text-[48px]">Privacy</h1>
       <div className="mt-6 space-y-4 text-[15px] text-[var(--text-dim)]">
         <p>
@@ -24,7 +26,10 @@ export default function PrivacyPage() {
           When a backend is configured, data lives in Supabase (Postgres + Auth). Rate limits in production use a Redis
           provider if configured. Magic-link abuse protection may use Cloudflare Turnstile when enabled.
         </p>
+        <p>
+          See also <Link href="/about">About</Link> and <Link href="/terms">Terms</Link>.
+        </p>
       </div>
-    </div>
+    </main>
   );
 }
