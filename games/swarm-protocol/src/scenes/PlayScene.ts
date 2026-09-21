@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, seededRng, fillBackdrop, fillVignette, drawFungusPatch, drawContainer, type GameKeyboard } from "@gamesweb/game-core";
+import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, seededRng, fillBackdrop, fillVignette, drawFungusPatch, drawContainer, qualityFromFps, type GameKeyboard, type QualityTier } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { readRunContext, swarmProtocolManifest, utcDayKey } from "@gamesweb/game-sdk";
 import {
@@ -117,7 +117,7 @@ export class SwarmPlayScene extends Phaser.Scene {
   private lastEliteWarn = 0;
   private retries = 0;
   private endedAt = 0;
-  private quality: "high" | "low" = "high";
+  private quality: QualityTier = "high";
   private fpsAcc = 0;
   private frames = 0;
   private missiles: Missile[] = [];
@@ -137,7 +137,7 @@ export class SwarmPlayScene extends Phaser.Scene {
 
   create() {
     this.platform = this.game.registry.get("platform") as PlatformSDK;
-    this.parts = new ParticlePool(this.sys.game.device.input.touch ? 180 : 280);
+    this.parts = new ParticlePool(this.sys.game.device.input.touch ? 160 : 240);
     this.synth = (this.game.registry.get("synth") as Synth | undefined) ?? new Synth();
     this.game.registry.set("synth", this.synth);
     this.synth.setSettings(this.platform.audio.getSettings());
@@ -187,7 +187,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.game.canvas.tabIndex = 0;
     this.game.canvas.focus({ preventScroll: true });
     if (!this.enemies.length) {
-      for (let i = 0; i < 110; i += 1) this.enemies.push(emptyEnemy());
+      for (let i = 0; i < 160; i += 1) this.enemies.push(emptyEnemy());
       for (let i = 0; i < 180; i += 1) this.bullets.push(emptyBullet());
       for (let i = 0; i < 16; i += 1) this.missiles.push(emptyMissile());
       for (let i = 0; i < 6; i += 1) this.drones.push(emptyDrone());
@@ -242,6 +242,38 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.game.events.on("continue-endless", () => this.continueEndless());
     this.started = this.time.now;
     this.seedOpening();
+  }
+
+  private seedPeakField() {
+    this.started = this.time.now - 270_000;
+    for (const e of this.enemies) {
+      if (e.kind !== "boss" && e.kind !== "warden") e.active = false;
+    }
+    const want = this.quality === "low" ? 36 : 56;
+    const kinds: Array<Enemy["kind"]> = ["chaser", "dart", "tank", "spitter", "splitter", "swarmling", "elite"];
+    let n = 0;
+    for (const slot of this.enemies) {
+      if (n >= want) break;
+      if (slot.active) continue;
+      const a = (n / want) * Math.PI * 2;
+      const dist = 72 + (n % 8) * 26;
+      spawnEnemy(slot, kinds[n % kinds.length], this.px + Math.cos(a) * dist, this.py + Math.sin(a) * dist, 1 + (n % 5) * 0.06);
+      slot.x = clamp(slot.x, 40, ARENA - 40);
+      slot.y = clamp(slot.y, 40, ARENA - 40);
+      n += 1;
+    }
+    let orbs = 0;
+    for (const o of this.orbs) {
+      if (orbs >= 10) break;
+      if (o.active) continue;
+      o.active = true;
+      o.x = this.px + (orbs % 5) * 22 - 44;
+      o.y = this.py + 36 + ((orbs / 5) | 0) * 18;
+      o.vx = 0;
+      o.vy = 0;
+      o.value = 6;
+      orbs += 1;
+    }
   }
 
   private seedOpening() {
@@ -307,7 +339,7 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.fpsAcc += delta;
     if (this.fpsAcc > 1000) {
       const fps = this.frames / (this.fpsAcc / 1000);
-      this.quality = fps < 46 ? "low" : this.sys.game.device.input.touch ? "low" : "high";
+      this.quality = qualityFromFps(fps, this.sys.game.device.input.touch, this.quality);
       this.fpsAcc = 0;
       this.frames = 0;
     }
@@ -434,7 +466,8 @@ export class SwarmPlayScene extends Phaser.Scene {
   private spawnWave(dt: number) {
     const elapsed = (this.time.now - this.started) / 1000;
     const live = this.enemies.reduce((n, e) => n + (e.active && e.kind !== "boss" && e.kind !== "warden" ? 1 : 0), 0);
-    const want = desiredCount(elapsed);
+    const cap = this.quality === "low" ? 28 : this.quality === "mid" ? 42 : 64;
+    const want = Math.min(desiredCount(elapsed), cap);
     if (!this.bossSpawned && shouldSpawnBoss(elapsed, this.kills, this.level)) {
       const slot = this.enemies.find((e) => !e.active);
       if (slot) {
@@ -446,7 +479,7 @@ export class SwarmPlayScene extends Phaser.Scene {
       }
     }
     if (live >= want) return;
-    if (simRand() > dt * (elapsed < 8 ? 7.2 : 2.2 + elapsed * 0.01)) return;
+    if (simRand() > dt * (elapsed < 8 ? 10 : 3.6 + elapsed * 0.018)) return;
     const slot = this.enemies.find((e) => !e.active);
     if (!slot) return;
     const kind = pickKind(elapsed, elapsed > 90);
@@ -1182,8 +1215,12 @@ export class SwarmPlayScene extends Phaser.Scene {
     }
     for (const o of this.orbs) {
       if (!o.active) continue;
-      g.fillStyle(0xffc58a, 0.9);
-      g.fillCircle(o.x, o.y, 4);
+      g.fillStyle(0xffe08a, 0.28);
+      g.fillCircle(o.x, o.y, 10);
+      g.fillStyle(0xffc58a, 1);
+      g.fillCircle(o.x, o.y, 5.5);
+      g.fillStyle(0xfff4d8, 0.9);
+      g.fillCircle(o.x - 1.4, o.y - 1.6, 2);
     }
     for (const p of this.plasmaTicks) {
       g.lineStyle(3, this.build.plasma ? 0xff4ad4 : 0xf07a3a, Math.min(0.85, p.t * 2.4));
@@ -1204,8 +1241,11 @@ export class SwarmPlayScene extends Phaser.Scene {
         g.fillStyle(0xff8a6a, 0.9);
         g.fillRect(b.x - 7, b.y - 2, 14, 4);
       } else {
-        g.fillStyle(b.hostile ? 0xc45c3a : b.over ? 0xffe0c0 : 0xf7ebe3, 1);
-        g.fillCircle(b.x, b.y, b.r);
+        const a = Math.atan2(b.vy, b.vx);
+        g.fillStyle(b.hostile ? 0xc45c3a : b.over ? 0xffe0c0 : 0xf7ebe3, 0.35);
+        g.fillCircle(b.x - Math.cos(a) * 8, b.y - Math.sin(a) * 8, b.r * 1.4);
+        g.fillStyle(b.hostile ? 0xff6a3a : b.over ? 0xffe0c0 : 0xf7ebe3, 1);
+        g.fillCircle(b.x, b.y, b.r + 1.2);
       }
     }
     for (const m of this.missiles) {
@@ -1222,34 +1262,62 @@ export class SwarmPlayScene extends Phaser.Scene {
       g.fillCircle(-14, 0, 6);
       g.restore();
     }
+    const drawnEnemies = this.quality === "low" ? 36 : this.quality === "mid" ? 52 : 80;
+    let enemyDrawn = 0;
     for (const e of this.enemies) {
       if (!e.active) continue;
+      if (e.kind !== "boss" && e.kind !== "warden" && e.kind !== "elite") {
+        enemyDrawn += 1;
+        if (enemyDrawn > drawnEnemies) continue;
+      }
       if (e.telegraph > 0.05) {
         g.lineStyle(2, 0xff8a6a, 0.35 + e.telegraph * 0.4);
         g.strokeCircle(e.x, e.y, e.r + 10 + e.telegraph * 18);
       }
       const col = e.flash > 0 ? 0xffffff : KIND[e.kind].color;
       g.fillStyle(col, 1);
-      if (e.kind === "dart") g.fillTriangle(e.x + e.r, e.y, e.x - e.r * 0.7, e.y - e.r * 0.6, e.x - e.r * 0.7, e.y + e.r * 0.6);
-      else if (e.kind === "tank") {
+      if (e.kind === "dart") {
+        g.fillTriangle(e.x + e.r * 1.15, e.y, e.x - e.r * 0.7, e.y - e.r * 0.55, e.x - e.r * 0.7, e.y + e.r * 0.55);
+        g.fillStyle(0x6ab84a, 0.85);
+        g.fillTriangle(e.x - 2, e.y - e.r * 0.9, e.x + 8, e.y - 2, e.x - 6, e.y);
+        g.fillTriangle(e.x - 2, e.y + e.r * 0.9, e.x + 8, e.y + 2, e.x - 6, e.y);
+      } else if (e.kind === "tank") {
         g.fillRoundedRect(e.x - e.r, e.y - e.r * 0.7, e.r * 2, e.r * 1.4, 4);
-        g.fillStyle(0x120c10, 0.4);
-        g.fillRect(e.x - e.r + 4, e.y - 4, e.r * 2 - 8, 8);
+        g.fillStyle(0x120c10, 0.45);
+        g.fillRect(e.x - e.r + 3, e.y - 5, e.r * 2 - 6, 4);
+        g.fillRect(e.x - e.r + 3, e.y + 2, e.r * 2 - 6, 4);
+        g.fillStyle(0x2a1810, 1);
+        g.fillRect(e.x + e.r * 0.2, e.y - 4, e.r * 0.9, 8);
       } else if (e.kind === "spitter") {
-        g.fillCircle(e.x, e.y, e.r);
-        g.fillStyle(0xff8a4a, 0.8);
-        g.fillCircle(e.x, e.y - e.r * 0.2, e.r * 0.35);
+        g.fillCircle(e.x, e.y + 3, e.r * 0.85);
+        g.fillStyle(0x3a5028, 1);
+        g.fillRect(e.x - 3, e.y - e.r * 0.9, 6, e.r * 0.8);
+        g.fillStyle(0xff8a4a, 0.9);
+        g.fillCircle(e.x, e.y - e.r * 0.55, e.r * 0.42);
       } else if (e.kind === "splitter") {
-        g.fillTriangle(e.x, e.y - e.r, e.x + e.r, e.y + e.r * 0.6, e.x - e.r, e.y + e.r * 0.6);
-        g.fillCircle(e.x, e.y, e.r * 0.35);
-      } else if (e.kind === "swarmling") g.fillCircle(e.x, e.y, e.r);
-      else if (e.kind === "chaser") {
+        g.fillTriangle(e.x, e.y - e.r * 1.1, e.x + e.r * 0.85, e.y, e.x - e.r * 0.85, e.y);
+        g.fillTriangle(e.x, e.y + e.r * 1.1, e.x + e.r * 0.85, e.y, e.x - e.r * 0.85, e.y);
+        g.fillStyle(0xe8f6c8, 0.7);
+        g.fillCircle(e.x, e.y, e.r * 0.28);
+      } else if (e.kind === "swarmling") {
         g.fillCircle(e.x, e.y, e.r);
-        g.fillStyle(0x2a2018, 0.55);
-        g.fillCircle(e.x + 3, e.y - 2, 3);
         g.fillStyle(col, 0.85);
-        g.fillRect(e.x - e.r, e.y + 2, 5, 8);
-        g.fillRect(e.x + e.r - 5, e.y + 2, 5, 8);
+        g.fillRect(e.x - e.r * 1.15, e.y + 1, 5, 2);
+        g.fillRect(e.x + e.r * 0.4, e.y + 1, 5, 2);
+        g.fillRect(e.x - 1, e.y + e.r * 0.4, 2, 5);
+      } else if (e.kind === "chaser") {
+        g.fillRoundedRect(e.x - e.r * 0.95, e.y - e.r * 0.55, e.r * 1.9, e.r * 1.1, 6);
+        g.fillStyle(0x2a2018, 0.55);
+        g.fillCircle(e.x + e.r * 0.35, e.y - 2, 3);
+        g.fillStyle(col, 0.9);
+        g.fillCircle(e.x - e.r * 0.55, e.y + 3, e.r * 0.38);
+        g.fillCircle(e.x + e.r * 0.15, e.y + 4, e.r * 0.32);
+      } else if (e.kind === "elite") {
+        g.fillRoundedRect(e.x - e.r, e.y - e.r * 0.7, e.r * 2, e.r * 1.4, 6);
+        g.fillStyle(0x2a2010, 0.45);
+        g.fillRect(e.x - e.r + 6, e.y - 6, e.r * 2 - 12, 5);
+        g.fillStyle(0xffe8b0, 0.85);
+        g.fillTriangle(e.x, e.y - e.r - 6, e.x + 10, e.y - e.r + 8, e.x - 10, e.y - e.r + 8);
       } else if (e.kind === "warden") {
         g.fillRoundedRect(e.x - e.r, e.y - e.r, e.r * 2, e.r * 2, 8);
         g.fillStyle(0xffe0c0, 0.7);
@@ -1314,13 +1382,21 @@ export class SwarmPlayScene extends Phaser.Scene {
     }
 
     const heading = Math.atan2(this.vy, this.vx);
+    g.fillStyle(0x08110e, 0.28);
+    g.fillCircle(this.px, this.py, 62);
+    g.fillStyle(0xd8f0c8, 0.22);
+    g.fillCircle(this.px, this.py, 38);
+    g.fillStyle(0xfff4e0, 0.16);
+    g.fillCircle(this.px, this.py, 20);
     g.save();
     g.translateCanvas(this.px, this.py);
     g.rotateCanvas(Math.hypot(this.vx, this.vy) > 8 ? heading : 0);
     g.fillStyle(this.iFrames > 0 ? 0xffffff : 0xf07a3a, 1);
     g.fillTriangle(16, 0, -10, -9, -10, 9);
-    g.fillStyle(0xffe8d4, this.hp / this.maxHp > 0.35 ? 0.9 : 0.35);
-    g.fillCircle(0, 0, 5);
+    g.fillStyle(0xffe8d4, this.hp / this.maxHp > 0.35 ? 0.95 : 0.4);
+    g.fillCircle(0, 0, 6);
+    g.lineStyle?.(2, 0xfff4e0, 0.85);
+    g.strokeCircle?.(0, 0, 14);
     if (this.dashing > 0) {
       g.fillStyle(0xffffff, 0.35);
       g.fillTriangle(-16, 0, -28, -6, -28, 6);
@@ -1447,6 +1523,7 @@ export class SwarmPlayScene extends Phaser.Scene {
           this.hud.setVisible(false);
           this.overlay.setVisible(false);
         },
+        seedPeak: () => this.seedPeakField(),
       },
     );
   }

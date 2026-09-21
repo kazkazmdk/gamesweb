@@ -1,5 +1,7 @@
 export type Kind = "solid" | "spike" | "spinner" | "mover" | "gate" | "fall" | "finish" | "spawn" | "beam";
 
+export type PropLook = "hammer" | "disc" | "inflate";
+
 export type Rect = {
   x: number;
   y: number;
@@ -8,6 +10,7 @@ export type Rect = {
   kind: Kind;
   route?: "safe" | "fast" | "expert";
   phase?: number;
+  prop?: PropLook;
 };
 
 export type MapEnv = "factory" | "skyworks" | "signal";
@@ -33,20 +36,20 @@ export const MAPS: MapDef[] = [
     width: 2800,
     height: 720,
     env: "factory",
-    theme: { sky: 0x87c8ea, ground: 0xffd24a, accent: 0xff6b4a, danger: 0xff3b6a },
+    theme: { sky: 0xf4d48a, ground: 0xffd24a, accent: 0xff6b4a, danger: 0xff3b6a },
     solids: [
       { x: 40, y: 580, w: 40, h: 40, kind: "spawn" },
       plat(20, 620, 280),
-      { x: 360, y: 500, w: 70, h: 70, kind: "spinner", phase: 0 },
+      { x: 360, y: 500, w: 70, h: 70, kind: "spinner", phase: 0, prop: "hammer" },
       plat(320, 620, 220),
       { x: 620, y: 520, w: 160, h: 22, kind: "mover", phase: 0 },
       plat(860, 620, 200),
-      { x: 1120, y: 430, w: 24, h: 190, kind: "gate", phase: 0 },
+      { x: 1120, y: 430, w: 24, h: 190, kind: "gate", phase: 0, prop: "inflate" },
       plat(1080, 620, 260),
       plat(1400, 540, 180, "fast"),
       plat(1640, 460, 140, "fast"),
       plat(1880, 620, 240),
-      { x: 2160, y: 520, w: 70, h: 70, kind: "spinner", phase: 1.2 },
+      { x: 2160, y: 520, w: 70, h: 70, kind: "spinner", phase: 1.2, prop: "disc" },
       plat(2100, 620, 260),
       { x: 2480, y: 280, w: 36, h: 340, kind: "finish" },
       plat(2400, 620, 280),
@@ -58,7 +61,7 @@ export const MAPS: MapDef[] = [
     width: 1600,
     height: 2200,
     env: "factory",
-    theme: { sky: 0x9ad4f0, ground: 0x4ad4e8, accent: 0xff6b4a, danger: 0xff4d62 },
+    theme: { sky: 0xf2c878, ground: 0x4ad4e8, accent: 0xff6b4a, danger: 0xff4d62 },
     solids: [
       { x: 80, y: 2040, w: 40, h: 40, kind: "spawn" },
       plat(40, 2080, 320),
@@ -140,7 +143,7 @@ export const MAPS: MapDef[] = [
     width: 2600,
     height: 800,
     env: "signal",
-    theme: { sky: 0x8ec8e8, ground: 0x4ad4e8, accent: 0xffd166, danger: 0xff5a6e },
+    theme: { sky: 0xf0c070, ground: 0x4ad4e8, accent: 0xffd166, danger: 0xff5a6e },
     solids: [
       { x: 50, y: 640, w: 40, h: 40, kind: "spawn" },
       plat(20, 680, 280),
@@ -209,7 +212,7 @@ export const MAPS: MapDef[] = [
     width: 3400,
     height: 780,
     env: "signal",
-    theme: { sky: 0xa8d8f0, ground: 0x7ad4e8, accent: 0xff6b4a, danger: 0xff5570 },
+    theme: { sky: 0xf4c898, ground: 0x7ad4e8, accent: 0xff6b4a, danger: 0xff5570 },
     solids: [
       { x: 40, y: 620, w: 40, h: 40, kind: "spawn" },
       plat(20, 660, 260),
