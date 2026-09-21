@@ -19,6 +19,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
           images: [{ url: game.hero, alt: game.title }],
         }
       : undefined,
+    twitter: game
+      ? {
+          card: "summary_large_image",
+          title,
+          description: game.description,
+          images: [game.hero],
+        }
+      : undefined,
   };
 }
 

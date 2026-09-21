@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { GameManifest } from "@gamesweb/game-sdk";
 
+const ITEMS = ["resume", "restart", "controls", "settings", "exit"] as const;
+
 export function PauseOverlay({
   game,
   onResume,
@@ -20,16 +22,19 @@ export function PauseOverlay({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowDown" || e.key === "ArrowRight") {
         e.preventDefault();
-        setSel((n) => (n + 1) % 3);
+        setSel((n) => (n + 1) % ITEMS.length);
       }
       if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
         e.preventDefault();
-        setSel((n) => (n - 1 + 3) % 3);
+        setSel((n) => (n - 1 + ITEMS.length) % ITEMS.length);
       }
       if (e.key === "Enter") {
         e.preventDefault();
-        if (sel === 0) onResume();
-        else if (sel === 1) onRestart();
+        const item = ITEMS[sel];
+        if (item === "resume") onResume();
+        else if (item === "restart") onRestart();
+        else if (item === "controls") setHelp((v) => !v);
+        else if (item === "settings") window.location.assign("/settings");
         else window.location.assign(`/games/${game.slug}`);
       }
     };
@@ -48,39 +53,24 @@ export function PauseOverlay({
         <p className="meta text-white/45">{game.title}</p>
         <p className="display mt-2 text-[44px] text-white">Paused</p>
         <div className="mt-8 flex flex-col gap-2" role="group" aria-label="Pause">
-          <button
-            type="button"
-            data-selected={sel === 0}
-            className="gw-pause-item"
-            onMouseEnter={() => setSel(0)}
-            onClick={onResume}
-          >
+          <button type="button" data-selected={sel === 0} className="gw-pause-item" onMouseEnter={() => setSel(0)} onClick={onResume}>
             Resume
           </button>
-          <button
-            type="button"
-            data-selected={sel === 1}
-            className="gw-pause-item"
-            onMouseEnter={() => setSel(1)}
-            onClick={onRestart}
-          >
+          <button type="button" data-selected={sel === 1} className="gw-pause-item" onMouseEnter={() => setSel(1)} onClick={onRestart}>
             Restart
           </button>
-          <Link
-            href={`/games/${game.slug}`}
-            data-selected={sel === 2}
-            data-priority="low"
-            className="gw-pause-item"
-            onMouseEnter={() => setSel(2)}
-          >
-            Exit
+          <button type="button" data-selected={sel === 2} className="gw-pause-item" onMouseEnter={() => setSel(2)} onClick={() => setHelp((v) => !v)}>
+            Controls
+          </button>
+          <Link href="/settings" data-selected={sel === 3} data-priority="low" className="gw-pause-item" onMouseEnter={() => setSel(3)}>
+            Settings
+          </Link>
+          <Link href={`/games/${game.slug}`} data-selected={sel === 4} data-priority="low" className="gw-pause-item" onMouseEnter={() => setSel(4)}>
+            Exit to hub
           </Link>
         </div>
-        <button type="button" className="home-secondary mt-6 text-left" onClick={() => setHelp((v) => !v)}>
-          Controls
-        </button>
         {help ? (
-          <ul className="mt-3 space-y-1 text-[12px] text-white/60">
+          <ul className="mt-5 space-y-1 text-[12px] text-white/60">
             {game.controls.map((c) => (
               <li key={c.input}>
                 {c.input} — {c.action}

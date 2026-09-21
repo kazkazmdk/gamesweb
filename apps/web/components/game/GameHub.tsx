@@ -22,6 +22,7 @@ import { achievementProgress, friendOnBoard, rankViewModel } from "@/lib/platfor
 import { formatPlayScore } from "@/lib/platform/format";
 import { focusedGameContext } from "@/lib/platform/focus";
 import { boardModeFromPlayIndex, loadPlayIndex, lowerIsBetter, playModeOptions, savePlayIndex } from "@/lib/platform/modes";
+import { editorialFor } from "@/content";
 
 export function GameHub({ game }: { game: GameManifest }) {
   useAccent(game.accent);
@@ -49,6 +50,7 @@ export function GameHub({ game }: { game: GameManifest }) {
   );
   const selected = modes.find((m) => m.id === playMode);
   const played = player.history.some((h) => h.gameId === game.id);
+  const ed = editorialFor(game.slug);
 
   return (
     <article>
@@ -204,11 +206,50 @@ export function GameHub({ game }: { game: GameManifest }) {
         </aside>
       </div>
 
-      <p className="sr-only">
-        <Link href={`/games/${game.slug}/guide`}>Guide</Link>
-        <Link href={`/games/${game.slug}/controls`}>Controls</Link>
-        <Link href="/games">Catalog</Link>
-      </p>
+      <section className="border-t border-white/8 px-5 py-10 md:px-10" aria-label="Learn the game">
+        <p className="meta text-white/45">Learn the game</p>
+        <h2 className="display mt-2 text-[32px] text-white md:text-[44px]">Master {game.title}</h2>
+        <p className="mt-3 max-w-xl text-[15px] text-white/60">
+          Hub pages stay the play surface. These are the authored reads for this title — not a footer dump.
+        </p>
+        <nav className="mt-6 flex flex-wrap gap-2" aria-label={`${game.title} guides`}>
+          <Link href={`/games/${game.slug}/guide`} className="gw-cta-ghost min-h-11 px-4">
+            Guide
+          </Link>
+          <Link href={`/games/${game.slug}/how-to-play`} className="gw-cta-ghost min-h-11 px-4">
+            How to play
+          </Link>
+          <Link href={`/games/${game.slug}/controls`} className="gw-cta-ghost min-h-11 px-4">
+            Controls
+          </Link>
+          {ed.strategy.length ? (
+            <Link href={`/games/${game.slug}/strategy`} className="gw-cta-ghost min-h-11 px-4">
+              Strategy
+            </Link>
+          ) : null}
+          {ed.tracks?.length ? (
+            <Link href={`/games/${game.slug}/tracks`} className="gw-cta-ghost min-h-11 px-4">
+              Tracks
+            </Link>
+          ) : null}
+          {ed.courses?.length ? (
+            <Link href={`/games/${game.slug}/courses`} className="gw-cta-ghost min-h-11 px-4">
+              Courses
+            </Link>
+          ) : null}
+          {ed.scoring ? (
+            <Link href={`/games/${game.slug}/scoring`} className="gw-cta-ghost min-h-11 px-4">
+              Scoring
+            </Link>
+          ) : null}
+          <Link href={`/games/${game.slug}/achievements`} className="gw-cta-ghost min-h-11 px-4">
+            Achievements
+          </Link>
+          <Link href="/games" className="home-secondary px-3">
+            Catalog ›
+          </Link>
+        </nav>
+      </section>
     </article>
   );
 }

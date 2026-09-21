@@ -43,6 +43,8 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
         <Breadcrumbs items={crumbs} />
         <h1 className="display mt-6 text-[48px] md:text-[72px]">{page.h1}</h1>
         <p className="mt-4 max-w-2xl text-[16px] text-[var(--text-dim)]">{col.rationale}</p>
+        <p className="mt-4 max-w-2xl text-[15px] text-[var(--text-dim)]">{col.audience}</p>
+        <p className="mt-3 max-w-2xl text-[15px] text-[var(--text-dim)]">{col.pick}</p>
         <div className="mt-10">
           <GameCatalogGrid slugs={col.games} />
         </div>

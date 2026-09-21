@@ -13,6 +13,8 @@ export default function PartyCreatePage() {
   const player = usePlayer();
   const router = useRouter();
   const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   return (
     <div data-testid="party-create">
@@ -20,15 +22,19 @@ export default function PartyCreatePage() {
         slug="sky-stack"
         kicker="Party"
         title="Open a lobby"
-        body="Same playlist. Play on your own time. Standings update after each result — this is not a live match room."
+        body="A server code. Anyone on this instance can join it. Same playlist, shared roster, standings after each result — not a live match room."
         action={
           <ChamferButton
+            disabled={busy}
             onClick={() => {
-              const party = arcadeStore.createParty(player.id, player.displayName || "Host");
-              router.push(`/party/${party.code}`);
+              setBusy(true);
+              setError("");
+              void arcadeStore.createParty(player.id, player.displayName || "Host").then((party) => {
+                router.push(`/party/${party.code}`);
+              });
             }}
           >
-            Create party
+            {busy ? "Opening…" : "Create party"}
           </ChamferButton>
         }
       />
@@ -53,6 +59,7 @@ export default function PartyCreatePage() {
           Join
         </ChamferButton>
       </form>
+      {error ? <p className="px-5 text-[13px] text-rose-300 md:px-10">{error}</p> : null}
     </div>
   );
 }

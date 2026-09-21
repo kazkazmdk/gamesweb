@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, qualityFromFps, type GameKeyboard, type QualityTier } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { neonDriftManifest } from "@gamesweb/game-sdk";
-import { CAMERA, NEON, VEHICLE } from "../config";
+import { CAMERA_BY_TRACK, NEON, VEHICLE } from "../config";
 import { createCam, stepCamera, type Cam } from "../systems/camera";
 import {
   ghostEnabled,
@@ -112,7 +112,7 @@ export class DriftPlayScene extends Phaser.Scene {
     this.cleanLap = true;
     this.streakClean = true;
     this.runStart = this.time.now;
-    this.cam = createCam(pose.x, pose.y);
+    this.cam = createCam(pose.x, pose.y, CAMERA_BY_TRACK[this.def.id]);
     this.marks = [];
     this.recorder.reset();
     this.showGhost = ghostEnabled();
@@ -262,7 +262,7 @@ export class DriftPlayScene extends Phaser.Scene {
     this.cameras.resize(w, h);
     this.cameras.main.setViewport(0, 0, w, h);
     this.cameras.main.setSize(w, h);
-    this.cameras.main.setZoom(this.cam?.zoom ?? CAMERA.zoomSlow);
+    this.cameras.main.setZoom(this.cam?.zoom ?? CAMERA_BY_TRACK[this.def.id].zoomSlow);
   }
 
   private ensureAudio() {
@@ -321,7 +321,7 @@ export class DriftPlayScene extends Phaser.Scene {
       this.car.throttle = 0;
       this.ensureAudio();
       this.synth.engineRpm(0.35 + (3.2 - this.countdown) * 0.12, 0.4);
-      this.cam.zoom += (CAMERA.zoomSlow * 1.08 - this.cam.zoom) * (1 - Math.exp(-dt * 3));
+      this.cam.zoom += (CAMERA_BY_TRACK[this.def.id].zoomSlow * 1.08 - this.cam.zoom) * (1 - Math.exp(-dt * 3));
       this.cameras.main.setZoom(this.cam.zoom);
       this.cameras.main.centerOn(this.car.x, this.car.y);
       if (this.countdown <= 0) {
@@ -510,7 +510,7 @@ export class DriftPlayScene extends Phaser.Scene {
     const elapsed = this.time.now - this.runStart;
     this.recorder.tick(dt, elapsed, this.car.x, this.car.y, this.car.angle);
 
-    stepCamera(this.cam, this.car, dt, this.scale.width, this.scale.height, this.def.worldW, this.def.worldH);
+    stepCamera(this.cam, this.car, dt, this.scale.width, this.scale.height, this.def.worldW, this.def.worldH, CAMERA_BY_TRACK[this.def.id]);
     const shaken = this.juice.applyCamera({ x: this.cam.x, y: this.cam.y }, this.time.now);
     this.cameras.main.setZoom(this.cam.zoom);
     this.cameras.main.setRotation(this.cam.yaw);

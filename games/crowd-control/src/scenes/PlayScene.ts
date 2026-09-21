@@ -59,6 +59,7 @@ export class CrowdScene extends Phaser.Scene {
   private levelIndex = 0;
   private viewZoom = 1.62;
   private viewCy = 0.68;
+  private paused = false;
 
   constructor() {
     super("crowd-play");
@@ -120,6 +121,8 @@ export class CrowdScene extends Phaser.Scene {
       this.x = Phaser.Math.Clamp(p.x / this.scale.width, 0.08, 0.92);
     });
     this.input.on("pointerdown", () => this.ensureAudio());
+    this.game.events.on("platform-pause", () => (this.paused = true));
+    this.game.events.on("platform-resume", () => (this.paused = false));
     this.platform.session.start();
     this.started = this.time.now;
     this.platform.events.emit({ name: "gameplay_started", props: { gameId: "crowd-control" } });
@@ -168,6 +171,11 @@ export class CrowdScene extends Phaser.Scene {
     }
     const native = this.native?.read();
     if (native?.retryPressed) this.scene.restart();
+    if (this.paused) {
+      this.draw();
+      this.publishDebug();
+      return;
+    }
     if (!this.ended) {
       const steer = Number(Boolean(native?.right)) - Number(Boolean(native?.left));
       if (steer) this.ensureAudio();
@@ -423,13 +431,18 @@ export class CrowdScene extends Phaser.Scene {
       },
       { y: this.z },
     );
-    g.fillStyle(0xf0c878, 1);
-    g.fillRect(0, h * 0.42, w * 0.16, h);
-    g.fillRect(w * 0.84, h * 0.42, w * 0.16, h);
-    g.fillStyle(0xe8a050, 1);
-    for (let i = 0; i < 6; i += 1) {
-      g.fillRect(8, h * 0.2 + i * 90 - (this.z * 0.15) % 90, 40, 48);
-      g.fillRect(w - 48, h * 0.24 + i * 90 - (this.z * 0.15) % 90, 40, 48);
+    g.fillStyle(0x6a8aaa, 1);
+    g.fillRect(0, h * 0.28, w * 0.14, h);
+    g.fillRect(w * 0.86, h * 0.28, w * 0.14, h);
+    const facade = (this.z * 0.22) % 110;
+    for (let i = 0; i < 8; i += 1) {
+      const y = h * 0.08 + i * 110 - facade;
+      g.fillStyle(0x3a4a5c, 1);
+      g.fillRect(4, y, w * 0.12, 88);
+      g.fillRect(w - w * 0.12 - 4, y + 8, w * 0.12, 88);
+      g.fillStyle(0xffe08a, 0.18);
+      g.fillRect(12, y + 16, 10, 8);
+      g.fillRect(w - 28, y + 24, 10, 8);
     }
     g.fillStyle(0xd8d0c4, 1);
     g.fillRect(w * 0.16, 0, w * 0.68, h);
@@ -545,7 +558,7 @@ export class CrowdScene extends Phaser.Scene {
         playerX: this.x,
         playerY: this.z,
         score: this.pack,
-        paused: false,
+        paused: this.paused,
         fps: this.game.loop.actualFps,
         longFrames: this.longFrames,
         tick: this.ticks,

@@ -264,16 +264,24 @@ export default function HomePage() {
         challenges={openChallenges}
         you={{ name: player.displayName || "You", avatar: player.avatar }}
       />
-      <nav className="sr-only" aria-label="Public catalog">
-        <Link href="/games">Browser games catalog</Link>
-        <Link href="/guides">Guides</Link>
-        <Link href="/collections">Collections</Link>
-        {GAME_MANIFESTS.map((g) => (
-          <Link key={g.slug} href={`/games/${g.slug}`}>
-            {g.title}
+      <section className="px-5 pb-16 md:px-10" aria-label="Public catalog">
+        <p className="meta text-white/40">Public catalog</p>
+        <h2 className="display mt-2 text-[28px] md:text-[40px]">Browse every game</h2>
+        <p className="mt-3 max-w-xl text-[15px] text-white/60">
+          Home is the product landing. The crawlable catalog, guides, and collections live on their own URLs.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Link href="/games" className="gw-cta-ghost min-h-11 px-4">
+            Games catalog
           </Link>
-        ))}
-      </nav>
+          <Link href="/guides" className="gw-cta-ghost min-h-11 px-4">
+            Guides
+          </Link>
+          <Link href="/collections" className="gw-cta-ghost min-h-11 px-4">
+            Collections
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }

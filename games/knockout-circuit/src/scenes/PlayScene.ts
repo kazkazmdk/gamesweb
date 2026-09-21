@@ -64,6 +64,7 @@ export class KnockoutScene extends Phaser.Scene {
   private usedExpert = false;
   private spawn = { x: 80, y: 600 };
   private rag = { x: 0, y: 0, vx: 0, vy: 0, rot: 0, av: 0 };
+  private paused = false;
 
   constructor() {
     super("knockout-play");
@@ -124,6 +125,8 @@ export class KnockoutScene extends Phaser.Scene {
       if (p.id === this.dashId) this.dashId = -1;
     });
     this.loadGhosts();
+    this.game.events.on("platform-pause", () => (this.paused = true));
+    this.game.events.on("platform-resume", () => (this.paused = false));
     this.platform.events.emit({ name: "gameplay_started", props: { gameId: "knockout-circuit" } });
   }
 
@@ -147,6 +150,11 @@ export class KnockoutScene extends Phaser.Scene {
     }
     const native = this.nativeKeys?.read();
     if (native?.retryPressed) this.scene.restart();
+    if (this.paused) {
+      this.draw();
+      this.publishDebug();
+      return;
+    }
     if (native?.onePressed) this.switchMap(0);
     if (native?.twoPressed) this.switchMap(1);
     if (native?.threePressed) this.switchMap(2);
@@ -529,7 +537,7 @@ export class KnockoutScene extends Phaser.Scene {
         playerX: this.x,
         playerY: this.y,
         score: Math.floor(this.timeMs),
-        paused: false,
+        paused: this.paused,
         fps: this.game.loop.actualFps,
         longFrames: this.longFrames,
         tick: this.ticks,

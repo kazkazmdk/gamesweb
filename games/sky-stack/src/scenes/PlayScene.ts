@@ -65,6 +65,7 @@ export class SkyStackScene extends Phaser.Scene {
   private event: "none" | "wind" | "narrow" | "fast" | "mirror" = "none";
   private eventT = 0;
   private theme = 0;
+  private paused = false;
 
   constructor() {
     super("sky-stack-play");
@@ -102,7 +103,8 @@ export class SkyStackScene extends Phaser.Scene {
     this.resetClimb();
     this.input.addPointer(2);
     this.input.on("pointerdown", () => this.tryPlace());
-    this.game.events.on("platform-pause", () => undefined);
+    this.game.events.on("platform-pause", () => (this.paused = true));
+    this.game.events.on("platform-resume", () => (this.paused = false));
     this.platform.session.start();
     this.platform.events.emit({ name: "gameplay_started", props: { gameId: "sky-stack" } });
     this.started = this.time.now;
@@ -293,6 +295,11 @@ export class SkyStackScene extends Phaser.Scene {
         if (!this.ended || this.time.now - this.endedAt >= RETRY_GRACE_MS) this.retry();
       } else this.tryPlace();
     }
+    if (this.paused) {
+      this.draw(dt);
+      this.publishDebug();
+      return;
+    }
     if (!this.ended) {
       const wind = this.event === "wind" ? Math.sin(this.time.now / 180) * 40 : 0;
       this.moving.x += (this.dir * this.speed + wind) * dt * (this.fever ? 1.18 : 1);
@@ -439,7 +446,7 @@ export class SkyStackScene extends Phaser.Scene {
         playerX: this.moving.x,
         playerY: this.moving.y,
         score: this.score,
-        paused: false,
+        paused: this.paused,
         fps: this.game.loop.actualFps,
         longFrames: this.longFrames,
         tick: this.ticks,
