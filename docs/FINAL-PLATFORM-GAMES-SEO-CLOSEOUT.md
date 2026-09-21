@@ -2,8 +2,10 @@
 
 Branch: `cursor/final-platform-games-seo-c08e`  
 Base: `cursor/game-art-direction-rebuild-c08e` @ `c7e307c`  
-Head at report time: `9054cdc` + QA capture commit  
+Head: `8377639`  
 PR: https://github.com/kazkazmdk/gamesweb/pull/19  
+CI on HEAD: green (`check`, `database`, Vercel pass — run `35547612600`)  
+Preview: `https://gamesweb-6e76jzxlh-loan-s-projects2z.vercel.app`  
 Not merged.
 
 This report is evidence of what landed. It does **not** claim “SEO terminé”, guaranteed rankings, or an empty P0/P1 list.
@@ -84,10 +86,10 @@ Play OG tags still inherit the root Gamesweb card (**P2** — page is noindex).
 | `pnpm build` | pass, 110 static pages, 43 cluster paths |
 | Playwright smoke/platform/gameplay/progression/security/visual/seo | **pass** after origin + hub heading + sitemap path-parse fixes |
 | `QA_MATRIX=1` final-closeout + game-art-direction + qa-matrix | **9 passed** (2.8m) |
-| Vercel preview `017f6cf` | sitemap/robots/play/hub verified live |
+| Vercel preview `017f6cf` / `9054cdc` | sitemap/robots/play/hub verified live |
+| Vercel `8377639` | READY — `gamesweb-6e76jzxlh-loan-s-projects2z.vercel.app` |
 | Vercel `a38ef15` | **ERROR** (lint on raw `<a href="/games/">`, fixed in `017f6cf`) |
-
-CI on the latest push was subscribed; do not assume green until the dashboard says so.
+| GitHub CI HEAD | green — run `35547612600` (`check`, `database`) |
 
 ---
 
