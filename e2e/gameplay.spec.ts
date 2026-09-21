@@ -269,13 +269,14 @@ test("a finished run opens the result screen and the score reaches the server", 
   await cmd(page, "finishRun");
 
   const overlay = page.getByText("R or Space retries");
-  await expect(overlay).toBeVisible({ timeout: 5_000 });
-
-  // A tap still in the play rhythm must not dismiss the recap.
-  // Dispatch in-page so Playwright IPC cannot burn the 800ms grace.
-  await page.evaluate(() => {
+  // The recap ignores Space for 800ms after it mounts. Dispatch in the same
+  // page turn that first sees the copy, so a slow runner cannot burn that grace.
+  await page.waitForFunction(() => {
+    const text = document.body.innerText;
+    if (!text.includes("R or Space retries")) return false;
     window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
-  });
+    return document.body.innerText.includes("R or Space retries");
+  }, undefined, { timeout: 20_000 });
   await expect(overlay).toBeVisible();
 
   const res = await scoreReq;

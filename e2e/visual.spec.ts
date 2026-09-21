@@ -1,21 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
-import { settleVisual, shot, stabilizeVisual } from "./visual-helpers";
-
-async function stepCarousel(page: Page) {
-  const before = ((await page.locator("h1").first().textContent()) ?? "").trim();
-  for (let i = 0; i < 5; i += 1) {
-    await page.keyboard.press("ArrowRight");
-    try {
-      await expect
-        .poll(async () => ((await page.locator("h1").first().textContent()) ?? "").trim(), { timeout: 2_000 })
-        .not.toBe(before);
-      return;
-    } catch {
-      /* The home key listener attaches after hydration. A press before that is ignored. */
-    }
-  }
-  throw new Error(`carousel stayed on ${before}`);
-}
+import { test, expect } from "@playwright/test";
+import { settleVisual, shot, stabilizeVisual, stepCarousel } from "./visual-helpers";
 
 test.describe("visual regression", () => {
   test("Games Home Neon 1440", async ({ page }) => {

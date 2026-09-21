@@ -44,8 +44,21 @@ async function waitTrack(page: Page, index: number) {
     .toBe("neon-drift");
 }
 
+async function shotCanvas(page: Page, file: string) {
+  const canvas = page.locator("canvas").first();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("canvas missing");
+  // locator.screenshot waits until the element stops moving. A live WebGL
+  // canvas never settles on a busy CI runner, so the shot is clipped instead.
+  await page.screenshot({
+    path: file,
+    animations: "disabled",
+    clip: { x: box.x, y: box.y, width: Math.floor(box.width), height: Math.floor(box.height) },
+  });
+}
+
 test("neon harbour / hairpin / ridge are visually distinct at 1440", async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   mkdirSync(OUT, { recursive: true });
   const files: string[] = [];
 
@@ -58,9 +71,8 @@ test("neon harbour / hairpin / ridge are visually distinct at 1440", async ({ pa
         await page.waitForTimeout(280 + i * 80);
         await cmd(page, "setDrive", 0, 0, false);
       }
-      const canvas = page.locator("canvas").first();
       const unlabeled = `${OUT}/${track.id}-${moment}-unlabeled-1440.png`;
-      await canvas.screenshot({ path: unlabeled });
+      await shotCanvas(page, unlabeled);
       files.push(unlabeled);
       if (moment === "opening") {
         const labeled = `${OUT}/${track.id}-${moment}-1440.png`;
@@ -93,7 +105,18 @@ test("neon harbour / hairpin / ridge are visually distinct at 1440", async ({ pa
   );
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.goto("file://" + process.cwd() + "/docs/qa-production-closure/neon-contact-sheet.html");
-  await page.locator("#labeled").screenshot({ path: `${OUT}/contact-sheet.png` });
-  await page.locator("#unlabeled").screenshot({ path: `${OUT}/contact-sheet-unlabeled.png` });
+  await page.waitForFunction(() => [...document.images].every((img) => img.complete));
+  for (const [id, file] of [
+    ["#labeled", `${OUT}/contact-sheet.png`],
+    ["#unlabeled", `${OUT}/contact-sheet-unlabeled.png`],
+  ] as const) {
+    const box = await page.locator(id).boundingBox();
+    if (!box) throw new Error(`${id} missing`);
+    await page.screenshot({
+      path: file,
+      animations: "disabled",
+      clip: { x: box.x, y: box.y, width: Math.max(1, Math.round(box.width)), height: Math.max(1, Math.round(box.height)) },
+    });
+  }
   expect(files.length).toBe(TRACKS.length * MOMENTS.length + TRACKS.length);
 });
