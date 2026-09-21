@@ -36,14 +36,14 @@ export const VEHICLE = {
 } as const;
 
 export const CAMERA = {
-  follow: 6.2,
-  lookBlend: 0.55,
-  lookBase: 48,
-  lookSpeed: 0.17,
-  zoomSlow: 1.3,
-  zoomFast: 1.07,
-  driftOffset: 14,
-  yawMax: 0.035,
+  follow: 5.2,
+  lookBlend: 0.52,
+  lookBase: 220,
+  lookSpeed: 0.2,
+  zoomSlow: 0.78,
+  zoomFast: 0.66,
+  driftOffset: 16,
+  yawMax: 0.028,
 } as const;
 
 export const SCORE = {

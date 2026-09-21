@@ -50,6 +50,7 @@ export function GameView({ slug }: { slug: string }) {
     metadata?: Record<string, number | string | boolean>;
   }>(null);
   const [intense, setIntense] = useState(false);
+  const [qaHideChrome, setQaHideChrome] = useState(false);
   const historyLen = useRef(0);
   const acceptHistory = useRef(false);
   const historyCount = useRef(0);
@@ -224,13 +225,19 @@ export function GameView({ slug }: { slug: string }) {
       const kb = phaser.current?.input?.keyboard as { resetKeys?: () => void } | undefined;
       kb?.resetKeys?.();
     };
+    const onHideHud = () => {
+      document.documentElement.dataset.gwHideHud = "1";
+      setQaHideChrome(true);
+    };
     window.addEventListener("keydown", onKey);
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("blur", onWindowBlur);
+    window.addEventListener("gw-hide-hud", onHideHud);
     return () => {
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("blur", onWindowBlur);
+      window.removeEventListener("gw-hide-hud", onHideHud);
     };
   }, []);
 
@@ -297,7 +304,7 @@ export function GameView({ slug }: { slug: string }) {
   return (
     <div className="relative h-dvh bg-black text-white" style={{ ["--accent" as string]: game.accent }}>
       <div
-        className={`pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between px-3 py-2 transition-opacity ${intense && !paused && !result ? "opacity-0 hover:opacity-100" : "opacity-100"}`}
+        className={`pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between px-3 py-2 transition-opacity ${qaHideChrome || (intense && !paused && !result) ? "opacity-0 hover:opacity-100" : "opacity-100"} ${qaHideChrome ? "invisible" : ""}`}
       >
         <div className="pointer-events-auto flex items-center gap-3">
           <button type="button" onClick={() => router.push(`/games/${game.slug}`)} className="text-[13px] text-white/70">
@@ -373,7 +380,7 @@ export function GameView({ slug }: { slug: string }) {
       />
 
       <div
-        className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-between px-4 py-3 text-[11px] text-white/55 transition-opacity ${intense && !paused && !result ? "opacity-0" : "opacity-100"}`}
+        className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-between px-4 py-3 text-[11px] text-white/55 transition-opacity ${qaHideChrome || (intense && !paused && !result) ? "opacity-0" : "opacity-100"} ${qaHideChrome ? "invisible" : ""}`}
       >
         <span>
           Record {Number.isFinite(pb) && pb > 0 && pb < 1e12 ? formatScore(game.id, pb) : "—"}

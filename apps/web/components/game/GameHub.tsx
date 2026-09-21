@@ -1,6 +1,7 @@
 "use client";
 
 import { GAME_MANIFESTS, type GameManifest } from "@gamesweb/game-sdk";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PlayButton } from "@/components/game/GameCard";
 import {
@@ -35,7 +36,7 @@ export function GameHub({ game }: { game: GameManifest }) {
   const modes = playModeOptions(game.id);
   const boardMode = boardModeFromPlayIndex(game.id, Number(playMode));
   const pb = store.personalBest(game.id, boardMode, lowerIsBetter(game.id));
-  const related = GAME_MANIFESTS.filter((g) => g.id !== game.id);
+  const related = GAME_MANIFESTS.filter((g) => g.id !== game.id).slice(0, 4);
   const board = store.leaderboard(game.id, boardMode);
   const personal = store.personalRank(game.id, boardMode);
   const rank = rankViewModel(board, game.id, personal);
@@ -65,9 +66,6 @@ export function GameHub({ game }: { game: GameManifest }) {
           ) : null}
           <div className="mt-7 flex flex-wrap items-center gap-4">
             <PlayButton href={`/play/${game.slug}`}>{played ? "Continue" : "Play"}</PlayButton>
-            <a href="#board" className="home-secondary">
-              Leaderboard ›
-            </a>
           </div>
         </div>
       </GameBackdrop>
@@ -200,27 +198,12 @@ export function GameHub({ game }: { game: GameManifest }) {
         </aside>
       </div>
 
-      <details className="border-t border-white/8 px-5 py-8 md:px-10">
-        <summary className="cursor-pointer text-white/45">
-          <h2 className="meta inline">The game</h2>
-          <span className="ml-3 text-[12px] tracking-[0.12em] uppercase">how it plays</span>
-        </summary>
+      <section className="border-t border-white/8 px-5 py-8 md:px-10">
+        <h2 className="meta">The game</h2>
         <div className="mt-6 max-w-2xl space-y-8">
+          <p className="text-[15px] text-[var(--text-dim)]">{game.description}</p>
           <section>
-            <p className="mt-3 text-[15px] text-[var(--text-dim)]">{game.description}</p>
-          </section>
-          <section>
-            <h2 className="meta">Features</h2>
-            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-[var(--text-dim)]">
-              {game.tags.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-              <li>{game.sessionHint}</li>
-              <li>{game.supportedDevices.join(" · ")}</li>
-            </ul>
-          </section>
-          <section>
-            <h2 className="meta">How to play</h2>
+            <h3 className="meta">How it plays</h3>
             <ul className="mt-3 space-y-2 text-[15px] text-[var(--text-dim)]">
               {game.howToPlay.map((t) => (
                 <li key={t}>{t}</li>
@@ -228,7 +211,7 @@ export function GameHub({ game }: { game: GameManifest }) {
             </ul>
           </section>
           <section>
-            <h2 className="meta">Controls</h2>
+            <h3 className="meta">Controls</h3>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[14px]">
               {game.controls.map((c) => (
                 <div key={c.input} className="border-t border-[var(--line)] pt-2">
@@ -239,7 +222,21 @@ export function GameHub({ game }: { game: GameManifest }) {
             </dl>
           </section>
           <section>
-            <h2 className="meta">FAQ</h2>
+            <h3 className="meta">Guides</h3>
+            <ul className="mt-3 space-y-2 text-[14px]">
+              <li>
+                <Link href={`/guides/${game.slug}/how-to-play`}>How to play {game.title}</Link>
+              </li>
+              <li>
+                <Link href={`/guides/${game.slug}/tips`}>{game.title} strategy</Link>
+              </li>
+              <li>
+                <Link href="/games">All Gamesweb games</Link>
+              </li>
+            </ul>
+          </section>
+          <section>
+            <h3 className="meta">FAQ</h3>
             {game.faq.map((f) => (
               <div key={f.q} className="mt-3 border-t border-[var(--line)] pt-3">
                 <p className="text-[14px]">{f.q}</p>
@@ -248,7 +245,7 @@ export function GameHub({ game }: { game: GameManifest }) {
             ))}
           </section>
         </div>
-      </details>
+      </section>
     </article>
   );
 }

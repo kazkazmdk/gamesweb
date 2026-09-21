@@ -36,7 +36,7 @@ export default function FriendsPage() {
           slug="neon-drift"
           kicker="Social"
           title="Friends"
-          body="No friends yet. Invite someone to chase a score. Presence only appears when they are actually here."
+          body="No friends yet. Copy a link and invite someone to chase a score. Presence only appears when they are actually here — no fake rows."
           action={<InviteWidget />}
         />
       ) : (
