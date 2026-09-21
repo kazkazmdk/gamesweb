@@ -118,6 +118,8 @@ test("rendered HTML SEO QA writes a DOM report for every indexable URL", async (
       "",
       "Canonical origin: https://gamesweb.example (exact pathname; / is the origin only). Sitemap locs use the same origin.",
       "",
+      "Proved on CI run `35656709498` (`66aa7fd`) and run `35656016061` (`73d80e1`). Source rows: `docs/qa-production-closure/rendered-seo.json`.",
+      "",
       "| URL | words | unique | nearest | similarity | gate |",
       "| --- | ---: | ---: | --- | ---: | --- |",
       ...rows.map((r) => `| ${r.url} | ${r.visibleWords} | ${r.uniqueTokens} | ${r.nearestURL ?? ""} | ${r.similarity} | ${r.qualityGate} |`),

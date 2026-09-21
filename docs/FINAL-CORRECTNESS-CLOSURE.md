@@ -2,16 +2,14 @@
 
 Branche : `cursor/production-social-closure-032a`  
 Base de la PR : `cursor/final-product-seo-qa-032a` @ `d7a22e3`  
-Début de cette passe : `9002c9485d5b2d42dd113589e8d9653a776ca14e`  
-SHA prouvé : `73d80e183bbc5a5cf8154db05c27a8fc6d282f02`  
-Workflow : [run 35656016061](https://github.com/kazkazmdk/gamesweb/actions/runs/35656016061)
+Début de cette passe : `9002c9485d5b2d42dd113589e8d9653a776ca14e`
 
-| Job | ID | Conclusion |
-| --- | --- | --- |
-| `check` | 106519776517 | success |
-| `database` | 106519776248 | success |
+| SHA | Run | Rôle | `check` | `database` |
+| --- | --- | --- | --- | --- |
+| `73d80e183bbc5a5cf8154db05c27a8fc6d282f02` | [35656016061](https://github.com/kazkazmdk/gamesweb/actions/runs/35656016061) | correctifs e2e | 106519776517 success | 106519776248 success |
+| `66aa7fda83003c7eb23a2c0eb37e0c051338dcd5` | [35656709498](https://github.com/kazkazmdk/gamesweb/actions/runs/35656709498) | même code, docs seulement | 106522060229 success | 106522059966 success |
 
-Un seul run sur ce SHA : typecheck, lint, `pnpm test` (136 passed), build, Playwright (91 passed, 9 skipped, 0 failed), `pnpm test:db` (43 checks passed). Le run `35654295700` sur `a39bedf` était vert, puis `35654976916` sur `f25eaee` a raté trois flakes e2e (canvas Neon jamais stable, grâce du recap, carousel avant hydratation). `73d80e1` corrige ces flakes. Pas de merge `main`. Pas de deploy.
+Les deux runs : typecheck, lint, `pnpm test` (136 passed), build, Playwright (91 passed, 9 skipped, 0 failed), `pnpm test:db` (43 checks passed). Le run `35654295700` sur `a39bedf` était vert, puis `35654976916` sur `f25eaee` a raté trois flakes e2e (canvas Neon jamais stable, grâce du recap, carousel avant hydratation). `73d80e1` corrige ces flakes. `66aa7fd` réexécute le workflow entier, vert. Pas de merge `main`. Pas de deploy.
 
 ## Politique de confiance
 
