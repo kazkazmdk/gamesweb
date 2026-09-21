@@ -1,12 +1,14 @@
 import type { MetadataRoute } from "next";
+import { requestOrigin } from "@/lib/origin";
 
-export default function robots(): MetadataRoute.Robots {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  const origin = await requestOrigin();
   return {
     rules: {
       userAgent: "*",
       allow: "/",
+      disallow: ["/play/", "/auth", "/settings", "/me", "/friends", "/crew", "/party", "/inbox", "/c/"],
     },
-    sitemap: `${base}/sitemap.xml`,
+    sitemap: `${origin}/sitemap.xml`,
   };
 }

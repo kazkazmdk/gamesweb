@@ -152,6 +152,16 @@ export default function HomePage() {
 
   return (
     <div className="relative min-h-dvh" data-testid="games-home">
+      <nav className="sr-only" aria-label="Catalog">
+        <Link href="/games">Games catalog</Link>
+        <Link href="/guides">Guides</Link>
+        <Link href="/collections">Collections</Link>
+        {GAME_MANIFESTS.map((g) => (
+          <Link key={g.id} href={`/games/${g.slug}`}>
+            {g.title}
+          </Link>
+        ))}
+      </nav>
       <HomeStage slug={game.slug} reduced={reduced} step={travel} />
 
       <div className="relative flex min-h-dvh flex-col px-5 pb-[calc(var(--bottom-nav)+12px)] pt-[calc(var(--header-h)+8px)] md:px-10 md:pb-8">

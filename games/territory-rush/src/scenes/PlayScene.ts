@@ -17,7 +17,7 @@ import {
 } from "@gamesweb/game-core";
 import { readRunContext, territoryRushManifest, type PlatformSDK } from "@gamesweb/game-sdk";
 import { brickDir, needleDir, sweepDir } from "../systems/bots";
-import { contourSpans, drawRibbon, ribbonPoints } from "../systems/render";
+import { authoredCaptureLoop, contourSpans, drawRibbon, ribbonPoints } from "../systems/render";
 
 const COLS = 48;
 const ROWS = 28;
@@ -196,10 +196,10 @@ export class TerritoryScene extends Phaser.Scene {
           else b.dir = sweepDir(this.botSteps[i], b.x, b.y);
           this.stepActor(b.id, b.dir.x, b.dir.y, b.trail, true);
         });
-        this.captureWave = Math.max(0, this.captureWave - dt * 1.8);
         for (const b of this.banners) b.t -= dt;
         this.banners = this.banners.filter((b) => b.t > 0);
       }
+      this.captureWave = Math.max(0, this.captureWave - dt * 0.6);
       if (this.t >= TIME) this.finish();
       this.boost = Math.max(0, this.boost - dt);
       this.shield = Math.max(0, this.shield - dt);
@@ -375,7 +375,7 @@ export class TerritoryScene extends Phaser.Scene {
         const park = ((x / 8) | 0) + ((y / 6) | 0);
         g.fillStyle(park % 3 === 0 ? (this.arena === 0 ? 0xe4dcc4 : 0xd8e8d4) : this.arena === 0 ? 0xf6f0e2 : 0xeef4ea, 1);
         g.fillRect(x * c, y * c, c, c);
-        if ((x + y * 3) % 17 === 0 && x > 1 && y > 1) {
+        if ((x + y * 3) % 17 === 0 && x > 1 && y > 1 && this.get(x, y) === 0) {
           drawToyHouse(g, x * c + 1, y * c + 4, c - 2, c - 5, park % 2 ? 0xf4d8b0 : 0xd8e8f0, park % 2 ? 0xc45c3a : 0x3a6a88);
         }
       }
@@ -390,7 +390,7 @@ export class TerritoryScene extends Phaser.Scene {
       g.fillRoundedRect(x * c, y * c, c, c, this.arena === 0 ? 2 : 0);
     }
     for (let owner = 1; owner <= 4; owner += 1) {
-      g.fillStyle(colors[owner], 0.92);
+      g.fillStyle(colors[owner], owner === 1 ? 0.98 : 0.94);
       for (const span of contourSpans(this.grid, COLS, ROWS, owner)) {
         g.fillRoundedRect(span.x * c, span.y * c, span.w * c, c + 0.6, 3);
       }
@@ -414,12 +414,15 @@ export class TerritoryScene extends Phaser.Scene {
       }
     }
     if (this.captureWave > 0) {
-      g.fillStyle(0xffffff, this.captureWave * 0.1);
+      const waveR = (1.05 - this.captureWave) * Math.max(COLS, ROWS) * c * 0.72;
+      g.fillStyle(0xffffff, this.captureWave * 0.14);
       g.fillRect(0, 0, COLS * c, ROWS * c);
-      g.fillStyle(colors[1], this.captureWave * 0.16);
-      g.fillCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, 28 + (1 - this.captureWave) * 70);
+      g.fillStyle(colors[1], this.captureWave * 0.38);
+      g.fillCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, Math.max(48, waveR));
+      g.fillStyle(0xffffff, this.captureWave * 0.18);
+      g.fillCircle(this.vis.x * c + c / 2, this.vis.y * c + c / 2, Math.max(24, waveR * 0.55));
     }
-    drawRibbon(g, ribbonPoints(this.trail, c), this.shield > 0 ? 0x8fe8ff : 0xffffff, this.trail.length > 8 ? 1.15 : 1);
+    drawRibbon(g, ribbonPoints(this.trail, c), this.shield > 0 ? 0x8fe8ff : 0xff4d6d, this.trail.length > 8 ? 1.55 : 1.35);
     for (const b of this.bots) drawRibbon(g, ribbonPoints(b.trail, c), colors[b.id], 0.85);
     for (const p of this.pickups) {
       g.fillStyle(p.kind === "speed" ? 0xffe08a : p.kind === "shield" ? 0x8fe8ff : 0xff8ad4, 0.95);
@@ -466,30 +469,41 @@ export class TerritoryScene extends Phaser.Scene {
       {
         finishRun: () => this.finish(),
         exposeTrail: () => {
+          this.px = 8;
+          this.py = 14;
           this.trail = [
-            { x: this.px + 1, y: this.py },
-            { x: this.px + 2, y: this.py },
-            { x: this.px + 3, y: this.py },
-            { x: this.px + 3, y: this.py + 1 },
-            { x: this.px + 3, y: this.py + 2 },
+            { x: 9, y: 14 },
+            { x: 10, y: 14 },
+            { x: 11, y: 14 },
+            { x: 12, y: 14 },
+            { x: 13, y: 14 },
+            { x: 14, y: 14 },
+            { x: 15, y: 14 },
+            { x: 16, y: 14 },
+            { x: 16, y: 15 },
+            { x: 16, y: 16 },
+            { x: 16, y: 17 },
+            { x: 15, y: 17 },
           ];
-          this.px = this.px + 3;
-          this.py = this.py + 2;
+          this.px = 15;
+          this.py = 17;
           this.vis = { x: this.px, y: this.py };
         },
         closeLoop: () => {
-          if (this.trail.length < 3) {
-            this.trail = [
-              { x: this.px + 1, y: this.py },
-              { x: this.px + 2, y: this.py },
-              { x: this.px + 2, y: this.py + 1 },
-              { x: this.px + 1, y: this.py + 1 },
-            ];
-          }
-          this.fill(1, this.trail);
+          this.trail = authoredCaptureLoop(COLS, ROWS);
+          const before = this.grid.slice();
+          const n = this.fill(1, this.trail);
+          const cells: number[] = [];
+          for (let i = 0; i < this.grid.length; i += 1) if (before[i] !== this.grid[i]) cells.push(i);
+          this.flashes.push({ cells, t: 1.2, id: 1 });
           this.captureWave = 1;
-          this.flashes.push({ cells: this.trail.map((c) => this.idx(c.x, c.y)), t: 1, id: 1 });
+          this.claims += 1;
+          this.largest = Math.max(this.largest, n);
+          this.lastPct = this.pct(1);
           this.trail = [];
+          this.px = 8;
+          this.py = 14;
+          this.vis = { x: this.px, y: this.py };
         },
         hideHud: () => {
           this.hud.setVisible(false);
