@@ -11,8 +11,8 @@ export function GameHubEditorial({ slug }: { slug: string }) {
   const related = collections[0]?.games.filter((id) => id !== slug).slice(0, 3) ?? [];
   return (
     <section className="border-t border-white/8 px-5 py-12 md:px-10" aria-label="About the game">
-      <p className="meta">The game</p>
-      <h2 className="display mt-3 max-w-[14ch] text-[36px] md:text-[52px]">{game.title}</h2>
+      <h2 className="meta">The game</h2>
+      <p className="display mt-3 max-w-[14ch] text-[36px] md:text-[52px]">{game.title}</p>
       <p className="mt-4 max-w-2xl text-[16px] text-[var(--text-dim)]">{ed.hubDescription}</p>
       <p className="mt-4 max-w-2xl text-[15px] text-[var(--text-dim)]">{ed.whyDistinct}</p>
       <div className="mt-8 max-w-2xl">

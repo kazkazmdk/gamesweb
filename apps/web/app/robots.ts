@@ -1,8 +1,8 @@
 import type { MetadataRoute } from "next";
-import { publicOrigin } from "@/lib/env";
+import { requestOrigin } from "@/lib/origin";
 
-export default function robots(): MetadataRoute.Robots {
-  const base = publicOrigin();
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  const base = await requestOrigin();
   return {
     rules: {
       userAgent: "*",

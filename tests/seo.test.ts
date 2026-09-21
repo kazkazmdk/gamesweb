@@ -128,4 +128,10 @@ describe("public origin", () => {
     stash();
     expect(publicOrigin()).toBe("http://localhost:3000");
   });
+
+  it("can adopt the incoming host when no public env is set", () => {
+    stash();
+    expect(publicOrigin("gamesweb-git.vercel.app", "https")).toBe("https://gamesweb-git.vercel.app");
+    expect(publicOrigin("127.0.0.1:3010")).toBe("http://127.0.0.1:3010");
+  });
 });

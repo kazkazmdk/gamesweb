@@ -15,13 +15,19 @@ export function isVercelProduction(): boolean {
   return read("VERCEL_ENV") === "production";
 }
 
-export function publicOrigin(): string {
+export function publicOrigin(requestHost?: string, requestProto?: string): string {
   const explicit = read("NEXT_PUBLIC_APP_URL");
   if (explicit) return explicit.replace(/\/$/, "");
   const vercel = read("VERCEL_URL");
   if (vercel) {
     const host = vercel.replace(/^https?:\/\//, "").replace(/\/$/, "");
     return `https://${host}`;
+  }
+  if (requestHost) {
+    const host = requestHost.replace(/\/$/, "");
+    const local = host.startsWith("localhost") || host.startsWith("127.0.0.1");
+    const proto = requestProto ?? (local ? "http" : "https");
+    return `${proto}://${host}`;
   }
   return "http://localhost:3000";
 }
