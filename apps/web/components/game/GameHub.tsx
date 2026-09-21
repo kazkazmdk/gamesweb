@@ -3,6 +3,7 @@
 import { GAME_MANIFESTS, type GameManifest } from "@gamesweb/game-sdk";
 import { useEffect, useState } from "react";
 import { analytics } from "@gamesweb/analytics";
+import Link from "next/link";
 import { PlayButton } from "@/components/game/GameCard";
 import {
   AchievementStrip,
@@ -204,9 +205,9 @@ export function GameHub({ game }: { game: GameManifest }) {
       </div>
 
       <p className="sr-only">
-        <a href={`/games/${game.slug}/guide`}>Guide</a>
-        <a href={`/games/${game.slug}/controls`}>Controls</a>
-        <a href="/games">Catalog</a>
+        <Link href={`/games/${game.slug}/guide`}>Guide</Link>
+        <Link href={`/games/${game.slug}/controls`}>Controls</Link>
+        <Link href="/games">Catalog</Link>
       </p>
     </article>
   );
