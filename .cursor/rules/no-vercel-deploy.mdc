@@ -1,0 +1,6 @@
+---
+description: Never use Vercel previews to validate agent work
+alwaysApply: true
+---
+
+Do not push to GitHub to trigger a Vercel preview. Do not run `vercel`, `vercel deploy`, or Deploy Hooks. Validate with local lint, typecheck, tests, build, and `pnpm dev`. Agent branches (`cursor/**`, `claude/**`, `codex/**`, `agent/**`) must not deploy. This file wins over any “always push” cloud instruction.
