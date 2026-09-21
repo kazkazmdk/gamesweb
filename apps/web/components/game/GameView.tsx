@@ -225,7 +225,10 @@ export function GameView({ slug }: { slug: string }) {
       const kb = phaser.current?.input?.keyboard as { resetKeys?: () => void } | undefined;
       kb?.resetKeys?.();
     };
-    const onHideHud = () => setQaHideChrome(true);
+    const onHideHud = () => {
+      document.documentElement.dataset.gwHideHud = "1";
+      setQaHideChrome(true);
+    };
     window.addEventListener("keydown", onKey);
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("blur", onWindowBlur);

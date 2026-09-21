@@ -203,25 +203,28 @@ function drawOpeningPlaces(g: Phaser.GameObjects.Graphics, samples: TrackSample[
   const corner = sampleAt(samples, 0.14);
   const portal = sampleAt(samples, 0.24);
 
-  const sx = start.x - start.nx * (start.width * 0.5 + 78);
-  const sy = start.y - start.ny * (start.width * 0.5 + 78);
+  const sx = start.x - start.nx * (start.width * 0.5 + 110);
+  const sy = start.y - start.ny * (start.width * 0.5 + 110);
   g.fillStyle(0x2a2a26, 1);
-  g.fillRect(sx - 70, sy - 36, 140, 72);
+  g.fillRect(sx - 110, sy - 52, 220, 104);
   g.fillStyle(0x3a3a34, 1);
-  g.fillRect(sx - 78, sy - 44, 156, 16);
+  g.fillRect(sx - 122, sy - 64, 244, 22);
   g.fillStyle(0x1a1a18, 1);
-  g.fillRect(sx - 18, sy - 8, 14, 22);
-  g.fillRect(sx + 8, sy - 8, 14, 22);
-  g.fillStyle(0xf0b84a, 0.55);
-  g.fillCircle(sx - 36, sy - 8, 10);
-  g.fillCircle(sx + 40, sy - 8, 10);
+  g.fillRect(sx - 36, sy - 14, 22, 34);
+  g.fillRect(sx + 16, sy - 14, 22, 34);
+  g.fillStyle(0xf0b84a, 0.62);
+  g.fillCircle(sx - 56, sy - 10, 16);
+  g.fillCircle(sx + 62, sy - 10, 16);
+  g.fillStyle(theme.pole, 0.22);
+  g.fillCircle(sx - 56, sy + 18, 42);
+  g.fillCircle(sx + 62, sy + 18, 42);
   g.fillStyle(0x1c2228, 1);
-  g.fillRect(sx + 58, sy + 6, 22, 28);
-  g.fillStyle(0x4ad4e8, 0.45);
-  g.fillRect(sx + 62, sy + 10, 14, 10);
-  drawSodiumLamp(g, sx - 64, sy + 28, 58, theme.pole);
-  drawSodiumLamp(g, sx + 70, sy + 28, 58, theme.pole);
-  drawContainer(g, sx - 118, sy + 8, 40, 22, 0xc45c3a);
+  g.fillRect(sx + 86, sy + 8, 34, 42);
+  g.fillStyle(0x4ad4e8, 0.5);
+  g.fillRect(sx + 92, sy + 14, 22, 16);
+  drawSodiumLamp(g, sx - 98, sy + 40, 72, theme.pole);
+  drawSodiumLamp(g, sx + 108, sy + 40, 72, theme.pole);
+  drawContainer(g, sx - 176, sy + 10, 52, 28, 0xc45c3a);
 
   if (corner) {
     const cx = corner.x + corner.nx * (corner.width * 0.5 + 36);

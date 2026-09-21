@@ -6,15 +6,17 @@ Not merged. No Vercel deploy for this pass.
 
 Local stills: `docs/qa-game-universe-seo/screenshots/` + `contact-open.png` / `contact-peak.png` / `contact-nameless.png`.
 
-Inspected honestly:
+Inspected honestly (local stills after `bea6772` + follow-up capture):
 
 - Territory peak: large pink ownership (~40% PAINT) — fill is now the picture.
 - Crowd peak: huge ×2 / +N boards + pack mass — gates are no longer thin bars.
 - Velocity vs Knockout: ivory roofs vs candy foam hammer / yellow lot — not the same sky family.
-- Swarm peak: denser than open, still not a 300-enemy survivor wall.
-- Neon open: wet road + HOLD DRIFT, but roadside zones do **not** read as three places in one default frame.
+- Swarm peak: `seedPeak` now fields ~130 hosts + boss/elite + orbs. Still not a 300-enemy Vampire Survivors wall, but the nameless peak is no longer a sparse opening.
+- Neon open: pulled-back default camera now keeps **service canopy, chevron corner, tunnel mouth** in one frame. The plaza is still the weakest of the three; roadside is no longer a single empty ribbon.
 
 This report does **not** claim “SEO terminé”, empty P0, or that nameless contact is a perfect eight-way ID.
+
+Vercel: `bd65580` did create a preview despite `git.deploymentEnabled: false`. Previews are now disabled on the Gamesweb project. Push `bea6772` did **not** spawn a new deployment.
 
 ---
 
@@ -26,9 +28,9 @@ P1 code from the prior art closeout was cherry-picked and deepened:
 
 | Game | Universe | What changed | Still open |
 | --- | --- | --- | --- |
-| Neon Drift | Haruna Service Line | Authored roadside families: service / touge / tunnel; wet pools; harbour/district/ridge | Default camera can still flatten zones — treat as remaining P1 until contact-nameless is inspected |
+| Neon Drift | Haruna Service Line | Opening camera pulled to 0.78; authored plaza / chevrons / tunnel mouth share the start frame | Plaza still smaller than the tunnel; keep iterating if a reviewer only reads “dark road” |
 | Velocity Run | Coastal Service Roofs | Ivory/sand sky, HVAC / transit / ascent kits, `setCourse` | Mid-run kits need local stills to confirm 4 places |
-| Swarm Protocol | Colony Deck 7 | Distinct families + `seedPeak` | Peak density vs Vampire Survivors is still our scale, not 300 enemies |
+| Swarm Protocol | Colony Deck 7 | Distinct families + denser `seedPeak` (boss, elite, orbs, orbital blades) | Peak is a packed infestation, not a 300-enemy survivor wall |
 | Knockout Circuit | Toy Show Lot | Candy sky, foam props (hammer / inflate / disc) | Must stay visually off Velocity ivory |
 | Pocket Striker | Rec-Room Table | Furniture / lamp / card | Targeted polish, not a redesign |
 | Territory Rush | Paint First | Authored `closeLoop` map fill, houses recede on paint | Houses on unclaimed cells remain |
@@ -82,7 +84,7 @@ Local commands (no Vercel):
 
 ## Honest gaps
 
-- Nameless contact sheet must be inspected after local capture. If two games still read as palette swaps, continue.
-- Neon default-camera zone identity remains the hardest P1.
+- Nameless contact: eight worlds separate by palette and silhouette. Neon’s three places are in frame but the plaza can still lose to the road ribbon.
+- Swarm peak is denser, not VS-scale.
 - Search Console, not this branch, decides indexation.
-- No Vercel preview was used.
+- No Vercel QA. `vercel.json` alone did not stop Git previews; project `previewDeploymentsDisabled` did.
