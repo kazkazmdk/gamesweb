@@ -18,6 +18,7 @@ export default defineConfig({
     env: {
       ...process.env,
       GAMESWEB_BACKEND: "memory",
+      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? "https://gamesweb.example",
       PORT: "3010",
     },
   },

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * Apply 0001–0006 to a clean Postgres and run security / concurrency / dedupe tests.
+ * Apply every SQL migration in supabase/migrations, in filename order, then run
+ * security, concurrency, and social-arcade checks. A migration that fails SQL
+ * fails the job. Extra migrations are expected.
  * Requires DATABASE_URL. Fails if the database is missing or a migration is invalid.
  */
 import { readdirSync, readFileSync } from "node:fs";
@@ -60,9 +62,7 @@ async function main() {
     const files = readdirSync(join(root, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql"))
       .sort();
-    if (files.join() !== "0001_init.sql,0002_hardening.sql,0003_quality_hardening.sql,0004_authoritative_progression.sql,0005_privacy_rewards_dedupe.sql,0006_social_arcade.sql") {
-      throw new Error(`unexpected migrations: ${files.join(", ")}`);
-    }
+    if (!files.length) throw new Error("no migrations found");
     for (const file of files) {
       const sql = readFileSync(join(root, "supabase/migrations", file), "utf8");
       try {
@@ -323,6 +323,236 @@ async function main() {
         detail: `rows ${scores.rows[0].n}`,
       });
     });
+
+    async function partyFixture(code: string, playlist: unknown, roster: string[]) {
+      const inserted = await client.query(
+        `insert into public.parties (code, state, current_round, playlist, round_roster, submitted, standings, host_actor)
+         values ($1, 'playing', 0, $2::jsonb, $3::jsonb, '[]'::jsonb, '[]'::jsonb, $4)
+         returning id`,
+        [code, JSON.stringify(playlist), JSON.stringify(roster), roster[0]],
+      );
+      const partyId = inserted.rows[0].id as string;
+      for (const actor of roster) {
+        await client.query(
+          `insert into public.party_members (party_id, actor_id, display_name, ready, points)
+           values ($1, $2, $2, true, 0)`,
+          [partyId, actor],
+        );
+      }
+      return partyId;
+    }
+
+    function pointsOf(standings: Array<{ id: string; points: number }>, id: string) {
+      return standings.find((row) => row.id === id)?.points;
+    }
+
+    const higherId = await partyFixture("RANKHI", [{ gameId: "sky-stack", mode: "climb" }], ["actor-a", "actor-b"]);
+    const firstOnly = await client.query(
+      `select public.submit_party_round_attempt('RANKHI','actor-a',$1,100,'unverified','sky-stack','climb') as payload`,
+      [crypto.randomUUID()],
+    );
+    const firstPayload = firstOnly.rows[0].payload as { state?: string; error?: string };
+    const mid = await client.query("select state, standings, points from public.parties p join public.party_members m on m.party_id = p.id where p.code = 'RANKHI'");
+    checks.push({
+      name: "party round stores the first attempt without awarding points",
+      ok: firstPayload.state === "playing" && mid.rows.every((row: { points: number; state: string }) => row.points === 0 && row.state === "playing"),
+      detail: JSON.stringify({ firstPayload, points: mid.rows.map((row: { points: number }) => row.points) }),
+    });
+    const higherClose = await client.query(
+      `select public.submit_party_round_attempt('RANKHI','actor-b',$1,200,'verified','sky-stack','climb') as payload`,
+      [crypto.randomUUID()],
+    );
+    const higherParty = await client.query("select state, standings from public.parties where id = $1", [higherId]);
+    const higherStandings = higherParty.rows[0].standings as Array<{ id: string; points: number }>;
+    checks.push({
+      name: "higher-is-better party ranks B 10 and A 7 together",
+      ok:
+        higherClose.rows[0].payload.state === "results" &&
+        higherParty.rows[0].state === "results" &&
+        pointsOf(higherStandings, "actor-b") === 10 &&
+        pointsOf(higherStandings, "actor-a") === 7,
+      detail: JSON.stringify(higherStandings),
+    });
+
+    await partyFixture("RANKLO", [{ gameId: "velocity-run", mode: "course-1" }], ["actor-a", "actor-b"]);
+    await client.query(
+      `select public.submit_party_round_attempt('RANKLO','actor-a',$1,30,'unverified','velocity-run','course-1')`,
+      [crypto.randomUUID()],
+    );
+    await client.query(
+      `select public.submit_party_round_attempt('RANKLO','actor-b',$1,40,'unverified','velocity-run','course-1')`,
+      [crypto.randomUUID()],
+    );
+    const lowerParty = await client.query("select standings from public.parties where code = 'RANKLO'");
+    const lowerStandings = lowerParty.rows[0].standings as Array<{ id: string; points: number }>;
+    checks.push({
+      name: "lower-is-better party ranks A 10 and B 7",
+      ok: pointsOf(lowerStandings, "actor-a") === 10 && pointsOf(lowerStandings, "actor-b") === 7,
+      detail: JSON.stringify(lowerStandings),
+    });
+
+    await partyFixture("MODE01", [{ gameId: "velocity-run", mode: "course-1" }], ["actor-a", "actor-b"]);
+    const modeMiss = await client.query(
+      `select public.submit_party_round_attempt('MODE01','actor-a',$1,12,'unverified','velocity-run','course-2') as payload`,
+      [crypto.randomUUID()],
+    );
+    checks.push({
+      name: "party rejects a run on the wrong mode",
+      ok: modeMiss.rows[0].payload.error === "mode_mismatch",
+      detail: JSON.stringify(modeMiss.rows[0].payload),
+    });
+
+    const flagged = await client.query(
+      `select public.submit_party_round_attempt('MODE01','actor-a',$1,1,'flagged','velocity-run','course-1') as payload`,
+      [crypto.randomUUID()],
+    );
+    const flaggedCount = await client.query(
+      `select count(*)::int as n from public.party_round_attempts a
+       join public.parties p on p.id = a.party_id
+       where p.code = 'MODE01'`,
+    );
+    checks.push({
+      name: "rejected party runs leave no attempt",
+      ok: flaggedCount.rows[0].n === 0,
+      detail: `rows ${flaggedCount.rows[0].n}`,
+    });
+    checks.push({
+      name: "party rejects a flagged run",
+      ok: flagged.rows[0].payload.error === "invalid_score",
+      detail: JSON.stringify(flagged.rows[0].payload),
+    });
+
+    await partyFixture(
+      "CUMUL8",
+      [
+        { gameId: "sky-stack", mode: "climb" },
+        { gameId: "velocity-run", mode: "course-1" },
+      ],
+      ["actor-a", "actor-b"],
+    );
+    await client.query(`select public.submit_party_round_attempt('CUMUL8','actor-a',$1,200,'unverified','sky-stack','climb')`, [crypto.randomUUID()]);
+    await client.query(`select public.submit_party_round_attempt('CUMUL8','actor-b',$1,100,'unverified','sky-stack','climb')`, [crypto.randomUUID()]);
+    await client.query(
+      `update public.parties
+         set state = 'playing', current_round = 1, submitted = '[]'::jsonb
+       where code = 'CUMUL8'`,
+    );
+    await client.query(`select public.submit_party_round_attempt('CUMUL8','actor-a',$1,41,'unverified','velocity-run','course-1')`, [crypto.randomUUID()]);
+    await client.query(`select public.submit_party_round_attempt('CUMUL8','actor-b',$1,32,'unverified','velocity-run','course-1')`, [crypto.randomUUID()]);
+    const cumul = await client.query("select standings, state from public.parties where code = 'CUMUL8'");
+    const cumulStandings = cumul.rows[0].standings as Array<{ id: string; points: number }>;
+    checks.push({
+      name: "two party rounds accumulate to 17 and 17",
+      ok: cumul.rows[0].state === "results" && pointsOf(cumulStandings, "actor-a") === 17 && pointsOf(cumulStandings, "actor-b") === 17,
+      detail: JSON.stringify(cumulStandings),
+    });
+
+    const raceCode = "RACE88";
+    await partyFixture(raceCode, [{ gameId: "sky-stack", mode: "climb" }], ["actor-a", "actor-b"]);
+    const raceA = crypto.randomUUID();
+    const raceB = crypto.randomUUID();
+    const left = new pg.Client({ connectionString: url });
+    const right = new pg.Client({ connectionString: url });
+    await left.connect();
+    await right.connect();
+    try {
+      const [ra, rb] = await Promise.all([
+        left.query(`select public.submit_party_round_attempt($1,'actor-a',$2,100,'unverified','sky-stack','climb') as payload`, [raceCode, raceA]),
+        right.query(`select public.submit_party_round_attempt($1,'actor-b',$2,200,'verified','sky-stack','climb') as payload`, [raceCode, raceB]),
+      ]);
+      const race = await client.query(
+        `select p.state, p.standings, p.submitted, count(a.id)::int as attempts
+         from public.parties p
+         left join public.party_round_attempts a on a.party_id = p.id
+         where p.code = $1
+         group by p.id`,
+        [raceCode],
+      );
+      const raceStandings = race.rows[0].standings as Array<{ id: string; points: number }>;
+      const submitted = race.rows[0].submitted as string[];
+      checks.push({
+        name: "concurrent party submits keep both attempts and the real ranking",
+        ok:
+          ra.rows[0].payload.error == null &&
+          rb.rows[0].payload.error == null &&
+          race.rows[0].state === "results" &&
+          race.rows[0].attempts === 2 &&
+          submitted.includes("actor-a") &&
+          submitted.includes("actor-b") &&
+          pointsOf(raceStandings, "actor-b") === 10 &&
+          pointsOf(raceStandings, "actor-a") === 7,
+        detail: JSON.stringify({ a: ra.rows[0].payload, b: rb.rows[0].payload, race: race.rows[0] }),
+      });
+    } finally {
+      await left.end();
+      await right.end();
+    }
+
+    await partyFixture("REUSE1", [{ gameId: "sky-stack", mode: "climb" }], ["actor-a", "actor-b"]);
+    const reused = await client.query(
+      `select public.submit_party_round_attempt('REUSE1','actor-a',$1,50,'unverified','sky-stack','climb') as payload`,
+      [raceA],
+    );
+    checks.push({
+      name: "a party run id cannot be reused",
+      ok: reused.rows[0].payload.error === "run_reuse",
+      detail: JSON.stringify(reused.rows[0].payload),
+    });
+
+    const challengeRun = crypto.randomUUID();
+    const challenge = await client.query(
+      `insert into public.challenges (public_code, game_id, mode, seed, type, challenger_actor, challenger_name, challenger_run_id, challenger_score, trust, expires_at)
+       values ('CHAL01','velocity-run','course-1','velocity-run:seed','beat-time','actor-a','A',$1,40,'unverified', now() + interval '1 day')
+       returning id`,
+      [challengeRun],
+    );
+    const dupChallenge = await client.query(
+      `insert into public.challenges (public_code, game_id, mode, seed, type, challenger_actor, challenger_name, challenger_run_id, challenger_score, trust, expires_at)
+       values ('CHAL02','velocity-run','course-1','velocity-run:seed','beat-time','actor-a','A',$1,40,'unverified', now() + interval '1 day')`,
+      [challengeRun],
+    ).then(
+      () => ({ ok: false }),
+      (err: unknown) => ({ ok: /23505|duplicate/i.test(err instanceof Error ? err.message : String(err)) }),
+    );
+    checks.push({ name: "challenger_run_id is unique", ok: dupChallenge.ok, detail: String(dupChallenge.ok) });
+
+    const attemptRun = crypto.randomUUID();
+    await client.query(
+      `insert into public.challenge_attempts (challenge_id, player_actor, player_name, score, trust, run_id)
+       values ($1, 'actor-b', 'B', 30, 'unverified', $2)`,
+      [challenge.rows[0].id, attemptRun],
+    );
+    const dupActor = await client.query(
+      `insert into public.challenge_attempts (challenge_id, player_actor, player_name, score, trust, run_id)
+       values ($1, 'actor-b', 'B', 29, 'unverified', $2)`,
+      [challenge.rows[0].id, crypto.randomUUID()],
+    ).then(
+      () => false,
+      (err: unknown) => /23505|duplicate/i.test(err instanceof Error ? err.message : String(err)),
+    );
+    const dupRun = await client.query(
+      `insert into public.challenge_attempts (challenge_id, player_actor, player_name, score, trust, run_id)
+       values ($1, 'actor-c', 'C', 28, 'unverified', $2)`,
+      [challenge.rows[0].id, attemptRun],
+    ).then(
+      () => false,
+      (err: unknown) => /23505|duplicate/i.test(err instanceof Error ? err.message : String(err)),
+    );
+    checks.push({
+      name: "challenge attempts are unique per player_actor and per run_id",
+      ok: dupActor && dupRun,
+      detail: `actor ${dupActor} run ${dupRun}`,
+    });
+
+    checks.push(
+      await asRole(client, "anon", null, async () =>
+        expectDenied("anon cannot execute submit_party_round_attempt", () =>
+          client.query(
+            "select public.submit_party_round_attempt('RANKHI','actor-a','run','1','unverified','sky-stack','climb')",
+          ),
+        ),
+      ),
+    );
 
     const cols = await client.query(
       `select column_name from information_schema.columns

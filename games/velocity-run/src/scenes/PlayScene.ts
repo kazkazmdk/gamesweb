@@ -36,6 +36,7 @@ export class VelocityPlayScene extends Phaser.Scene {
   private paused = false;
   private ended = false;
   private dying = 0;
+  private attemptEpoch = 0;
   private running = false;
   private startMs = 0;
   private timeMs = 0;
@@ -232,7 +233,9 @@ export class VelocityPlayScene extends Phaser.Scene {
     }
 
     if (this.dying > 0) {
-      this.dying -= dt * 1000;
+      // Wall-clock ms. Capping this by the physics dt made a 220ms respawn take
+      // several frames, so a slow CI loop never observed the reset timer.
+      this.dying -= delta;
       this.parts.update(dt);
       this.draw(dt);
       if (this.dying <= 0) {
@@ -243,6 +246,7 @@ export class VelocityPlayScene extends Phaser.Scene {
         this.splitIndex = 0;
         this.splits = [];
         this.recorder.reset();
+        this.attemptEpoch += 1;
       }
       return;
     }
@@ -745,6 +749,7 @@ export class VelocityPlayScene extends Phaser.Scene {
         deaths: this.deaths,
         sessionDeaths: this.sessionDeaths,
         timeMs: this.timeMs,
+        attemptEpoch: this.attemptEpoch,
         courseId: this.course.id,
         contentId: this.course.id,
         tick: this.ticks,

@@ -6,6 +6,22 @@ import { getBackend } from "@/lib/backend";
 import { attemptChallengeFromRun, createChallengeFromRun, getChallenge, putChallenge } from "@/lib/backend/social-arcade";
 import { decodeChallengePayload, getManifest } from "@gamesweb/game-sdk";
 
+function challengeFailure(error: string) {
+  if (error === "run_forbidden" || error === "game_mismatch") return jsonError("FORBIDDEN", error, 403);
+  if (error === "not_found" || error === "run_not_found") return jsonError("NOT_FOUND", error, 404);
+  if (
+    error === "expired" ||
+    error === "mode_mismatch" ||
+    error === "type_mismatch" ||
+    error === "invalid_score" ||
+    error === "run_reuse" ||
+    error === "seed_mismatch"
+  ) {
+    return jsonError("CONFLICT", error, 409);
+  }
+  return jsonError("INVALID_PAYLOAD", error, 400);
+}
+
 function knownGame(id: string) {
   return Boolean(getManifest(id));
 }
@@ -89,18 +105,13 @@ export async function POST(req: Request) {
     const code = (body.code ?? "").toUpperCase();
     if (!code || !body.runId) return jsonError("INVALID_PAYLOAD", "Need code and runId.", 400);
     const result = await attemptChallengeFromRun(identity, code, body.runId);
-    if (!result.ok) {
-      const forbidden = result.error === "run_forbidden" || result.error === "game_mismatch";
-      return jsonError(forbidden ? "FORBIDDEN" : result.error === "expired" ? "CONFLICT" : "NOT_FOUND", result.error, forbidden ? 403 : result.error === "expired" ? 409 : 404);
-    }
+    if (!result.ok) return challengeFailure(result.error);
     return jsonOk({ ...result, persistence: "server" });
   }
   const limited = await rateLimit(`challenge-create:${identityKey(identity)}:${clientIp(req)}`, policies.challengeCreate);
   if (!limited.ok) return jsonError("RATE_LIMITED", "Too many challenges.", 429);
   if (!body.runId) return jsonError("INVALID_PAYLOAD", "Need runId.", 400);
   const created = await createChallengeFromRun(identity, body.runId, body.challengeType ?? body.type);
-  if ("error" in created) {
-    return jsonError(created.error === "run_forbidden" ? "FORBIDDEN" : "NOT_FOUND", created.error, created.error === "run_forbidden" ? 403 : 404);
-  }
+  if ("error" in created) return challengeFailure(created.error);
   return jsonOk({ ...created, persistence: "server" });
 }

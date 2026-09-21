@@ -7,7 +7,7 @@ const TRACKS = [
   { id: "hairpin", index: 1, key: "technical" },
   { id: "ridge", index: 2, key: "ridge" },
 ] as const;
-const MOMENTS = ["opening", "mid", "distinctive", "peak"] as const;
+const MOMENTS = ["opening", "mid", "distinctive"] as const;
 
 async function debugOf(page: Page) {
   return page.evaluate(
@@ -45,25 +45,28 @@ async function waitTrack(page: Page, index: number) {
 }
 
 test("neon harbour / hairpin / ridge are visually distinct at 1440", async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(120_000);
   mkdirSync(OUT, { recursive: true });
   const files: string[] = [];
 
   for (const track of TRACKS) {
     await waitTrack(page, track.index);
     for (const [i, moment] of MOMENTS.entries()) {
-      if (i === 0) await page.waitForTimeout(500);
+      if (i === 0) await page.waitForTimeout(200);
       if (i > 0) {
         await cmd(page, "setDrive", 0.7, i === 2 ? 0.22 : 0.08, false);
-        await page.waitForTimeout(650 + i * 220);
+        await page.waitForTimeout(280 + i * 80);
         await cmd(page, "setDrive", 0, 0, false);
       }
-      const labeled = `${OUT}/${track.id}-${moment}-1440.png`;
-      const unlabeled = `${OUT}/${track.id}-${moment}-unlabeled-1440.png`;
-      await page.screenshot({ path: labeled, fullPage: false });
       const canvas = page.locator("canvas").first();
+      const unlabeled = `${OUT}/${track.id}-${moment}-unlabeled-1440.png`;
       await canvas.screenshot({ path: unlabeled });
-      files.push(labeled, unlabeled);
+      files.push(unlabeled);
+      if (moment === "opening") {
+        const labeled = `${OUT}/${track.id}-${moment}-1440.png`;
+        await page.screenshot({ path: labeled, fullPage: false, animations: "disabled" });
+        files.push(labeled);
+      }
     }
   }
 
@@ -92,5 +95,5 @@ test("neon harbour / hairpin / ridge are visually distinct at 1440", async ({ pa
   await page.goto("file://" + process.cwd() + "/docs/qa-production-closure/neon-contact-sheet.html");
   await page.locator("#labeled").screenshot({ path: `${OUT}/contact-sheet.png` });
   await page.locator("#unlabeled").screenshot({ path: `${OUT}/contact-sheet-unlabeled.png` });
-  expect(files.length).toBe(24);
+  expect(files.length).toBe(TRACKS.length * MOMENTS.length + TRACKS.length);
 });

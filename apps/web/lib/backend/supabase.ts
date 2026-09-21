@@ -8,10 +8,11 @@ import {
   type LeaderboardEntry,
   type VerifiedStatus,
 } from "@gamesweb/database";
-import { applyChallengeAttempt, getManifest, makePublicCode, QUICK_PARTY_PLAYLIST, rankScores, utcDayKey, type ChallengeRecord } from "@gamesweb/game-sdk";
+import { applyChallengeAttempt, getManifest, makePublicCode, QUICK_PARTY_PLAYLIST, utcDayKey, type ChallengeRecord } from "@gamesweb/game-sdk";
 import { actorId } from "@/lib/api/actor";
 import type { Identity } from "@/lib/api/identity";
 import { competitiveTrust, loadCompetitiveRun } from "@/lib/backend/competitive-run";
+import { resolveChallengeType, rivalsFromChallenges, validateCompetitiveRunTarget } from "@/lib/backend/competitive-contract";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { commitSha, APP_VERSION } from "@/lib/version";
 import type { BackendStore, OfflineRun, PublicPlayerPayload, ScoreWriteResult, StoredInbox, StoredParty, StoredProfile, StoredRival, StoredSave, StoredScore, StoredSession, SubmitScoreInput } from "@/lib/backend/types";
@@ -1027,43 +1028,24 @@ export class SupabaseBackend implements BackendStore {
   }
 
   async submitPartyRound(identity: Identity, code: string, runId: string) {
-    const party = await this.getParty(code);
-    if (!party) return { error: "not_found" };
-    const id = actorId(identity);
-    if (!party.members.some((m) => m.id === id)) return { error: "not_member" };
-    if (party.state !== "playing") return { error: "bad_state" };
-    if (!party.roundRoster.includes(id)) return { error: "not_in_round" };
-    if (party.submitted.includes(id)) return { error: "duplicate" };
     const run = await loadCompetitiveRun(this, identity, runId);
     if ("error" in run) return { error: run.error };
-    const slot = party.playlist[party.round];
-    if (!slot || run.gameId !== slot.gameId) return { error: "game_mismatch" };
     if (run.verificationStatus === "flagged") return { error: "invalid_score" };
     const sb = admin();
-    const { error: attemptError } = await sb.from("party_round_attempts").insert({
-      party_id: party.id,
-      round_index: party.round,
-      actor_id: id,
-      run_id: run.runId,
-      score: run.score,
-      trust: competitiveTrust(run.verificationStatus),
+    const { data, error } = await sb.rpc("submit_party_round_attempt", {
+      p_code: code,
+      p_actor: actorId(identity),
+      p_run_id: run.runId,
+      p_score: run.score,
+      p_trust: competitiveTrust(run.verificationStatus),
+      p_game_id: run.gameId,
+      p_mode: run.mode,
     });
-    if (attemptError) return { error: attemptError.code === "23505" ? "run_reuse" : "invalid_score" };
-    const ranked = rankScores([{ id, name: party.members.find((m) => m.id === id)?.name ?? "Player", score: run.score }], lowerIsBetter(run.gameId));
-    const standings = [...party.standings];
-    for (const r of ranked) {
-      const standing = standings.find((s) => s.id === r.id);
-      if (standing) standing.points += r.points;
-      else standings.push({ id: r.id, name: r.name, points: r.points });
-      await sb.from("party_members").update({ points: standings.find((s) => s.id === r.id)?.points ?? r.points }).eq("party_id", party.id).eq("actor_id", r.id);
-    }
-    const submitted = [...party.submitted, id];
-    const complete = party.roundRoster.every((rid) => submitted.includes(rid));
-    await sb
-      .from("parties")
-      .update({ standings, submitted, state: complete ? "results" : "playing" })
-      .eq("id", party.id);
-    return (await this.getParty(code))!;
+    if (error) return { error: "invalid_score" };
+    const payload = (data ?? {}) as { error?: string };
+    if (payload.error) return { error: payload.error };
+    const party = await this.getParty(code);
+    return party ?? { error: "not_found" };
   }
 
   private mapChallenge(row: Record<string, unknown>, attempts: ChallengeRecord["attempts"] = []): ChallengeRecord {
@@ -1120,6 +1102,9 @@ export class SupabaseBackend implements BackendStore {
   async createChallengeFromRun(identity: Identity, runId: string, type?: string) {
     const run = await loadCompetitiveRun(this, identity, runId);
     if ("error" in run) return { error: run.error };
+    if (run.verificationStatus === "flagged") return { error: "invalid_score" };
+    const resolved = resolveChallengeType(run.gameId, type);
+    if (!resolved.ok) return { error: resolved.error };
     const profile = await this.getOrCreateProfile(identity);
     const publicCode = makePublicCode();
     const sb = admin();
@@ -1130,7 +1115,7 @@ export class SupabaseBackend implements BackendStore {
         game_id: run.gameId,
         mode: run.mode,
         seed: `${run.gameId}:${run.runId}`,
-        type: type ?? "beat-score",
+        type: resolved.type,
         challenger_id: identity.userId,
         challenger_actor: actorId(identity),
         challenger_name: profile.displayName || "Player",
@@ -1180,7 +1165,9 @@ export class SupabaseBackend implements BackendStore {
     if (current.expiresAt < Date.now()) return { ok: false as const, error: "expired" };
     const run = await loadCompetitiveRun(this, identity, runId);
     if ("error" in run) return { ok: false as const, error: run.error };
-    if (run.gameId !== current.gameId) return { ok: false as const, error: "game_mismatch" };
+    const target = validateCompetitiveRunTarget(run, { gameId: current.gameId, mode: current.mode });
+    if (!target.ok) return { ok: false as const, error: target.error };
+    if (run.verificationStatus === "flagged") return { ok: false as const, error: "invalid_score" };
     const profile = await this.getOrCreateProfile(identity);
     const applied = applyChallengeAttempt(current, {
       id: crypto.randomUUID(),
@@ -1206,7 +1193,11 @@ export class SupabaseBackend implements BackendStore {
       metadata: { durationMs: run.durationMs },
     });
     if (error) {
-      if (error.code === "23505") return { ok: true as const, challenge: current, outcome: "pending" as const, duplicate: true };
+      if (error.code === "23505") {
+        const detail = `${error.message ?? ""} ${error.details ?? ""}`;
+        if (/run_id|challenger_run/i.test(detail)) return { ok: false as const, error: "run_reuse" };
+        return { ok: true as const, challenge: current, outcome: "pending" as const, duplicate: true };
+      }
       return { ok: false as const, error: "attempt_failed" };
     }
     await sb
@@ -1291,62 +1282,41 @@ export class SupabaseBackend implements BackendStore {
 
   async listRivals(identity: Identity): Promise<StoredRival[]> {
     const me = actorId(identity);
-    const inbox = await this.listInbox(identity);
-    void inbox;
     const sb = admin();
-    const { data: mine } = await sb.from("challenges").select("*").eq("challenger_actor", me);
-    const { data: attempts } = await sb.from("challenge_attempts").select("*, challenges(*)").eq("player_actor", me);
-    const rows = new Map<string, StoredRival>();
-    for (const row of mine ?? []) {
-      for (const attempt of ((row as { challenge_attempts?: unknown[] }).challenge_attempts ?? []) as Array<{ player_actor?: string; player_name?: string; score: number }>) {
-        if (!attempt.player_actor || attempt.player_actor === me) continue;
-        const win = Number(attempt.score) > Number(row.challenger_score);
-        const key = attempt.player_actor;
-        const cur = rows.get(key) ?? {
-          selfId: me,
-          otherId: key,
-          otherName: attempt.player_name ?? "Player",
-          winsA: 0,
-          winsB: 0,
-          draws: 0,
-          totalMatches: 0,
-          lastMatch: Date.now(),
-          streak: 0,
-          rivalryScore: 0,
-        };
-        cur.totalMatches += 1;
-        if (win) cur.winsB += 1;
-        else if (Number(attempt.score) === Number(row.challenger_score)) cur.draws += 1;
-        else cur.winsA += 1;
-        cur.rivalryScore = cur.totalMatches * 10 + Math.abs(cur.winsA - cur.winsB);
-        rows.set(key, cur);
-      }
+    const { data: owned } = await sb.from("challenges").select("*").eq("challenger_actor", me);
+    const ownedRows = (owned ?? []) as Record<string, unknown>[];
+    const ownedIds = ownedRows.map((row) => String(row.id));
+    const { data: ownedAttempts } = ownedIds.length
+      ? await sb.from("challenge_attempts").select("*").in("challenge_id", ownedIds)
+      : { data: [] as Record<string, unknown>[] };
+    const { data: myAttempts } = await sb.from("challenge_attempts").select("*").eq("player_actor", me);
+    const myRows = (myAttempts ?? []) as Record<string, unknown>[];
+    const extraIds = [...new Set(myRows.map((row) => String(row.challenge_id)))].filter((id) => !ownedIds.includes(id));
+    const { data: faced } = extraIds.length
+      ? await sb.from("challenges").select("*").in("id", extraIds)
+      : { data: [] as Record<string, unknown>[] };
+    const challengeRows = [...ownedRows, ...((faced ?? []) as Record<string, unknown>[])];
+    const attemptRows = [...((ownedAttempts ?? []) as Record<string, unknown>[]), ...myRows];
+    const attemptsByChallenge = new Map<string, ChallengeRecord["attempts"]>();
+    for (const attempt of attemptRows) {
+      const challengeId = String(attempt.challenge_id);
+      const list = attemptsByChallenge.get(challengeId) ?? [];
+      if (list.some((row) => row.id === String(attempt.id))) continue;
+      list.push({
+        id: String(attempt.id),
+        challengeId,
+        playerId: String(attempt.player_actor ?? attempt.player_id ?? ""),
+        playerName: String(attempt.player_name ?? "Player"),
+        score: Number(attempt.score),
+        runId: attempt.run_id ? String(attempt.run_id) : null,
+        trust: (attempt.trust as ChallengeRecord["trust"]) ?? "unverified",
+        createdAt: new Date(String(attempt.created_at)).getTime(),
+        metadata: (attempt.metadata as Record<string, number | string | boolean>) ?? {},
+      });
+      attemptsByChallenge.set(challengeId, list);
     }
-    for (const attempt of attempts ?? []) {
-      const challenge = (attempt as { challenges?: { challenger_actor?: string; challenger_name?: string; challenger_score?: number } }).challenges;
-      if (!challenge?.challenger_actor || challenge.challenger_actor === me) continue;
-      const win = Number((attempt as { score: number }).score) > Number(challenge.challenger_score ?? 0);
-      const key = challenge.challenger_actor;
-      const cur = rows.get(key) ?? {
-        selfId: me,
-        otherId: key,
-        otherName: challenge.challenger_name ?? "Player",
-        winsA: 0,
-        winsB: 0,
-        draws: 0,
-        totalMatches: 0,
-        lastMatch: Date.now(),
-        streak: 0,
-        rivalryScore: 0,
-      };
-      cur.totalMatches += 1;
-      if (win) cur.winsA += 1;
-      else if (Number((attempt as { score: number }).score) === Number(challenge.challenger_score ?? 0)) cur.draws += 1;
-      else cur.winsB += 1;
-      cur.rivalryScore = cur.totalMatches * 10 + Math.abs(cur.winsA - cur.winsB);
-      rows.set(key, cur);
-    }
-    return [...rows.values()];
+    const challenges = challengeRows.map((row) => this.mapChallenge(row, attemptsByChallenge.get(String(row.id)) ?? []));
+    return rivalsFromChallenges(me, challenges);
   }
 }
 

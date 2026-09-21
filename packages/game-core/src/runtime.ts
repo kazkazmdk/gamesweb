@@ -12,6 +12,7 @@ export type GwDebugState = {
   deaths?: number;
   sessionDeaths?: number;
   timeMs?: number;
+  attemptEpoch?: number;
   kills?: number;
   level?: number;
   trackId?: string;

@@ -3,13 +3,17 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { indexablePages } from "../apps/web/content/registry";
 import { intentGate, jaccard, tokenize, type RenderedSeoRow } from "../apps/web/content/rendered-seo";
 
+const QA_ORIGIN = "https://gamesweb.example";
 const NOINDEX = ["/play/neon-drift", "/arcade", "/friends", "/inbox", "/daily", "/party", "/crew", "/me", "/settings", "/c/TEST1"];
+
+function expectedCanonical(path: string) {
+  return path === "/" ? QA_ORIGIN : `${QA_ORIGIN}${path}`;
+}
 
 test("rendered HTML SEO QA writes a DOM report for every indexable URL", async ({ page }) => {
   test.setTimeout(240_000);
   const pages = indexablePages();
-  expect(pages.length).toBeGreaterThanOrEqual(50);
-  expect(pages.length).toBeLessThanOrEqual(70);
+  expect(pages.length).toBe(65);
 
   const rows: RenderedSeoRow[] = [];
   const bags: Array<{ url: string; tokens: Set<string> }> = [];
@@ -71,7 +75,8 @@ test("rendered HTML SEO QA writes a DOM report for every indexable URL", async (
 
     expect(status, seo.path).toBe(200);
     expect(title.length, seo.path).toBeGreaterThan(8);
-    expect(canonical, seo.path).toMatch(/^https?:\/\//);
+    expect(canonical, seo.path).toBe(expectedCanonical(seo.path));
+    expect(canonical, seo.path).not.toMatch(/localhost|127\.0\.0\.1|vercel\.app|[?#]/);
     expect(robots, seo.path).not.toMatch(/noindex/i);
     expect(h1.length, seo.path).toBeGreaterThan(2);
     expect(hrefs.length, seo.path).toBeGreaterThan(0);
@@ -127,7 +132,13 @@ test("noindex surfaces stay out of the sitemap", async ({ page, request }) => {
     expect(robots, path).toMatch(/noindex/i);
   }
   const xml = await (await request.get("/sitemap.xml")).text();
-  const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname);
+  const locValues = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  expect(locValues).toHaveLength(65);
+  for (const loc of locValues) {
+    expect(loc.startsWith(`${QA_ORIGIN}/`) || loc === QA_ORIGIN, loc).toBeTruthy();
+    expect(loc, loc).not.toMatch(/localhost|127\.0\.0\.1|vercel\.app|[?#]/);
+  }
+  const locs = locValues.map((loc) => new URL(loc).pathname);
   for (const path of locs) {
     expect(path === "/arcade" || path.startsWith("/play/") || path.startsWith("/friends") || path.startsWith("/inbox") || path.startsWith("/party") || path.startsWith("/c/"), path).toBeFalsy();
   }

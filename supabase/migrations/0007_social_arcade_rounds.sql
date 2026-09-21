@@ -29,7 +29,15 @@ create table if not exists public.party_round_attempts (
 create index if not exists party_round_attempts_party_idx on public.party_round_attempts (party_id, round_index);
 create index if not exists notifications_actor_idx on public.notifications (actor_id, created_at desc);
 
+-- user_id is part of the original primary key, so it cannot become nullable until that key is dropped.
+alter table public.party_members drop constraint if exists party_members_pkey;
 alter table public.party_members alter column user_id drop not null;
+create unique index if not exists party_members_party_user_uidx
+  on public.party_members (party_id, user_id)
+  where user_id is not null;
+create unique index if not exists party_members_party_actor_uidx
+  on public.party_members (party_id, actor_id)
+  where actor_id is not null;
 alter table public.notifications alter column user_id drop not null;
 alter table public.parties add column if not exists standings jsonb not null default '[]'::jsonb;
 alter table public.parties add column if not exists round_roster jsonb not null default '[]'::jsonb;

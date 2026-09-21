@@ -72,6 +72,8 @@ describe("social arcade backend store", () => {
     if ("error" in afterHost) return;
     expect(afterHost.state).toBe("playing");
     expect(afterHost.round).toBe(0);
+    expect(afterHost.standings).toEqual([]);
+    expect(afterHost.submitted).toHaveLength(1);
 
     const guestRun = await runFor(backend, guest, started.playlist[0].gameId, 1800);
     const afterGuest = await submitPartyRound(guest, party.code, guestRun);
@@ -79,7 +81,8 @@ describe("social arcade backend store", () => {
     if ("error" in afterGuest) return;
     expect(afterGuest.state).toBe("results");
     expect(afterGuest.round).toBe(0);
-    expect(afterGuest.standings.length).toBe(2);
+    expect(afterGuest.standings.find((row) => row.name === "Guest")?.points).toBe(10);
+    expect(afterGuest.standings.find((row) => row.name === "Host")?.points).toBe(7);
   });
 
   it("creates a challenge from a run and persists inbox + rivals", async () => {

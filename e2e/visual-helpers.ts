@@ -121,6 +121,22 @@ export async function stabilizeVisual(
   await page.clock.setFixedTime(new Date("2026-09-15T12:00:00Z"));
 }
 
+export async function settleVisual(page: Page) {
+  await page.evaluate(async () => {
+    const pending = [...document.images].filter((img) => !img.complete);
+    await Promise.all(
+      pending.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            img.addEventListener("load", () => resolve(), { once: true });
+            img.addEventListener("error", () => resolve(), { once: true });
+          }),
+      ),
+    );
+    if (document.fonts?.ready) await document.fonts.ready;
+  });
+}
+
 export const shot = {
   animations: "disabled" as const,
   caret: "hide" as const,
