@@ -35,7 +35,18 @@ export const VEHICLE = {
   touchSteerAssist: 0.16,
 } as const;
 
-export const CAMERA = {
+export type CamProfile = {
+  follow: number;
+  lookBlend: number;
+  lookBase: number;
+  lookSpeed: number;
+  zoomSlow: number;
+  zoomFast: number;
+  driftOffset: number;
+  yawMax: number;
+};
+
+export const CAMERA: CamProfile = {
   follow: 6.2,
   lookBlend: 0.55,
   lookBase: 48,
@@ -44,7 +55,40 @@ export const CAMERA = {
   zoomFast: 1.07,
   driftOffset: 14,
   yawMax: 0.035,
-} as const;
+};
+
+export const CAMERA_BY_TRACK: Record<"foundation" | "technical" | "velocity", CamProfile> = {
+  foundation: {
+    follow: 5.1,
+    lookBlend: 0.4,
+    lookBase: 92,
+    lookSpeed: 0.21,
+    zoomSlow: 1.02,
+    zoomFast: 0.86,
+    driftOffset: 10,
+    yawMax: 0.018,
+  },
+  technical: {
+    follow: 8.1,
+    lookBlend: 0.68,
+    lookBase: 18,
+    lookSpeed: 0.07,
+    zoomSlow: 1.68,
+    zoomFast: 1.42,
+    driftOffset: 7,
+    yawMax: 0.055,
+  },
+  velocity: {
+    follow: 4.4,
+    lookBlend: 0.32,
+    lookBase: 128,
+    lookSpeed: 0.28,
+    zoomSlow: 0.82,
+    zoomFast: 0.68,
+    driftOffset: 20,
+    yawMax: 0.012,
+  },
+};
 
 export const SCORE = {
   basePerSec: 860,

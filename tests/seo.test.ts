@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { COLLECTIONS } from "../apps/web/content/collections.ts";
 import { GAME_EDITORIAL } from "../apps/web/content/editorial.ts";
 import { collectSeoIssues } from "../apps/web/content/quality.ts";
+import { buildSeoContentReport, seoContentIssues } from "../apps/web/content/quality-report.ts";
 import { SEO_PAGES, indexablePages, sitemapEntries } from "../apps/web/content/registry.ts";
 import { GAME_SEO_KIND, gameSeoKind, gameSeoTitle } from "../apps/web/content/taxonomy.ts";
 import { publicOrigin } from "../apps/web/lib/env.ts";
@@ -133,5 +134,18 @@ describe("public origin", () => {
     stash();
     expect(publicOrigin("gamesweb-git.vercel.app", "https")).toBe("https://gamesweb-git.vercel.app");
     expect(publicOrigin("127.0.0.1:3010")).toBe("http://127.0.0.1:3010");
+  });
+});
+
+describe("SEO content quality", () => {
+  it("keeps 65 indexable pages above the thin/near-duplicate gate", () => {
+    const report = buildSeoContentReport();
+    expect(report).toHaveLength(indexablePages().length);
+    const issues = seoContentIssues(report);
+    expect(issues, JSON.stringify(issues, null, 2)).toEqual([]);
+    for (const col of COLLECTIONS) {
+      expect(col.audience.length).toBeGreaterThan(20);
+      expect(col.pick.length).toBeGreaterThan(20);
+    }
   });
 });

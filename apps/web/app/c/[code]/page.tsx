@@ -1,19 +1,19 @@
 "use client";
 
 import { analytics } from "@gamesweb/analytics";
-import { getManifest, decodeChallengePayload } from "@gamesweb/game-sdk";
+import { getManifest, decodeChallengePayload, type ChallengeRecord, type ChallengeShare } from "@gamesweb/game-sdk";
 import { formatScore } from "@/lib/player-store";
 import { arcadeStore } from "@/lib/social/arcade-store";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
 
 export default function ChallengeMagicPage() {
   const params = useParams<{ code: string }>();
   const search = useSearchParams();
   const code = params.code?.toUpperCase() ?? "";
   const payload = search.get("p");
-  const challenge = useMemo(() => arcadeStore.getChallenge(code, payload), [code, payload]);
+  const [challenge, setChallenge] = useState<ChallengeRecord | ChallengeShare | null | undefined>(undefined);
 
   useEffect(() => {
     analytics.track("challenge_opened", { code });
@@ -21,15 +21,30 @@ export default function ChallengeMagicPage() {
       const share = decodeChallengePayload(payload);
       if (share) arcadeStore.hydrateFromShare(share);
     }
+    const cached = arcadeStore.getChallenge(code, payload);
+    if (cached) setChallenge(cached);
+    void arcadeStore.fetchChallenge(code, payload).then((next) => {
+      setChallenge(next);
+    });
   }, [code, payload]);
+
+  if (challenge === undefined) {
+    return (
+      <div className="grid min-h-dvh place-items-center px-6">
+        <p className="meta text-white/45">Challenge {code}</p>
+      </div>
+    );
+  }
 
   if (!challenge) {
     return (
       <div className="grid min-h-dvh place-items-center px-6">
         <div className="max-w-md text-center">
           <p className="meta text-white/45">Challenge</p>
-          <h1 className="display mt-3 text-4xl">Link expired</h1>
-          <p className="mt-3 text-white/60">This magic link has no payload on this device. Ask your friend to share it again.</p>
+          <h1 className="display mt-3 text-4xl">Not on this instance</h1>
+          <p className="mt-3 text-white/60">
+            This code is not stored on the current server, and the link has no share payload. Ask for a fresh challenge.
+          </p>
           <Link href="/" className="mt-6 inline-block rounded-full bg-[var(--accent)] px-5 py-3 text-[#140d12]">
             Back to arcade
           </Link>
@@ -44,7 +59,7 @@ export default function ChallengeMagicPage() {
   return (
     <div className="grid min-h-dvh place-items-center px-6" data-testid="challenge-magic">
       <div className="w-[min(440px,94vw)] text-center">
-        <p className="meta text-white/45">Challenge</p>
+        <p className="meta text-white/45">Challenge {code}</p>
         <h1 className="display mt-4 text-4xl">{challenge.challengerName} challenged you</h1>
         <p className="mt-4 text-[18px] text-white/80">{game?.title ?? challenge.gameId}</p>
         <p className="display mt-2 text-5xl">{formatScore(challenge.gameId, challenge.challengerScore)}</p>

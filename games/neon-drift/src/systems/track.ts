@@ -65,15 +65,15 @@ export const TRACKS: TrackDef[] = [
     worldW: 3600,
     worldH: 2400,
     theme: {
-      sky: 0x0c1628,
-      asphalt: 0x2a313c,
-      asphaltHi: 0x3c4654,
-      barrier: 0x8a7a58,
+      sky: 0x1c1408,
+      asphalt: 0x2c2824,
+      asphaltHi: 0x4a4236,
+      barrier: 0xa88848,
       accent: 0xe35aa0,
-      grass: 0x1a2c1e,
-      mark: 0xf2ead4,
-      building: 0x1a2434,
-      pole: 0xf0b84a,
+      grass: 0x0e2430,
+      mark: 0xf6e2b0,
+      building: 0x1a1820,
+      pole: 0xffc14a,
     },
     points: [
       { x: 780, y: 1280 },
@@ -90,9 +90,9 @@ export const TRACKS: TrackDef[] = [
       { x: 860, y: 1620 },
     ],
     widthAt: (t) => {
-      if (t > 0.16 && t < 0.28) return 188;
-      if (t > 0.58 && t < 0.72) return 176;
-      return 236;
+      if (t > 0.16 && t < 0.28) return 210;
+      if (t > 0.58 && t < 0.72) return 198;
+      return 268;
     },
     boostAt: [0.22, 0.63],
   },
@@ -100,40 +100,40 @@ export const TRACKS: TrackDef[] = [
     id: "technical",
     name: "Hairpin District",
     subtitle: "Commit, switch, recover",
-    worldW: 3000,
-    worldH: 2300,
+    worldW: 2600,
+    worldH: 2800,
     theme: {
-      sky: 0x101824,
-      asphalt: 0x2c3340,
-      asphaltHi: 0x3e4756,
-      barrier: 0x7a6a50,
-      accent: 0xffb45a,
-      grass: 0x18261c,
-      mark: 0xf0e8d4,
-      building: 0x1c2838,
-      pole: 0xf0b84a,
+      sky: 0x08140e,
+      asphalt: 0x222820,
+      asphaltHi: 0x334034,
+      barrier: 0x4a3824,
+      accent: 0xff8a3a,
+      grass: 0x143018,
+      mark: 0xe8f0d8,
+      building: 0x0c1810,
+      pole: 0xff9a3a,
     },
     points: [
-      { x: 620, y: 1180 },
-      { x: 780, y: 740 },
-      { x: 1180, y: 560 },
-      { x: 1560, y: 640 },
-      { x: 1680, y: 980 },
-      { x: 1480, y: 1220 },
-      { x: 1760, y: 1480 },
-      { x: 2220, y: 1420 },
-      { x: 2480, y: 1680 },
-      { x: 2320, y: 1980 },
-      { x: 1760, y: 2040 },
-      { x: 1240, y: 1940 },
-      { x: 860, y: 1700 },
-      { x: 640, y: 1440 },
+      { x: 520, y: 1680 },
+      { x: 680, y: 980 },
+      { x: 980, y: 560 },
+      { x: 1380, y: 720 },
+      { x: 1520, y: 1280 },
+      { x: 1240, y: 1640 },
+      { x: 1560, y: 1980 },
+      { x: 1980, y: 1860 },
+      { x: 2140, y: 2280 },
+      { x: 1860, y: 2520 },
+      { x: 1320, y: 2580 },
+      { x: 860, y: 2360 },
+      { x: 580, y: 2060 },
+      { x: 500, y: 1860 },
     ],
     widthAt: (t) => {
-      if (t > 0.2 && t < 0.38) return 148;
-      if (t > 0.48 && t < 0.62) return 136;
-      if (t > 0.74 && t < 0.86) return 152;
-      return 188;
+      if (t > 0.2 && t < 0.38) return 122;
+      if (t > 0.48 && t < 0.62) return 108;
+      if (t > 0.74 && t < 0.86) return 128;
+      return 158;
     },
     boostAt: [0.34, 0.79],
   },
@@ -144,15 +144,15 @@ export const TRACKS: TrackDef[] = [
     worldW: 4200,
     worldH: 2100,
     theme: {
-      sky: 0x0a1422,
-      asphalt: 0x283038,
-      asphaltHi: 0x3a4450,
-      barrier: 0x6a7a6a,
+      sky: 0x061018,
+      asphalt: 0x1c242c,
+      asphaltHi: 0x2c3844,
+      barrier: 0x8aa0a8,
       accent: 0x7ad0ff,
-      grass: 0x1a2c20,
-      mark: 0xe8f0e8,
-      building: 0x1a2430,
-      pole: 0xf0b84a,
+      grass: 0x0c1c18,
+      mark: 0xd8e8f0,
+      building: 0x0e1820,
+      pole: 0x9ad8ff,
     },
     points: [
       { x: 640, y: 1080 },
@@ -169,9 +169,9 @@ export const TRACKS: TrackDef[] = [
       { x: 720, y: 1280 },
     ],
     widthAt: (t) => {
-      if (t > 0.08 && t < 0.42) return 220;
-      if (t > 0.55 && t < 0.78) return 198;
-      return 248;
+      if (t > 0.08 && t < 0.42) return 236;
+      if (t > 0.55 && t < 0.78) return 208;
+      return 276;
     },
     boostAt: [0.18, 0.7],
   },

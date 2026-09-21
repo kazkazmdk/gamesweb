@@ -5,6 +5,7 @@ import { useArcade } from "@/lib/social/use-arcade";
 import { EmptyStateStage } from "@/components/visual";
 import { ChamferButton } from "@/components/visual/ChamferButton";
 import { useAccent } from "@/components/shell/AppShell";
+import { useEffect } from "react";
 
 const KIND: Record<string, string> = {
   challenge: "Challenge",
@@ -17,6 +18,9 @@ const KIND: Record<string, string> = {
 
 export default function InboxPage() {
   useAccent();
+  useEffect(() => {
+    void arcadeStore.hydrateRemote();
+  }, []);
   const items = useArcade().inbox;
   const live = items.filter((i) => !i.read);
   const older = items.filter((i) => i.read);

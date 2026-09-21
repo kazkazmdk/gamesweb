@@ -144,4 +144,52 @@ export const playerApi = {
       await fetch(`/api/friends?q=${encodeURIComponent(q)}`),
     );
   },
+  async createParty(hostName: string) {
+    return parse<{ party: import("@/lib/social/arcade-store").PartyState; persistence: string }>(
+      await fetch("/api/parties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", hostName }) }),
+    );
+  },
+  async joinParty(code: string, name: string) {
+    return parse<{ party: import("@/lib/social/arcade-store").PartyState; persistence: string }>(
+      await fetch("/api/parties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "join", code, name }) }),
+    );
+  },
+  async getParty(code: string) {
+    return parse<{ party: import("@/lib/social/arcade-store").PartyState; persistence: string }>(await fetch(`/api/parties?code=${encodeURIComponent(code)}`));
+  },
+  async scoreParty(code: string, gameId: string, rows: Array<{ id: string; name: string; score: number }>) {
+    return parse<{ party: import("@/lib/social/arcade-store").PartyState }>(
+      await fetch("/api/parties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "score", code, gameId, rows }) }),
+    );
+  },
+  async readyParty(code: string, ready: boolean) {
+    return parse<{ party: import("@/lib/social/arcade-store").PartyState; persistence: string }>(
+      await fetch("/api/parties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "ready", code, ready }) }),
+    );
+  },
+  async createChallenge(input: Record<string, unknown>) {
+    return parse<{ challenge: import("@gamesweb/game-sdk").ChallengeRecord; url: string; persistence: string }>(
+      await fetch("/api/challenges", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", ...input }) }),
+    );
+  },
+  async getChallenge(code: string, payload?: string | null) {
+    const q = new URLSearchParams({ code });
+    if (payload) q.set("p", payload);
+    return parse<{ challenge: import("@gamesweb/game-sdk").ChallengeRecord; persistence: string }>(await fetch(`/api/challenges?${q}`));
+  },
+  async attemptChallenge(input: Record<string, unknown>) {
+    return parse<{
+      ok: true;
+      challenge: import("@gamesweb/game-sdk").ChallengeRecord;
+      outcome: "win" | "loss" | "draw" | "pending";
+      duplicate: boolean;
+      persistence: string;
+    }>(await fetch("/api/challenges", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "attempt", ...input }) }));
+  },
+  async inbox() {
+    return parse<{ items: Array<{ id: string; type: string; title: string; body: string; href: string; at: number; read: boolean }> }>(await fetch("/api/inbox"));
+  },
+  async markInboxRead(id: string) {
+    return parse(await fetch("/api/inbox", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }));
+  },
 };

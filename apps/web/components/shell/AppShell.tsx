@@ -6,6 +6,7 @@ import { analytics } from "@gamesweb/analytics";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { arcadeStore } from "@/lib/social/arcade-store";
 import { useArcade } from "@/lib/social/use-arcade";
 import { usePlayer } from "@/lib/player";
 import { SavePrompt } from "@/components/meta/SavePrompt";
@@ -16,6 +17,7 @@ export const PLATFORM_ACCENT = "#d7c4a3";
 
 const DESKTOP_NAV = [
   { href: "/", label: "Games", match: (p: string) => p === "/" },
+  { href: "/games", label: "Catalog", match: (p: string) => p === "/games" || p.startsWith("/collections") || p.startsWith("/guides") },
   { href: "/arcade", label: "Arcade", match: (p: string) => p.startsWith("/arcade") || p.startsWith("/challenges") || p.startsWith("/achievements") || p.startsWith("/daily") || p.startsWith("/grand-prix") },
 ];
 
@@ -36,6 +38,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     analytics.page(path);
   }, [path]);
+
+  useEffect(() => {
+    void arcadeStore.hydrateRemote();
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("reduce-motion", player.settings.reducedMotion);

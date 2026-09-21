@@ -111,7 +111,7 @@ export function drawWorld(
     const turn = Math.abs(s.tx * n.ty - s.ty * n.tx);
     const side = s.width * 0.5 + 8;
     const u = i / samples.length;
-    const family = roadsideFamily(u, turn);
+    const family = roadsideFamily(def.id, u, turn);
     const outer = side + 18;
 
     g.fillStyle(mixColor(theme.barrier, 0xffffff, 0.18), 0.95);
@@ -175,68 +175,87 @@ export function drawWorld(
     }
   }
 
-  const tunnelStart = Math.floor(samples.length * 0.38);
-  const tunnelEnd = Math.floor(samples.length * 0.5);
-  for (let i = tunnelStart; i < tunnelEnd; i += 1) {
-    const s = samples[i];
-    if (!s) continue;
-    const tw = s.width * 0.64;
-    g.fillStyle(0x10141a, i === tunnelStart || i === tunnelEnd - 1 ? 0.95 : 0.72);
-    g.fillRect(s.x - tw, s.y - 32, tw * 2, 64);
+  if (def.id === "velocity") {
+    const tunnelStart = Math.floor(samples.length * 0.38);
+    const tunnelEnd = Math.floor(samples.length * 0.5);
+    for (let i = tunnelStart; i < tunnelEnd; i += 1) {
+      const s = samples[i];
+      if (!s) continue;
+      const tw = s.width * 0.72;
+      g.fillStyle(0x081018, i === tunnelStart || i === tunnelEnd - 1 ? 0.96 : 0.78);
+      g.fillRect(s.x - tw, s.y - 48, tw * 2, 96);
+    }
   }
 }
 
-function roadsideFamily(u: number, turn: number): "service" | "touge" | "tunnel" {
-  if ((u > 0.36 && u < 0.52) || (u > 0.78 && u < 0.86)) return "tunnel";
-  if (turn > 0.09 || (u > 0.18 && u < 0.34) || (u > 0.58 && u < 0.72)) return "touge";
+function roadsideFamily(id: TrackDef["id"], u: number, turn: number): "service" | "touge" | "tunnel" {
+  if (id === "foundation") return "service";
+  if (id === "technical") return "touge";
+  if ((u > 0.36 && u < 0.52) || turn > 0.12) return "tunnel";
   return "service";
 }
 
 function drawHarbourWorld(g: Phaser.GameObjects.Graphics, def: TrackDef, quality: string, t: number) {
-  g.fillStyle(0x0a1828, 1);
+  g.fillStyle(0x0a2038, 1);
+  g.fillRect(0, def.worldH * 0.42, def.worldW, def.worldH * 0.58);
+  g.fillStyle(0x0e2c48, 1);
   g.fillRect(0, def.worldH * 0.58, def.worldW, def.worldH * 0.42);
-  g.fillStyle(0xe8d8a0, 0.1);
-  g.fillCircle(def.worldW * 0.78, def.worldH * 0.16, 70);
+  g.fillStyle(0xffc14a, 0.18);
+  g.fillCircle(def.worldW * 0.82, def.worldH * 0.12, 110);
+  g.fillStyle(0xff8a3a, 0.08);
+  g.fillRect(0, 0, def.worldW, def.worldH * 0.22);
   if (quality !== "low") {
-    g.fillStyle(0x1a3a4a, 0.32 + Math.sin(t / 700) * 0.05);
-    for (let i = 0; i < 14; i += 1) g.fillRect(i * 280, def.worldH * 0.66 + Math.sin(t / 400 + i) * 5, 200, 7);
-    drawCrane(g, 420, def.worldH * 0.68, 180, 0x3a3a44);
-    drawCrane(g, 980, def.worldH * 0.7, 150, 0x2a2a32);
-    drawContainer(g, 260, def.worldH * 0.68 - 36, 64, 36, 0xc45c3a);
-    drawContainer(g, 330, def.worldH * 0.68 - 36, 64, 36, 0x3a6a88);
+    g.fillStyle(0x1a4a58, 0.4 + Math.sin(t / 700) * 0.06);
+    for (let i = 0; i < 16; i += 1) g.fillRect(i * 240, def.worldH * 0.62 + Math.sin(t / 400 + i) * 8, 180, 10);
+    drawCrane(g, 360, def.worldH * 0.58, 240, 0x4a3a28);
+    drawCrane(g, 920, def.worldH * 0.6, 210, 0x3a2a22);
+    drawCrane(g, 1680, def.worldH * 0.56, 260, 0x2a2420);
+    drawContainer(g, 220, def.worldH * 0.62 - 40, 78, 42, 0xc45c3a);
+    drawContainer(g, 300, def.worldH * 0.62 - 40, 78, 42, 0x3a6a88);
+    drawContainer(g, 700, def.worldH * 0.64 - 36, 70, 36, 0xe35aa0);
+    drawSodiumLamp(g, 540, def.worldH * 0.5, 52, 0xffc14a);
+    drawSodiumLamp(g, 1180, def.worldH * 0.48, 56, 0xffc14a);
   }
 }
 
 function drawDistrictWorld(g: Phaser.GameObjects.Graphics, def: TrackDef, quality: string, t: number) {
-  g.fillStyle(0xe8d8a0, 0.08);
-  g.fillCircle(def.worldW * 0.2, def.worldH * 0.12, 54);
+  g.fillStyle(0x0a1810, 1);
+  g.fillRect(0, 0, def.worldW, def.worldH);
+  g.fillStyle(0x142818, 1);
+  g.fillTriangle(0, def.worldH, 420, def.worldH * 0.18, 860, def.worldH);
+  g.fillTriangle(700, def.worldH, 1280, def.worldH * 0.08, 1900, def.worldH);
+  g.fillStyle(0x1a3020, 1);
+  g.fillTriangle(1400, def.worldH, 1980, def.worldH * 0.22, def.worldW, def.worldH);
   if (quality === "low") return;
-  for (let i = 0; i < 16; i += 1) {
-    const x = 80 + i * 180;
-    const h = 90 + (i % 5) * 32;
-    g.fillStyle(0x1a2434, 1);
-    g.fillRect(x, def.worldH * 0.78 - h, 58, h);
-    g.fillStyle(0xf0b84a, 0.1 + (Math.sin(t / 240 + i) > 0.35 ? 0.1 : 0));
-    g.fillRect(x + 10, def.worldH * 0.78 - h + 16, 10, 8);
-    g.fillRect(x + 32, def.worldH * 0.78 - h + 30, 10, 8);
+  for (let i = 0; i < 22; i += 1) {
+    const x = 40 + i * 118;
+    const h = 160 + (i % 4) * 70;
+    g.fillStyle(mixColor(0x0c1810, 0x243818, (i % 5) / 5), 1);
+    g.fillRect(x, def.worldH * 0.92 - h, 36, h);
+    drawBush(g, x + 18, def.worldH * 0.92 - h - 8, 16 + (i % 3) * 4, 0x1a3820);
   }
-  g.fillStyle(0xe35aa0, 0.28);
-  g.fillRect(640, 420, 86, 22);
-  g.fillStyle(0x4ad4e8, 0.24);
-  g.fillRect(1680, 980, 70, 20);
+  g.fillStyle(0xff8a3a, 0.22);
+  g.fillRect(480, 620, 18, 120);
+  g.fillRect(1120, 980, 18, 160);
+  void t;
 }
 
 function drawRidgeWorld(g: Phaser.GameObjects.Graphics, def: TrackDef, quality: string, t: number) {
-  g.fillStyle(0x1a2834, 1);
-  g.fillTriangle(200, def.worldH * 0.86, 700, def.worldH * 0.52, 1180, def.worldH * 0.86);
-  g.fillTriangle(900, def.worldH * 0.88, 1600, def.worldH * 0.46, 2300, def.worldH * 0.88);
-  g.fillStyle(0x243444, 1);
-  g.fillTriangle(1400, def.worldH * 0.9, 2100, def.worldH * 0.58, 2800, def.worldH * 0.9);
+  g.fillStyle(0x081420, 1);
+  g.fillRect(0, def.worldH * 0.28, def.worldW, def.worldH * 0.72);
+  g.fillStyle(0x122030, 1);
+  g.fillTriangle(-80, def.worldH * 0.92, 780, def.worldH * 0.18, 1640, def.worldH * 0.92);
+  g.fillStyle(0x1a2c3c, 1);
+  g.fillTriangle(900, def.worldH, 2100, def.worldH * 0.08, 3400, def.worldH);
+  g.fillStyle(0x0a1824, 1);
+  g.fillRect(0, def.worldH * 0.78, def.worldW, def.worldH * 0.22);
   if (quality !== "low") {
-    g.fillStyle(0xe8f0ff, 0.12);
-    g.fillCircle(def.worldW * 0.7, def.worldH * 0.12, 64);
-    g.fillStyle(0xf0b84a, 0.08 + Math.sin(t / 500) * 0.03);
-    g.fillRect(0, def.worldH * 0.22, def.worldW, 6);
+    g.fillStyle(0xc8e8ff, 0.16);
+    g.fillCircle(def.worldW * 0.78, def.worldH * 0.1, 88);
+    g.fillStyle(0x7ad0ff, 0.08 + Math.sin(t / 500) * 0.03);
+    g.fillRect(0, def.worldH * 0.16, def.worldW, 8);
+    g.fillStyle(0x0a1014, 0.55);
+    g.fillRect(def.worldW * 0.42, def.worldH * 0.36, def.worldW * 0.22, 70);
   }
 }
 

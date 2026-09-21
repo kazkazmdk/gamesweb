@@ -48,6 +48,7 @@ export class PocketScene extends Phaser.Scene {
   private trail: Array<{ x: number; y: number }> = [];
   private portalCd = 0;
   private lastPortal = false;
+  private paused = false;
 
   constructor() {
     super("pocket-play");
@@ -102,6 +103,8 @@ export class PocketScene extends Phaser.Scene {
       this.ay = p.y / this.scaleY;
       this.shoot();
     });
+    this.game.events.on("platform-pause", () => (this.paused = true));
+    this.game.events.on("platform-resume", () => (this.paused = false));
     this.platform.session.start();
     this.started = this.time.now;
     this.platform.events.emit({ name: "gameplay_started", props: { gameId: "pocket-striker" } });
@@ -134,6 +137,11 @@ export class PocketScene extends Phaser.Scene {
     this.scaleY = this.scale.height / this.layout.h;
     const native = this.native?.read();
     if (native?.retryPressed) this.scene.restart();
+    if (this.paused) {
+      this.draw();
+      this.publishDebug();
+      return;
+    }
     if (!this.ended) {
       const next = stepBall({ x: this.bx, y: this.by, vx: this.vx, vy: this.vy, portalCd: this.portalCd }, this.layout, dt);
       if (next.portalCd > this.portalCd) {
@@ -481,7 +489,7 @@ export class PocketScene extends Phaser.Scene {
         playerX: this.bx,
         playerY: this.by,
         score: this.strokes,
-        paused: false,
+        paused: this.paused,
         fps: this.game.loop.actualFps,
         longFrames: this.longFrames,
         tick: this.ticks,

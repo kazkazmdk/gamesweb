@@ -43,6 +43,8 @@ export type CollectionRecord = {
   h1: string;
   description: string;
   rationale: string;
+  audience: string;
+  pick: string;
   games: string[];
   updatedAt: string;
 };

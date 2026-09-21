@@ -501,28 +501,31 @@ function Results({
     analytics.track("game_finished", { gameId, score });
     arcadeStore.contributeCrew();
     if (challengeCode && challengeCode !== "NEW") {
-      const r = arcadeStore.completeChallenge(
-        challengeCode,
-        {
-          id: crypto.randomUUID?.() ?? `att-${Date.now()}`,
-          playerId: player.id,
-          playerName: player.displayName || "Guest",
-          score,
-          runId: null,
-          trust: player.syncStatus === "saved" ? "verified" : "unverified",
-          createdAt: Date.now(),
-          metadata: { durationMs },
-        },
-        payload,
-      );
-      if (r.ok && r.outcome !== "pending") setChallengeOutcome(r.outcome);
+      void arcadeStore
+        .completeChallenge(
+          challengeCode,
+          {
+            id: crypto.randomUUID?.() ?? `att-${Date.now()}`,
+            playerId: player.id,
+            playerName: player.displayName || "Guest",
+            score,
+            runId: null,
+            trust: player.syncStatus === "saved" ? "verified" : "unverified",
+            createdAt: Date.now(),
+            metadata: { durationMs },
+          },
+          payload,
+        )
+        .then((r) => {
+          if (r.ok && r.outcome !== "pending") setChallengeOutcome(r.outcome);
+        });
     }
     if (daily) {
       const event = dailyEvents.find((e) => e.gameId === gameId);
       arcadeStore.dailyProgress(day, `${gameId}:${event?.mode ?? "daily"}`, normalizePerformance(gameId, score));
     }
     if (partyCode) {
-      arcadeStore.scorePartyRound(partyCode, [{ id: player.id, name: player.displayName || "You", score }], gameId);
+      void arcadeStore.scorePartyRound(partyCode, [{ id: player.id, name: player.displayName || "You", score }], gameId);
     }
     if (gpRound) arcadeStore.gpScore(Math.max(0, Number(metadata?.gpRound ?? 0)), 10);
   }, [
@@ -544,20 +547,23 @@ function Results({
 
   function makeChallenge() {
     const game = getManifest(gameId);
-    const made = arcadeStore.createChallenge({
-      gameId,
-      mode: boardModeFromPlayIndex(gameId, resolvePlayIndex(gameId), daily),
-      seed: params.get("seed") ?? `${gameId}:${Date.now()}`,
-      type: game ? defaultChallengeType(game) : "beat-score",
-      challengerId: player.id,
-      challengerName: player.displayName || "Player",
-      score,
-      trust: player.syncStatus === "saved" ? "verified" : "unverified",
-    });
-    void navigator.clipboard.writeText(`${window.location.origin}${made.url}`);
-    setCopied(true);
-    analytics.track("challenge_shared", { gameId, code: made.challenge.publicCode });
-    analytics.track("social_action_after_result", { gameId, type: "challenge" });
+    void arcadeStore
+      .createChallenge({
+        gameId,
+        mode: boardModeFromPlayIndex(gameId, resolvePlayIndex(gameId), daily),
+        seed: params.get("seed") ?? `${gameId}:${Date.now()}`,
+        type: game ? defaultChallengeType(game) : "beat-score",
+        challengerId: player.id,
+        challengerName: player.displayName || "Player",
+        score,
+        trust: player.syncStatus === "saved" ? "verified" : "unverified",
+      })
+      .then((made) => {
+        void navigator.clipboard.writeText(`${window.location.origin}${made.url}`);
+        setCopied(true);
+        analytics.track("challenge_shared", { gameId, code: made.challenge.publicCode });
+        analytics.track("social_action_after_result", { gameId, type: "challenge" });
+      });
   }
 
   const pbDelta = typeof metadata?.pbDelta === "number" ? metadata.pbDelta : null;
@@ -613,31 +619,17 @@ function Results({
           : `${Math.abs(Math.round(pbDelta)).toLocaleString()} off PB`;
 
   const primary = hollow ? (
-    <ChamferButton onClick={onRetry}>Play again</ChamferButton>
+    <ChamferButton onClick={onRetry}>Retry</ChamferButton>
   ) : continueEndless ? (
     <ChamferButton onClick={() => onContinueEndless?.()}>Continue Endless</ChamferButton>
-  ) : wonChallenge ? (
-    <ChamferButton
-      onClick={() => {
-        analytics.track("meaningful_action_after_result", { gameId, type: "rematch" });
-        makeChallenge();
-      }}
-    >
-      {copied ? "Rematch link copied" : "Send rematch"}
-    </ChamferButton>
-  ) : action.href.startsWith("/play/") && (action.type === "retry_pb" || action.type === "challenge_friend" || action.type === "beat_friend") ? (
-    <ChamferButton
-      onClick={() => {
-        analytics.track("meaningful_action_after_result", { gameId, type: action.type });
-        if (action.type === "challenge_friend") makeChallenge();
-        else onRetry();
-      }}
-    >
-      {action.type === "challenge_friend" ? (copied ? "Link copied" : action.label) : action.label}
-    </ChamferButton>
   ) : (
-    <ChamferButton href={action.href} onClick={() => analytics.track("meaningful_action_after_result", { gameId, type: action.type })}>
-      {action.label}
+    <ChamferButton
+      onClick={() => {
+        analytics.track("meaningful_action_after_result", { gameId, type: "retry" });
+        onRetry();
+      }}
+    >
+      Retry
     </ChamferButton>
   );
 
@@ -650,7 +642,7 @@ function Results({
         </div>
       ) : null}
       <div className="relative mx-auto flex min-h-full w-[min(560px,94vw)] flex-col justify-end px-5 py-10 md:px-8">
-        <p className="meta text-white/50">{result}</p>
+        <p className="meta text-white/50">Result{result && result !== "result" ? ` · ${result}` : ""}</p>
         {hollow ? (
           <>
             <p className="display mt-3 text-[48px] leading-none text-white md:text-[72px]">{zeroResultCopy(gameId)}</p>
@@ -708,16 +700,28 @@ function Results({
         <div className="mt-8 flex flex-col items-start gap-3">
           {primary}
           {copied ? <p className="text-[12px] text-white/50">Challenge link copied</p> : null}
-          {action.type !== "retry_pb" && !continueEndless && !hollow ? (
-            <ChamferButton tone="ghost" cue={false} onClick={onRetry}>
-              Play again
+          {wonChallenge ? (
+            <ChamferButton
+              tone="ghost"
+              cue={false}
+              onClick={() => {
+                analytics.track("meaningful_action_after_result", { gameId, type: "rematch" });
+                makeChallenge();
+              }}
+            >
+              {copied ? "Rematch link copied" : "Send rematch"}
+            </ChamferButton>
+          ) : action.type === "challenge_friend" ? (
+            <ChamferButton tone="ghost" cue={false} onClick={makeChallenge}>
+              {copied ? "Link copied" : action.label}
             </ChamferButton>
           ) : null}
-          {action.type !== "challenge_friend" && !wonChallenge ? (
+          {!wonChallenge && action.type !== "challenge_friend" ? (
             <ChamferButton tone="quiet" cue={false} onClick={makeChallenge}>
               Share challenge
             </ChamferButton>
-          ) : nextSlug ? (
+          ) : null}
+          {nextSlug ? (
             <Link
               href={`/play/${nextSlug}`}
               onClick={() => analytics.track("recommendation_clicked", { from: gameId, to: nextSlug })}

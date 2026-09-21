@@ -1,7 +1,7 @@
 "use client";
 
 import { getManifest, PARTY_REACTIONS } from "@gamesweb/game-sdk";
-import { arcadeStore } from "@/lib/social/arcade-store";
+import { arcadeStore, type PartyState } from "@/lib/social/arcade-store";
 import { usePlayer } from "@/lib/player";
 import { SSR_PLAYER } from "@/lib/player-store";
 import { Avatar, useAccent } from "@/components/shell/AppShell";
@@ -10,23 +10,37 @@ import { ChamferButton } from "@/components/visual/ChamferButton";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
-type PartyState = ReturnType<typeof arcadeStore.createParty>;
-
 export default function PartyPage() {
   const params = useParams<{ code: string }>();
   const player = usePlayer();
   const code = (params.code ?? "").toUpperCase();
   const [reaction, setReaction] = useState("");
-  const [created, setCreated] = useState(code);
   const [party, setParty] = useState<PartyState | null | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (player.id === SSR_PLAYER.id) return;
-    const target = created || code;
-    const joined = arcadeStore.joinParty(target, player.id, player.displayName || "Player");
-    if (joined.ok) setParty(joined.party);
-    else setParty(arcadeStore.view().parties.find((p) => p.code === target) ?? null);
-  }, [code, created, player.displayName, player.id]);
+    let live = true;
+    async function sync() {
+      const joined = await arcadeStore.joinParty(code, player.id, player.displayName || "Player");
+      if (!live) return;
+      if (joined.ok) setParty(joined.party);
+      else {
+        const pulled = await arcadeStore.pullParty(code);
+        if (live) setParty(pulled);
+      }
+    }
+    void sync();
+    const timer = window.setInterval(() => {
+      void arcadeStore.pullParty(code).then((next) => {
+        if (live && next) setParty(next);
+      });
+    }, 2000);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+    };
+  }, [code, player.displayName, player.id]);
 
   const round = party?.playlist[Math.min(party.round, party.playlist.length - 1)];
   const game = round ? getManifest(round.gameId) : undefined;
@@ -46,10 +60,18 @@ export default function PartyPage() {
         <EmptyStateStage
           slug="sky-stack"
           kicker={`Party ${code}`}
-          title="Party not on this device"
-          body="This lobby is stored in the browser that created it. Open a new one here if you want to host."
+          title="Party not on this instance"
+          body="This code is not on the current server process. Create a lobby here, or ask the host to share a code from the same environment."
           action={
-            <ChamferButton onClick={() => setCreated(arcadeStore.createParty(player.id, player.displayName || "Host").code)}>
+            <ChamferButton
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                void arcadeStore.createParty(player.id, player.displayName || "Host").then((created) => {
+                  window.location.assign(`/party/${created.code}`);
+                });
+              }}
+            >
               Create party
             </ChamferButton>
           }
@@ -60,21 +82,36 @@ export default function PartyPage() {
 
   const slots = Array.from({ length: 6 }, (_, i) => party.members[i] ?? null);
   const hostId = party.host;
+  const me = party.members.find((m) => m.id === player.id);
 
   return (
     <div data-testid="party">
       <GameBackdrop slug={game?.slug ?? "sky-stack"} className="min-h-[58vh]" dim={0.24} priority>
         <div className="flex min-h-[58vh] flex-col justify-end px-5 pb-10 pt-20 md:px-10">
-          <p className="meta text-white/50">Party {party.code}</p>
+          <p className="meta text-white/50">
+            Party <span data-testid="party-code">{party.code}</span>
+            {party.persistence === "local" ? " · this device only" : " · shared lobby"}
+          </p>
           <h1 className="display mt-2 text-[44px] text-white md:text-[68px]">{game?.title ?? "Lobby"}</h1>
           <p className="mt-3 text-[14px] text-white/65">
             Round {Math.min(party.round + 1, party.playlist.length)}/{party.playlist.length} · async playlist
           </p>
-          {game ? (
-            <div className="mt-6">
-              <ChamferButton href={`/play/${game.slug}?party=${party.code}`}>Play this round</ChamferButton>
-            </div>
-          ) : null}
+          <div className="mt-6 flex flex-wrap gap-3">
+            {game ? <ChamferButton href={`/play/${game.slug}?party=${party.code}`}>Play this round</ChamferButton> : null}
+            {me ? (
+              <ChamferButton
+                tone="ghost"
+                cue={false}
+                onClick={() => {
+                  void arcadeStore.setReady(party.code, !me.ready).then((next) => {
+                    if (next) setParty(next);
+                  });
+                }}
+              >
+                {me.ready ? "Unready" : "Ready"}
+              </ChamferButton>
+            ) : null}
+          </div>
         </div>
       </GameBackdrop>
 

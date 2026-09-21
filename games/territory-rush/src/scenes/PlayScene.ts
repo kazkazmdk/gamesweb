@@ -12,7 +12,6 @@ import {
   drawParticles,
   drawHoverBlade,
   fillVignette,
-  drawToyHouse,
   type GameKeyboard,
 } from "@gamesweb/game-core";
 import { readRunContext, territoryRushManifest, type PlatformSDK } from "@gamesweb/game-sdk";
@@ -62,6 +61,7 @@ export class TerritoryScene extends Phaser.Scene {
   private banners: Array<{ text: string; t: number }> = [];
   private captureWave = 0;
   private lastPct = 0;
+  private paused = false;
 
   constructor() {
     super("territory-play");
@@ -140,6 +140,8 @@ export class TerritoryScene extends Phaser.Scene {
       this.stick.x = 0;
       this.stick.y = 0;
     });
+    this.game.events.on("platform-pause", () => (this.paused = true));
+    this.game.events.on("platform-resume", () => (this.paused = false));
     this.platform.session.start();
     this.platform.events.emit({ name: "gameplay_started", props: { gameId: "territory-rush" } });
   }
@@ -183,6 +185,11 @@ export class TerritoryScene extends Phaser.Scene {
     this.cell = Math.min(this.scale.width / COLS, this.scale.height / ROWS);
     const native = this.native?.read();
     if (native?.retryPressed) this.scene.restart();
+    if (this.paused) {
+      this.draw();
+      this.publishDebug();
+      return;
+    }
     if (!this.ended) {
       this.t += dt * 1000;
       if (this.ticks % (this.boost > 0 ? 3 : 5) === 0) {
@@ -375,8 +382,9 @@ export class TerritoryScene extends Phaser.Scene {
         const park = ((x / 8) | 0) + ((y / 6) | 0);
         g.fillStyle(park % 3 === 0 ? (this.arena === 0 ? 0xe4dcc4 : 0xd8e8d4) : this.arena === 0 ? 0xf6f0e2 : 0xeef4ea, 1);
         g.fillRect(x * c, y * c, c, c);
-        if ((x + y * 3) % 17 === 0 && x > 1 && y > 1 && this.get(x, y) === 0) {
-          drawToyHouse(g, x * c + 1, y * c + 4, c - 2, c - 5, park % 2 ? 0xf4d8b0 : 0xd8e8f0, park % 2 ? 0xc45c3a : 0x3a6a88);
+        if ((x + y * 5) % 29 === 0 && x > 2 && y > 2 && this.get(x, y) === 0) {
+          g.fillStyle(park % 2 ? 0xc4b898 : 0x9aa890, 0.22);
+          g.fillRect(x * c + c * 0.25, y * c + c * 0.35, c * 0.5, c * 0.4);
         }
       }
     }
@@ -446,7 +454,7 @@ export class TerritoryScene extends Phaser.Scene {
     drawParticles(g, this.parts);
     fillVignette(g, this.scale.width, this.scale.height, 0.06);
     this.hud.setText(
-      `PAINT  ${this.pct(1).toFixed(0)}%   ${Math.max(0, (TIME - this.t) / 1000).toFixed(0)}s\n${this.arena === 0 ? "TOY CITY" : "PLAZA"}${this.banners[0] ? `  ${this.banners[0].text}` : ""}`,
+      `HOLD  ${this.pct(1).toFixed(0)}%   ${Math.max(0, (TIME - this.t) / 1000).toFixed(0)}s\n${this.arena === 0 ? "DISTRICT" : "PLAZA"}${this.banners[0] ? `  ${this.banners[0].text}` : ""}`,
     );
   }
 
@@ -459,7 +467,7 @@ export class TerritoryScene extends Phaser.Scene {
         playerX: this.px,
         playerY: this.py,
         score: Math.round(this.pct(1) * 400),
-        paused: false,
+        paused: this.paused,
         fps: this.game.loop.actualFps,
         longFrames: this.longFrames,
         tick: this.ticks,
