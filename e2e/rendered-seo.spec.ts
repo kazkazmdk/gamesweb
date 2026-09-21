@@ -116,6 +116,8 @@ test("rendered HTML SEO QA writes a DOM report for every indexable URL", async (
       `Pass: ${rows.filter((r) => r.qualityGate === "pass").length}`,
       `Issues: ${failed.length}`,
       "",
+      "Canonical origin: https://gamesweb.example (exact pathname; / is the origin only). Sitemap locs use the same origin.",
+      "",
       "| URL | words | unique | nearest | similarity | gate |",
       "| --- | ---: | ---: | --- | ---: | --- |",
       ...rows.map((r) => `| ${r.url} | ${r.visibleWords} | ${r.uniqueTokens} | ${r.nearestURL ?? ""} | ${r.similarity} | ${r.qualityGate} |`),

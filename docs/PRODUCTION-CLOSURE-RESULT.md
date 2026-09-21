@@ -24,20 +24,20 @@ See `git diff --stat d7a22e3...HEAD`. Principal surfaces:
 | --- | --- | --- | --- |
 | Party / Challenge / Inbox process Maps | P0 open | **CLOSED** | `tests/social-arcade.test.ts` restart snapshot; two-context `e2e/social.spec.ts` |
 | Client `trust: verified` / `score` / `rows[]` | P0 open | **CLOSED** | `e2e/security-social.spec.ts` 403; unit security |
-| Party advances on first score | P0 open | **CLOSED** | host submit stays `playing`; both submits → `results` |
+| Party advances on first score | P0 open | **CLOSED** | host submit stays `playing` with **zero points**; both submits → `results` and `PARTY_POINTS`. See `docs/FINAL-CORRECTNESS-CLOSURE.md` |
 | Challenge `/c/CODE` without payload | P0 open | **CLOSED** | social e2e |
 | Inbox persist + read persist | P0 open | **CLOSED** | social e2e reload |
 | Rendered HTML SEO QA | P0 open (source lint only) | **CLOSED** | `e2e/rendered-seo.spec.ts` → 65/65 pass |
 | Pause on 8 games | P1 unproven | **CLOSED** | `e2e/pause-retry.spec.ts` 8 freeze + 8 retry |
 | Neon 3-track first-read | P1 code-only | **CLOSED** with screenshot proof | `docs/qa-production-closure/neon/` |
-| Rivals DB-derived | P1 local | **CLOSED** for completed challenges | backend `listRivals` |
+| Rivals DB-derived | P1 local | **CORRECTED, not a live Supabase HTTP proof** | Memory `listRivals` replays `challengeOutcome` in `tests/backend-social-contract.test.ts`. `SupabaseBackend.listRivals` uses the same helper and explicit queries. CI does not boot PostgREST, so that client was not executed against Postgres |
 | Crew / Daily / GP global pretence | honest local | kept local (P2) | copy unchanged |
 
 ## DB persistence
 
 - Default backend remains Memory when no Gamesweb Supabase project is configured.
 - Memory now hydrates/persists via `GAMESWEB_MEMORY_FILE` so a new process can reload parties/challenges/inbox/scores.
-- `0006` + `0007` are the SQL contract. `SupabaseBackend` implements the same `BackendStore` methods. Not attached to an arbitrary Supabase project.
+- `0006` + `0007` + `0008` are the SQL contract. Party round submit is the RPC `submit_party_round_attempt`. `SupabaseBackend` calls that RPC. CI proves the SQL function on Postgres 16, not the HTTP client. Not attached to an arbitrary Supabase project.
 
 ## Party state machine
 
@@ -53,39 +53,9 @@ Browser cannot send `trust`, competitive `score`, `playerId`, or `challengerId`.
 
 ## Test matrix
 
-### Unit (`pnpm test`)
+The table below is not a single run. The single HEAD proof is GitHub Actions run [`35654295700`](https://github.com/kazkazmdk/gamesweb/actions/runs/35654295700) on `a39bedf3b44e03063a2fc43e9a00a36860a3acee` (`check` success, `database` success): unit **136 passed**, Playwright **91 passed / 9 skipped / 0 failed**, `pnpm test:db` **43 checks passed**. `home-swarm-1440` and `home-neon-activities-1440` passed in that run after the snapshots were replaced with the stable current render. They were not noise.
 
-130 passed / 0 skipped / 0 failed
-
-### Typecheck / lint / build
-
-`pnpm typecheck` pass. `pnpm lint` pass (existing `GameArt` img warning). `pnpm build` pass.
-
-### Playwright
-
-Playwright (chromium), assembled from the closure re-runs:
-
-| Suite | Passed | Skipped | Failed |
-| --- | ---: | ---: | ---: |
-| `pause-retry` | 16 | 0 | 0 |
-| `rendered-seo` | 2 | 0 | 0 |
-| `social` | 2 | 0 | 0 |
-| `security-social` | 1 | 0 | 0 |
-| `neon-tracks` | 1 | 0 | 0 |
-| `mobile-closure` | 1 | 0 | 0 |
-| `smoke` | 14 | 0 | 0 |
-| `platform` | 14 | 0 | 0 |
-| `gameplay` | 8 | 0 | 0 |
-| `seo` | 7 | 0 | 0 |
-| `progression` (prior full run) | 5 | 0 | 0 |
-| `security` (prior full run) | 6 | 0 | 0 |
-| `visual` (prior full run) | 11 | 0 | 2 |
-| QA_MATRIX specs | 0 | 9 | 0 |
-| **Assembled** | **88** | **9** | **2** |
-
-The 2 visual failures (`home-swarm-1440`, `home-neon-activities-1440`) are pre-existing Home snapshot noise. This pass did not change Home art. Not a new P0.
-
-`remote-keyboard.spec.ts` is ignored by `playwright.config.ts`.
+`remote-keyboard.spec.ts` is ignored by `playwright.config.ts`. The 9 skipped tests are the opted-out QA matrix specs.
 
 ## SEO
 
@@ -99,7 +69,7 @@ The 2 visual failures (`home-swarm-1440`, `home-neon-activities-1440`) are pre-e
 
 - `docs/qa-production-closure/neon/contact-sheet.png`
 - `docs/qa-production-closure/neon/contact-sheet-unlabeled.png`
-- Per-track opening / mid / distinctive / peak at 1440, labeled and unlabeled
+- Per-track opening (page + canvas), mid and distinctive (canvas) at 1440. The CI screenshot timeout was the full page+canvas set of four moments.
 - `docs/qa-production-closure/mobile/*`
 
 Harbour / Hairpin / Ridge openings are distinguishable without reading captions: waterfront + sodium + containers vs tight green chevrons vs pulled-back guardrail / underpass.
