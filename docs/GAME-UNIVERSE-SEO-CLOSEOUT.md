@@ -4,7 +4,17 @@ Branch: `cursor/game-universe-seo-closeout-c08e`
 Base: `cursor/game-art-direction-rebuild-c08e` @ `c7e307c`  
 Not merged. No Vercel deploy for this pass.
 
-This report is evidence of what landed. It does **not** claim “SEO terminé”, empty P0, or that every nameless still is instantly identifiable.
+Local stills: `docs/qa-game-universe-seo/screenshots/` + `contact-open.png` / `contact-peak.png` / `contact-nameless.png`.
+
+Inspected honestly:
+
+- Territory peak: large pink ownership (~40% PAINT) — fill is now the picture.
+- Crowd peak: huge ×2 / +N boards + pack mass — gates are no longer thin bars.
+- Velocity vs Knockout: ivory roofs vs candy foam hammer / yellow lot — not the same sky family.
+- Swarm peak: denser than open, still not a 300-enemy survivor wall.
+- Neon open: wet road + HOLD DRIFT, but roadside zones do **not** read as three places in one default frame.
+
+This report does **not** claim “SEO terminé”, empty P0, or that nameless contact is a perfect eight-way ID.
 
 ---
 
