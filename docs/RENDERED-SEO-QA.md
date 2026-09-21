@@ -6,7 +6,7 @@ Issues: 0
 
 Canonical origin: https://gamesweb.example (exact pathname; / is the origin only). Sitemap locs use the same origin.
 
-Proved on CI run `35654295700` (`a39bedf`). Source rows: `docs/qa-production-closure/rendered-seo.json`.
+Proved on CI run `35656016061` (`73d80e1`). Source rows: `docs/qa-production-closure/rendered-seo.json`.
 
 | URL | words | unique | nearest | similarity | gate |
 | --- | ---: | ---: | --- | ---: | --- |

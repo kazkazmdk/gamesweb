@@ -53,7 +53,7 @@ Browser cannot send `trust`, competitive `score`, `playerId`, or `challengerId`.
 
 ## Test matrix
 
-The table below is not a single run. The single HEAD proof is GitHub Actions run [`35654295700`](https://github.com/kazkazmdk/gamesweb/actions/runs/35654295700) on `a39bedf3b44e03063a2fc43e9a00a36860a3acee` (`check` success, `database` success): unit **136 passed**, Playwright **91 passed / 9 skipped / 0 failed**, `pnpm test:db` **43 checks passed**. `home-swarm-1440` and `home-neon-activities-1440` passed in that run after the snapshots were replaced with the stable current render. They were not noise.
+The table below is not a single run. The single HEAD proof is GitHub Actions run [`35656016061`](https://github.com/kazkazmdk/gamesweb/actions/runs/35656016061) on `73d80e183bbc5a5cf8154db05c27a8fc6d282f02` (`check` success, `database` success): unit **136 passed**, Playwright **91 passed / 9 skipped / 0 failed**, `pnpm test:db` **43 checks passed**. `home-swarm-1440` and `home-neon-activities-1440` passed in that run after the snapshots were replaced with the stable current render. They were not noise.
 
 `remote-keyboard.spec.ts` is ignored by `playwright.config.ts`. The 9 skipped tests are the opted-out QA matrix specs.
 
