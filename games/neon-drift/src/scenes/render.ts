@@ -104,106 +104,194 @@ export function drawWorld(
 
   if (quality === "low") return;
 
+  drawOpeningPlaces(g, samples, theme);
+  drawTunnelMouth(g, samples, theme);
+
   const step = quality === "high" ? 2 : 3;
   for (let i = 0; i < samples.length; i += step) {
     const s = samples[i];
     const n = samples[(i + 3) % samples.length];
     const turn = Math.abs(s.tx * n.ty - s.ty * n.tx);
-    const side = s.width * 0.5 + 8;
+    const side = s.width * 0.5 + 10;
     const u = i / samples.length;
     const family = roadsideFamily(u, turn);
-    const outer = side + 18;
+    const outer = side + 28;
 
-    g.fillStyle(mixColor(theme.barrier, 0xffffff, 0.18), 0.95);
-    g.fillRect(s.x + s.nx * (side + 2) - 3, s.y + s.ny * (side + 2) - 8, 6, 16);
-    g.fillRect(s.x - s.nx * (side + 2) - 3, s.y - s.ny * (side + 2) - 8, 6, 16);
+    g.fillStyle(mixColor(theme.barrier, 0xffffff, 0.22), 0.95);
+    g.fillRect(s.x + s.nx * (side + 2) - 4, s.y + s.ny * (side + 2) - 12, 8, 24);
+    g.fillRect(s.x - s.nx * (side + 2) - 4, s.y - s.ny * (side + 2) - 12, 8, 24);
 
     if (family === "service") {
-      drawSodiumLamp(g, s.x + s.nx * (outer + 6), s.y + s.ny * (outer + 6), 36, theme.pole);
-      if (i % 2 === 0) drawSodiumLamp(g, s.x - s.nx * (outer + 4), s.y - s.ny * (outer + 4), 32, theme.pole);
-      if (i % 4 === 0) {
-        drawContainer(g, s.x + s.nx * (outer + 22) - 16, s.y + s.ny * (outer + 22) - 10, 34, 18, i % 8 === 0 ? 0xc45c3a : 0x3a6a88);
-        g.fillStyle(0x2a2a28, 1);
-        g.fillRect(s.x - s.nx * (outer + 16) - 14, s.y - s.ny * (outer + 16) - 8, 28, 16);
+      drawSodiumLamp(g, s.x + s.nx * (outer + 8), s.y + s.ny * (outer + 8), 52, theme.pole);
+      if (i % 2 === 0) drawSodiumLamp(g, s.x - s.nx * (outer + 6), s.y - s.ny * (outer + 6), 46, theme.pole);
+      if (i % 3 === 0) {
+        drawContainer(g, s.x + s.nx * (outer + 36) - 28, s.y + s.ny * (outer + 36) - 16, 56, 28, i % 6 === 0 ? 0xc45c3a : 0x3a6a88);
+        g.fillStyle(0x1c1c1a, 1);
+        g.fillRect(s.x - s.nx * (outer + 28) - 22, s.y - s.ny * (outer + 28) - 14, 44, 26);
+        g.fillStyle(0x2a8a7a, 0.7);
+        g.fillRect(s.x - s.nx * (outer + 28) - 16, s.y - s.ny * (outer + 28) - 8, 14, 10);
         g.fillStyle(theme.pole, 0.55);
-        g.fillRect(s.x - s.nx * (outer + 16) - 12, s.y - s.ny * (outer + 16) - 6, 10, 6);
+        g.fillRect(s.x - s.nx * (outer + 28) - 18, s.y - s.ny * (outer + 28) - 10, 12, 8);
       }
-      if (i % 6 === 0) {
-        g.fillStyle(0x1c2228, 1);
-        g.fillRect(s.x + s.nx * (outer + 36) - 18, s.y + s.ny * (outer + 36) - 16, 40, 22);
-        g.fillStyle(theme.pole, 0.35);
-        g.fillRect(s.x + s.nx * (outer + 36) - 14, s.y + s.ny * (outer + 36) - 12, 12, 8);
+      if (i % 5 === 0) {
+        g.fillStyle(0x1a2228, 1);
+        g.fillRect(s.x + s.nx * (outer + 58) - 28, s.y + s.ny * (outer + 58) - 22, 64, 36);
+        g.fillStyle(0xf0b84a, 0.28);
+        g.fillRect(s.x + s.nx * (outer + 58) - 20, s.y + s.ny * (outer + 58) - 14, 20, 12);
+        g.fillStyle(0x4ad4e8, 0.22);
+        g.fillRect(s.x + s.nx * (outer + 58) + 8, s.y + s.ny * (outer + 58) - 14, 16, 12);
       }
     } else if (family === "touge") {
-      drawBush(g, s.x + s.nx * (outer + 10), s.y + s.ny * (outer + 10), 13 + (i % 3) * 3, mixColor(theme.grass, 0x0a1810, 0.15));
-      drawBush(g, s.x - s.nx * (outer + 14), s.y - s.ny * (outer + 14), 11 + (i % 4) * 2, mixColor(theme.grass, 0x243818, 0.12));
+      drawBush(g, s.x + s.nx * (outer + 16), s.y + s.ny * (outer + 16), 22 + (i % 3) * 5, mixColor(theme.grass, 0x0a1810, 0.15));
+      drawBush(g, s.x - s.nx * (outer + 20), s.y - s.ny * (outer + 20), 18 + (i % 4) * 4, mixColor(theme.grass, 0x243818, 0.12));
       if (i % 2 === 0) {
-        drawBush(g, s.x + s.nx * (outer + 28), s.y + s.ny * (outer + 28), 16, mixColor(theme.grass, 0x142010, 0.2));
+        drawBush(g, s.x + s.nx * (outer + 42), s.y + s.ny * (outer + 42), 26, mixColor(theme.grass, 0x142010, 0.2));
       }
+      g.fillStyle(0x6a6254, 1);
+      g.fillRect(s.x - s.nx * (outer + 6) - 10, s.y - s.ny * (outer + 6) - 18, 20, 36);
       g.fillStyle(0x2a2430, 1);
-      g.fillRect(s.x - s.nx * (outer + 8) - 3, s.y - s.ny * (outer + 8) - 18, 6, 22);
-      g.fillStyle(theme.pole, 0.92);
+      g.fillRect(s.x - s.nx * (outer + 14) - 4, s.y - s.ny * (outer + 14) - 28, 8, 36);
+      g.fillStyle(theme.pole, 0.95);
       g.fillTriangle(
-        s.x - s.nx * (outer + 8),
-        s.y - s.ny * (outer + 8) - 30,
-        s.x - s.nx * (outer + 8) + 14,
-        s.y - s.ny * (outer + 8) - 20,
-        s.x - s.nx * (outer + 8),
-        s.y - s.ny * (outer + 8) - 10,
+        s.x - s.nx * (outer + 14),
+        s.y - s.ny * (outer + 14) - 48,
+        s.x - s.nx * (outer + 14) + 22,
+        s.y - s.ny * (outer + 14) - 30,
+        s.x - s.nx * (outer + 14),
+        s.y - s.ny * (outer + 14) - 14,
       );
-      if (turn > 0.08) {
-        g.fillStyle(theme.pole, 0.95);
-        const hx = s.x + s.nx * (s.width * 0.28);
-        const hy = s.y + s.ny * (s.width * 0.28);
-        g.fillTriangle(hx, hy, hx + s.tx * 16, hy + s.ty * 16, hx + s.nx * 8, hy + s.ny * 8);
+      if (turn > 0.06) {
+        const hx = s.x + s.nx * (s.width * 0.22);
+        const hy = s.y + s.ny * (s.width * 0.22);
+        g.fillStyle(theme.pole, 0.96);
+        g.fillTriangle(hx, hy, hx + s.tx * 28, hy + s.ty * 28, hx + s.nx * 14, hy + s.ny * 14);
+        g.fillStyle(0x1a1814, 0.9);
+        g.fillTriangle(hx + s.tx * 6, hy + s.ty * 6, hx + s.tx * 22, hy + s.ty * 22, hx + s.nx * 8, hy + s.ny * 8);
       }
     } else {
-      const tw = s.width * 0.58;
-      g.fillStyle(0x12161c, 0.94);
-      g.fillRect(s.x - tw, s.y - 28, tw * 2, 56);
-      g.fillStyle(0x0a0c10, 0.88);
-      g.fillRect(s.x - tw - 10, s.y - 40, 16, 80);
-      g.fillRect(s.x + tw - 6, s.y - 40, 16, 80);
+      const tw = s.width * 0.62;
+      g.fillStyle(0x10141a, 0.94);
+      g.fillRect(s.x - tw, s.y - 40, tw * 2, 80);
+      g.fillStyle(0x080a0e, 0.9);
+      g.fillRect(s.x - tw - 16, s.y - 56, 22, 112);
+      g.fillRect(s.x + tw - 6, s.y - 56, 22, 112);
       if (i % 2 === 0) {
-        g.fillStyle(theme.pole, 0.22);
-        g.fillRect(s.x - tw + 10, s.y - 6, tw * 2 - 20, 5);
+        g.fillStyle(theme.pole, 0.28);
+        g.fillRect(s.x - tw + 14, s.y - 8, tw * 2 - 28, 7);
       }
       if (i % 3 === 0) {
-        g.fillStyle(0xf0b84a, 0.16);
-        g.fillCircle(s.x, s.y - 18, 10);
+        g.fillStyle(0xf0b84a, 0.2);
+        g.fillCircle(s.x, s.y - 22, 14);
       }
     }
-  }
-
-  const tunnelStart = Math.floor(samples.length * 0.38);
-  const tunnelEnd = Math.floor(samples.length * 0.5);
-  for (let i = tunnelStart; i < tunnelEnd; i += 1) {
-    const s = samples[i];
-    if (!s) continue;
-    const tw = s.width * 0.64;
-    g.fillStyle(0x10141a, i === tunnelStart || i === tunnelEnd - 1 ? 0.95 : 0.72);
-    g.fillRect(s.x - tw, s.y - 32, tw * 2, 64);
   }
 }
 
 function roadsideFamily(u: number, turn: number): "service" | "touge" | "tunnel" {
-  if ((u > 0.36 && u < 0.52) || (u > 0.78 && u < 0.86)) return "tunnel";
-  if (turn > 0.09 || (u > 0.18 && u < 0.34) || (u > 0.58 && u < 0.72)) return "touge";
+  if ((u > 0.18 && u < 0.32) || (u > 0.72 && u < 0.82)) return "tunnel";
+  if (turn > 0.07 || (u > 0.08 && u < 0.2) || (u > 0.42 && u < 0.58)) return "touge";
   return "service";
+}
+
+function sampleAt(samples: TrackSample[], u: number) {
+  return samples[Math.min(samples.length - 1, Math.max(0, Math.floor(u * samples.length)))];
+}
+
+function drawOpeningPlaces(g: Phaser.GameObjects.Graphics, samples: TrackSample[], theme: TrackDef["theme"]) {
+  const start = samples[10] ?? samples[0];
+  if (!start) return;
+  const corner = sampleAt(samples, 0.14);
+  const portal = sampleAt(samples, 0.24);
+
+  const sx = start.x - start.nx * (start.width * 0.5 + 78);
+  const sy = start.y - start.ny * (start.width * 0.5 + 78);
+  g.fillStyle(0x2a2a26, 1);
+  g.fillRect(sx - 70, sy - 36, 140, 72);
+  g.fillStyle(0x3a3a34, 1);
+  g.fillRect(sx - 78, sy - 44, 156, 16);
+  g.fillStyle(0x1a1a18, 1);
+  g.fillRect(sx - 18, sy - 8, 14, 22);
+  g.fillRect(sx + 8, sy - 8, 14, 22);
+  g.fillStyle(0xf0b84a, 0.55);
+  g.fillCircle(sx - 36, sy - 8, 10);
+  g.fillCircle(sx + 40, sy - 8, 10);
+  g.fillStyle(0x1c2228, 1);
+  g.fillRect(sx + 58, sy + 6, 22, 28);
+  g.fillStyle(0x4ad4e8, 0.45);
+  g.fillRect(sx + 62, sy + 10, 14, 10);
+  drawSodiumLamp(g, sx - 64, sy + 28, 58, theme.pole);
+  drawSodiumLamp(g, sx + 70, sy + 28, 58, theme.pole);
+  drawContainer(g, sx - 118, sy + 8, 40, 22, 0xc45c3a);
+
+  if (corner) {
+    const cx = corner.x + corner.nx * (corner.width * 0.5 + 36);
+    const cy = corner.y + corner.ny * (corner.width * 0.5 + 36);
+    g.fillStyle(0x6a6254, 1);
+    g.fillRect(cx - 18, cy - 28, 36, 72);
+    g.fillStyle(0x4a463c, 1);
+    g.fillRect(cx - 22, cy - 32, 8, 80);
+    for (let k = 0; k < 4; k += 1) {
+      const hx = corner.x + corner.nx * (corner.width * 0.18) + corner.tx * (k * 26 - 30);
+      const hy = corner.y + corner.ny * (corner.width * 0.18) + corner.ty * (k * 26 - 30);
+      g.fillStyle(theme.pole, 0.96);
+      g.fillTriangle(hx, hy, hx + corner.tx * 24, hy + corner.ty * 24, hx + corner.nx * 16, hy + corner.ny * 16);
+    }
+    drawBush(g, cx + corner.nx * 28, cy + corner.ny * 28, 28, mixColor(theme.grass, 0x0a1810, 0.2));
+    drawBush(g, cx + corner.nx * 48, cy + corner.ny * 18, 22, mixColor(theme.grass, 0x142010, 0.15));
+    drawBush(g, cx + corner.nx * 22 + corner.tx * 40, cy + corner.ny * 22 + corner.ty * 40, 24, mixColor(theme.grass, 0x1a2814, 0.1));
+  }
+
+  if (portal) {
+    const tw = portal.width * 0.72;
+    g.fillStyle(0x0a0c10, 0.96);
+    g.fillRect(portal.x - tw - 18, portal.y - 70, 28, 140);
+    g.fillRect(portal.x + tw - 10, portal.y - 70, 28, 140);
+    g.fillStyle(0x161a20, 0.94);
+    g.fillRect(portal.x - tw - 18, portal.y - 78, tw * 2 + 36, 22);
+    g.fillStyle(0x08090c, 0.88);
+    g.fillRect(portal.x - tw + 8, portal.y - 52, tw * 2 - 16, 104);
+    g.fillStyle(theme.pole, 0.32);
+    g.fillCircle(portal.x - tw * 0.35, portal.y - 36, 12);
+    g.fillCircle(portal.x + tw * 0.35, portal.y - 36, 12);
+    g.fillStyle(0xf0b84a, 0.18);
+    g.fillRect(portal.x - tw + 16, portal.y + 10, tw * 2 - 32, 10);
+  }
+}
+
+function drawTunnelMouth(g: Phaser.GameObjects.Graphics, samples: TrackSample[], theme: TrackDef["theme"]) {
+  const tunnelStart = Math.floor(samples.length * 0.2);
+  const tunnelEnd = Math.floor(samples.length * 0.32);
+  for (let i = tunnelStart; i < tunnelEnd; i += 1) {
+    const s = samples[i];
+    if (!s) continue;
+    const tw = s.width * 0.68;
+    const portal = i === tunnelStart || i === tunnelEnd - 1;
+    g.fillStyle(0x10141a, portal ? 0.96 : 0.74);
+    g.fillRect(s.x - tw, s.y - 46, tw * 2, 92);
+    if (portal) {
+      g.fillStyle(0x080a0e, 0.92);
+      g.fillRect(s.x - tw - 14, s.y - 62, 22, 124);
+      g.fillRect(s.x + tw - 8, s.y - 62, 22, 124);
+      g.fillStyle(theme.pole, 0.22);
+      g.fillCircle(s.x, s.y - 28, 11);
+    }
+  }
 }
 
 function drawHarbourWorld(g: Phaser.GameObjects.Graphics, def: TrackDef, quality: string, t: number) {
   g.fillStyle(0x0a1828, 1);
-  g.fillRect(0, def.worldH * 0.58, def.worldW, def.worldH * 0.42);
-  g.fillStyle(0xe8d8a0, 0.1);
-  g.fillCircle(def.worldW * 0.78, def.worldH * 0.16, 70);
+  g.fillRect(0, def.worldH * 0.52, def.worldW, def.worldH * 0.48);
+  g.fillStyle(0xe8d8a0, 0.12);
+  g.fillCircle(def.worldW * 0.78, def.worldH * 0.16, 80);
   if (quality !== "low") {
-    g.fillStyle(0x1a3a4a, 0.32 + Math.sin(t / 700) * 0.05);
-    for (let i = 0; i < 14; i += 1) g.fillRect(i * 280, def.worldH * 0.66 + Math.sin(t / 400 + i) * 5, 200, 7);
-    drawCrane(g, 420, def.worldH * 0.68, 180, 0x3a3a44);
-    drawCrane(g, 980, def.worldH * 0.7, 150, 0x2a2a32);
-    drawContainer(g, 260, def.worldH * 0.68 - 36, 64, 36, 0xc45c3a);
-    drawContainer(g, 330, def.worldH * 0.68 - 36, 64, 36, 0x3a6a88);
+    g.fillStyle(0x1a3a4a, 0.36 + Math.sin(t / 700) * 0.05);
+    for (let i = 0; i < 16; i += 1) g.fillRect(i * 240, def.worldH * 0.62 + Math.sin(t / 400 + i) * 5, 180, 8);
+    drawCrane(g, 360, def.worldH * 0.64, 210, 0x3a3a44);
+    drawCrane(g, 920, def.worldH * 0.66, 180, 0x2a2a32);
+    drawCrane(g, 1480, def.worldH * 0.7, 150, 0x32323a);
+    drawContainer(g, 220, def.worldH * 0.64 - 40, 70, 40, 0xc45c3a);
+    drawContainer(g, 300, def.worldH * 0.64 - 40, 70, 40, 0x3a6a88);
+    drawContainer(g, 560, def.worldH * 0.66 - 36, 56, 32, 0xc45c3a);
   }
 }
 

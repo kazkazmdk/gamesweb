@@ -69,7 +69,7 @@ export const TRACKS: TrackDef[] = [
       asphalt: 0x2a313c,
       asphaltHi: 0x3c4654,
       barrier: 0x8a7a58,
-      accent: 0xe35aa0,
+      accent: 0xf0b84a,
       grass: 0x1a2c1e,
       mark: 0xf2ead4,
       building: 0x1a2434,

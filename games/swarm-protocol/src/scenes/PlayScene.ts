@@ -246,34 +246,52 @@ export class SwarmPlayScene extends Phaser.Scene {
 
   private seedPeakField() {
     this.started = this.time.now - 270_000;
-    for (const e of this.enemies) {
-      if (e.kind !== "boss" && e.kind !== "warden") e.active = false;
-    }
-    const want = this.quality === "low" ? 36 : 56;
-    const kinds: Array<Enemy["kind"]> = ["chaser", "dart", "tank", "spitter", "splitter", "swarmling", "elite"];
+    this.kills = 86;
+    this.level = 9;
+    this.build = {
+      ...this.build,
+      orbital: Math.max(this.build.orbital, 3),
+      blade: Math.max(this.build.blade, 2),
+      projectiles: Math.max(this.build.projectiles, 3),
+      fireRate: Math.max(this.build.fireRate, 3.4),
+    };
+    this.deathFx = 1;
+    for (const e of this.enemies) e.active = false;
+    const want = this.quality === "low" ? 72 : this.quality === "mid" ? 104 : 132;
+    const kinds: Array<Enemy["kind"]> = ["swarmling", "chaser", "dart", "tank", "spitter", "splitter", "swarmling", "elite"];
     let n = 0;
     for (const slot of this.enemies) {
       if (n >= want) break;
-      if (slot.active) continue;
-      const a = (n / want) * Math.PI * 2;
-      const dist = 72 + (n % 8) * 26;
-      spawnEnemy(slot, kinds[n % kinds.length], this.px + Math.cos(a) * dist, this.py + Math.sin(a) * dist, 1 + (n % 5) * 0.06);
+      const ring = 1 + (n % 5);
+      const a = (n / 11) * Math.PI * 2 + ring * 0.35;
+      const dist = 54 + ring * 38 + (n % 3) * 8;
+      spawnEnemy(slot, kinds[n % kinds.length], this.px + Math.cos(a) * dist, this.py + Math.sin(a) * dist, 1 + (n % 7) * 0.05);
       slot.x = clamp(slot.x, 40, ARENA - 40);
       slot.y = clamp(slot.y, 40, ARENA - 40);
       n += 1;
     }
+    const boss = this.enemies.find((e) => !e.active);
+    if (boss) {
+      spawnEnemy(boss, "boss", this.px + 210, this.py - 40, 1.15);
+      this.bossSpawned = true;
+    }
+    const elite = this.enemies.find((e) => !e.active);
+    if (elite) spawnEnemy(elite, "elite", this.px - 170, this.py + 80, 1.1);
     let orbs = 0;
     for (const o of this.orbs) {
-      if (orbs >= 10) break;
+      if (orbs >= 28) break;
       if (o.active) continue;
       o.active = true;
-      o.x = this.px + (orbs % 5) * 22 - 44;
-      o.y = this.py + 36 + ((orbs / 5) | 0) * 18;
+      const pocket = orbs < 10;
+      o.x = this.px + (pocket ? (orbs % 5) * 18 - 36 : Math.cos(orbs) * 90);
+      o.y = this.py + (pocket ? 28 + ((orbs / 5) | 0) * 16 : Math.sin(orbs * 1.7) * 70);
       o.vx = 0;
       o.vy = 0;
       o.value = 6;
       orbs += 1;
     }
+    this.parts.burst(this.px + 70, this.py - 30, 22, 0x9ae84a, 220, 260);
+    this.parts.burst(this.px - 90, this.py + 40, 16, 0xc45c3a, 180, 220);
   }
 
   private seedOpening() {
@@ -466,7 +484,7 @@ export class SwarmPlayScene extends Phaser.Scene {
   private spawnWave(dt: number) {
     const elapsed = (this.time.now - this.started) / 1000;
     const live = this.enemies.reduce((n, e) => n + (e.active && e.kind !== "boss" && e.kind !== "warden" ? 1 : 0), 0);
-    const cap = this.quality === "low" ? 28 : this.quality === "mid" ? 42 : 64;
+    const cap = this.quality === "low" ? 48 : this.quality === "mid" ? 72 : 110;
     const want = Math.min(desiredCount(elapsed), cap);
     if (!this.bossSpawned && shouldSpawnBoss(elapsed, this.kills, this.level)) {
       const slot = this.enemies.find((e) => !e.active);
@@ -1120,12 +1138,14 @@ export class SwarmPlayScene extends Phaser.Scene {
       g.fillStyle(0x9ae84a, this.deathFx * 0.08);
       g.fillRect(0, 0, ARENA, ARENA);
     }
-    for (let i = 0; i < 18; i += 1) {
-      drawFungusPatch(g, 80 + (i * 173) % (ARENA - 120), 90 + (i * 211) % (ARENA - 140), 18 + (i % 5) * 6, i % 2 ? 0x2a4a38 : 0x3a6a48);
+    for (let i = 0; i < 36; i += 1) {
+      drawFungusPatch(g, 70 + (i * 173) % (ARENA - 120), 80 + (i * 211) % (ARENA - 140), 22 + (i % 5) * 8, i % 2 ? 0x2a4a38 : 0x3a6a48);
     }
-    drawContainer(g, 180, 220, 70, 36, 0xc45c3a);
-    drawContainer(g, 1100, 980, 64, 32, 0x3a6a88);
-    drawContainer(g, 420, 1080, 54, 28, 0x6a4a28);
+    drawContainer(g, 180, 220, 86, 44, 0xc45c3a);
+    drawContainer(g, 1100, 980, 78, 40, 0x3a6a88);
+    drawContainer(g, 420, 1080, 64, 34, 0x6a4a28);
+    drawContainer(g, 760, 260, 70, 36, 0x8a3a28);
+    drawContainer(g, 980, 620, 58, 30, 0x3a6a48);
     g.fillStyle(0x2a3a34, 0.55);
     for (let i = 0; i < 8; i += 1) g.fillRect(60 + i * 160, 70, 4, 90);
     g.fillStyle(0x6a7a70, 0.35);
@@ -1262,7 +1282,7 @@ export class SwarmPlayScene extends Phaser.Scene {
       g.fillCircle(-14, 0, 6);
       g.restore();
     }
-    const drawnEnemies = this.quality === "low" ? 36 : this.quality === "mid" ? 52 : 80;
+    const drawnEnemies = this.quality === "low" ? 64 : this.quality === "mid" ? 96 : 140;
     let enemyDrawn = 0;
     for (const e of this.enemies) {
       if (!e.active) continue;
@@ -1522,6 +1542,7 @@ export class SwarmPlayScene extends Phaser.Scene {
         hideHud: () => {
           this.hud.setVisible(false);
           this.overlay.setVisible(false);
+          this.cards.forEach((c) => c.setVisible(false));
         },
         seedPeak: () => this.seedPeakField(),
       },

@@ -14,7 +14,7 @@ There is no agent path through Vercel.
 
 ## Git deployments
 
-`vercel.json` sets `git.deploymentEnabled` to `false` so a GitHub push does not create a Vercel deployment.
+`vercel.json` sets `git.deploymentEnabled` to `false`. That file alone did not stop Git preview builds on this project, so preview deployments are also disabled on the Vercel project (`previewDeploymentsDisabled`) and `ignoreCommand` skips agent branches.
 
 `ignoreCommand` still skips agent branches if Git deploys are turned back on:
 

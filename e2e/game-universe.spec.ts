@@ -82,7 +82,7 @@ test("universe stills and nameless contact", async ({ page }) => {
     await page.waitForTimeout(500);
     await save(page, `${slug}-peak`);
     await cmd(page, "hideHud");
-    await page.waitForTimeout(120);
+    await page.waitForTimeout(220);
     await save(page, `${slug}-nameless`);
   }
 

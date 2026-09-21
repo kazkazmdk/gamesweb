@@ -321,7 +321,7 @@ export class DriftPlayScene extends Phaser.Scene {
       this.car.throttle = 0;
       this.ensureAudio();
       this.synth.engineRpm(0.35 + (3.2 - this.countdown) * 0.12, 0.4);
-      this.cam.zoom += (CAMERA.zoomSlow * 1.08 - this.cam.zoom) * (1 - Math.exp(-dt * 3));
+      this.cam.zoom += (CAMERA.zoomSlow - this.cam.zoom) * (1 - Math.exp(-dt * 3));
       this.cameras.main.setZoom(this.cam.zoom);
       this.cameras.main.centerOn(this.car.x, this.car.y);
       if (this.countdown <= 0) {

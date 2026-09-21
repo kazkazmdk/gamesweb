@@ -73,7 +73,18 @@ export function publishGwDebug(state: GwDebugState, commands?: GwDebugCommands) 
   const w = debugWindow();
   if (!w) return;
   w.__GW_DEBUG__ = state;
-  if (commands) w.__GW_DEBUG_CMD__ = commands;
+  if (commands) {
+    const hide = commands.hideHud;
+    w.__GW_DEBUG_CMD__ = {
+      ...commands,
+      hideHud: hide
+        ? () => {
+            hide();
+            w.dispatchEvent(new Event("gw-hide-hud"));
+          }
+        : undefined,
+    };
+  }
 }
 
 export function clearGwDebug() {
