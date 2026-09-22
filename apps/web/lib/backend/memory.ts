@@ -8,20 +8,37 @@ import {
   type LeaderboardEntry,
 } from "@gamesweb/database";
 import { utcDayKey } from "@gamesweb/game-sdk";
+import { actorId } from "@/lib/api/actor";
 import type { Identity } from "@/lib/api/identity";
+import { defaultAccountUsername } from "@/lib/backend/default-username";
+import { competitiveTrust, loadCompetitiveRun } from "@/lib/backend/competitive-run";
+import {
+  applyRoundPoints,
+  rankPartyRound,
+  resolveChallengeType,
+  rivalsFromChallenges,
+  validateCompetitiveRunTarget,
+} from "@/lib/backend/competitive-contract";
 import type {
   BackendStore,
   OfflineRun,
   PublicPlayerPayload,
   ScoreWriteResult,
   StoredFriend,
+  StoredInbox,
+  StoredParty,
+  StoredPartyMember,
   StoredPresence,
   StoredProfile,
+  StoredRival,
   StoredSave,
   StoredScore,
   StoredSession,
   SubmitScoreInput,
 } from "@/lib/backend/types";
+import { applyChallengeAttempt, getManifest, makePublicCode, QUICK_PARTY_PLAYLIST, type ChallengeRecord } from "@gamesweb/game-sdk";
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 
 function utcDaySafeLocal(ms = Date.now()) {
   return new Date(ms).toISOString().slice(0, 10);
@@ -40,7 +57,23 @@ export class MemoryBackend implements BackendStore {
   migrations = new Map<string, string>();
   idempotency = new Map<string, { status: number; response: unknown }>();
   usernameIndex = new Map<string, string>();
+  parties = new Map<string, StoredParty>();
+  challenges = new Map<string, ChallengeRecord>();
+  inbox: StoredInbox[] = [];
+  rivals: StoredRival[] = [];
+  usedRuns = new Set<string>();
+  partyAttempts: Array<{
+    partyCode: string;
+    round: number;
+    actorId: string;
+    name: string;
+    runId: string;
+    score: number;
+    trust: string;
+    submittedAt: number;
+  }> = [];
   private locks = new Map<string, Promise<void>>();
+  private persistPath = process.env.GAMESWEB_MEMORY_FILE ?? "";
 
   private async withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
     const prev = this.locks.get(key) ?? Promise.resolve();
@@ -103,7 +136,7 @@ export class MemoryBackend implements BackendStore {
     const existing = this.profiles.get(key);
     if (existing) return existing;
     const username = identity.userId
-      ? `player_${identity.userId.replace(/-/g, "").slice(0, 8)}`
+      ? defaultAccountUsername(identity.userId)
       : `guest_${identity.anonymousId.replace(/-/g, "").slice(0, 6)}`;
     const row: StoredProfile = {
       userId: key,
@@ -271,7 +304,7 @@ export class MemoryBackend implements BackendStore {
       this.sessions.set(input.session.id, input.session);
     }
 
-    return {
+    const result = {
       score,
       alreadyApplied: false,
       progression: {
@@ -282,6 +315,8 @@ export class MemoryBackend implements BackendStore {
         questsCompleted: proposed.questsCompleted,
       },
     };
+    this.persist();
+    return result;
   }
 
   private rollDay(profile: StoredProfile) {
@@ -660,6 +695,40 @@ export class MemoryBackend implements BackendStore {
     return { ok: true as const, alreadyMerged: false, profile };
   }
 
+  async deleteAccount(identity: Identity) {
+    if (!identity.userId) return { error: "auth_required" };
+    const userId = identity.userId;
+    const profile = this.profiles.get(userId);
+    if (profile) this.usernameIndex.delete(profile.username.toLowerCase());
+    this.profiles.delete(userId);
+    this.friends = this.friends.filter((f) => f.requesterId !== userId && f.addresseeId !== userId);
+    this.presence.delete(userId);
+    for (const [key, save] of this.saves) {
+      if (save.userId === userId) this.saves.delete(key);
+    }
+    for (const score of this.scores.values()) {
+      if (score.userId === userId) {
+        score.userId = null;
+        score.anonymousId = null;
+      }
+    }
+    for (const session of this.sessions.values()) {
+      if (session.userId === userId) {
+        session.userId = null;
+        session.anonymousId = null;
+      }
+    }
+    for (const [anon, uid] of this.migrations) {
+      if (uid === userId) this.migrations.delete(anon);
+    }
+    for (const [key, _value] of this.idempotency) {
+      if (key.includes(userId)) this.idempotency.delete(key);
+    }
+    this.inbox = this.inbox.filter((row) => row.userId !== userId);
+    this.rivals = this.rivals.filter((row) => row.selfId !== userId && row.otherId !== userId);
+    return { ok: true as const };
+  }
+
   async getIdempotency(scope: string, key: string) {
     return this.idempotency.get(`${scope}::${key}`) ?? null;
   }
@@ -739,11 +808,361 @@ export class MemoryBackend implements BackendStore {
       activity,
     };
   }
+
+  async getScore(id: string) {
+    return this.scores.get(id) ?? null;
+  }
+
+  private persist() {
+    if (!this.persistPath) return;
+    try {
+      mkdirSync(dirname(this.persistPath), { recursive: true });
+      writeFileSync(
+        this.persistPath,
+        JSON.stringify({
+          sessions: [...this.sessions.entries()],
+          scores: [...this.scores.entries()],
+          profiles: [...this.profiles.entries()],
+          friends: this.friends,
+          parties: [...this.parties.entries()],
+          challenges: [...this.challenges.entries()],
+          inbox: this.inbox,
+          rivals: this.rivals,
+          usedRuns: [...this.usedRuns],
+          partyAttempts: this.partyAttempts,
+        }),
+      );
+    } catch {
+      /* private / read-only */
+    }
+  }
+
+  hydrateFromFile(path = this.persistPath) {
+    if (!path || !existsSync(path)) return this;
+    try {
+      const raw = JSON.parse(readFileSync(path, "utf8")) as {
+        sessions?: Array<[string, StoredSession]>;
+        scores?: Array<[string, StoredScore]>;
+        profiles?: Array<[string, StoredProfile]>;
+        friends?: StoredFriend[];
+        parties?: Array<[string, StoredParty]>;
+        challenges?: Array<[string, ChallengeRecord]>;
+        inbox?: StoredInbox[];
+        rivals?: StoredRival[];
+        usedRuns?: string[];
+        partyAttempts?: MemoryBackend["partyAttempts"];
+      };
+      this.sessions = new Map(raw.sessions ?? []);
+      this.scores = new Map(raw.scores ?? []);
+      this.profiles = new Map(raw.profiles ?? []);
+      this.friends = raw.friends ?? [];
+      this.parties = new Map(
+        (raw.parties ?? []).map(([code, party]) => {
+          party.members = party.members.map((member) => {
+            const legacy = member as StoredPartyMember & { score?: number };
+            return {
+              id: legacy.id,
+              name: legacy.name,
+              ready: Boolean(legacy.ready),
+              points: typeof legacy.points === "number" ? legacy.points : 0,
+              lastRoundScore: typeof legacy.lastRoundScore === "number" ? legacy.lastRoundScore : null,
+              joinedAt: legacy.joinedAt,
+            };
+          });
+          return [code, party] as [string, StoredParty];
+        }),
+      );
+      this.challenges = new Map(raw.challenges ?? []);
+      this.inbox = raw.inbox ?? [];
+      this.rivals = raw.rivals ?? [];
+      this.usedRuns = new Set(raw.usedRuns ?? []);
+      this.partyAttempts = raw.partyAttempts ?? [];
+    } catch {
+      /* corrupt snapshot */
+    }
+    return this;
+  }
+
+  private pushInbox(userId: string, item: Omit<StoredInbox, "id" | "at" | "read" | "userId">) {
+    this.inbox.unshift({ id: crypto.randomUUID(), userId, at: Date.now(), read: false, ...item });
+    this.inbox = this.inbox.slice(0, 200);
+  }
+
+  async createParty(identity: Identity, hostName: string): Promise<StoredParty> {
+    const id = actorId(identity);
+    const party: StoredParty = {
+      id: crypto.randomUUID(),
+      code: makePublicCode(),
+      host: id,
+      members: [{ id, name: hostName, ready: true, points: 0, lastRoundScore: null, joinedAt: Date.now() }],
+      playlist: QUICK_PARTY_PLAYLIST.map((r) => ({ ...r })),
+      round: 0,
+      state: "lobby",
+      standings: [],
+      createdAt: Date.now(),
+      persistence: "server",
+      roundRoster: [],
+      submitted: [],
+    };
+    this.parties.set(party.code, party);
+    this.persist();
+    return structuredClone(party);
+  }
+
+  async getParty(code: string) {
+    const hit = this.parties.get(code.toUpperCase());
+    return hit ? structuredClone(hit) : null;
+  }
+
+  async joinParty(identity: Identity, code: string, name: string) {
+    return this.withLock(`party:${code.toUpperCase()}`, async () => {
+      const party = this.parties.get(code.toUpperCase());
+      if (!party) return { ok: false as const, error: "not_found" as const };
+      const id = actorId(identity);
+      if (party.members.some((m) => m.id === id)) return { ok: true as const, duplicate: true, party: structuredClone(party) };
+      if (party.state !== "lobby") return { ok: false as const, error: "closed" as const };
+      if (party.members.length >= 6) return { ok: false as const, error: "full" as const };
+      party.members.push({ id, name, ready: false, points: 0, lastRoundScore: null, joinedAt: Date.now() });
+      this.persist();
+      return { ok: true as const, duplicate: false, party: structuredClone(party) };
+    });
+  }
+
+  async setPartyReady(identity: Identity, code: string, ready: boolean) {
+    return this.withLock(`party:${code.toUpperCase()}`, async () => {
+      const party = this.parties.get(code.toUpperCase());
+      if (!party) return null;
+      const m = party.members.find((row) => row.id === actorId(identity));
+      if (!m) return null;
+      m.ready = ready;
+      this.persist();
+      return structuredClone(party);
+    });
+  }
+
+  async startParty(identity: Identity, code: string) {
+    return this.withLock(`party:${code.toUpperCase()}`, async () => {
+      const party = this.parties.get(code.toUpperCase());
+      if (!party) return { error: "not_found" };
+      if (party.host !== actorId(identity)) return { error: "host_only" };
+      if (party.state !== "lobby") return { error: "bad_state" };
+      const roster = party.members.filter((m) => m.ready);
+      if (!roster.length) return { error: "no_ready" };
+      party.roundRoster = roster.map((m) => m.id);
+      party.submitted = [];
+      party.state = "playing";
+      this.persist();
+      return structuredClone(party);
+    });
+  }
+
+  async advanceParty(identity: Identity, code: string) {
+    return this.withLock(`party:${code.toUpperCase()}`, async () => {
+      const party = this.parties.get(code.toUpperCase());
+      if (!party) return { error: "not_found" };
+      if (party.host !== actorId(identity)) return { error: "host_only" };
+      if (party.state !== "results") return { error: "bad_state" };
+      party.round += 1;
+      if (party.round >= party.playlist.length) {
+        party.state = "done";
+      } else {
+        party.state = "playing";
+        party.submitted = [];
+        party.roundRoster = party.members.filter((m) => m.ready).map((m) => m.id);
+        if (!party.roundRoster.length) party.roundRoster = party.members.map((m) => m.id);
+      }
+      this.persist();
+      return structuredClone(party);
+    });
+  }
+
+  async submitPartyRound(identity: Identity, code: string, runId: string) {
+    return this.withLock(`party:${code.toUpperCase()}`, async () => {
+      const party = this.parties.get(code.toUpperCase());
+      if (!party) return { error: "not_found" };
+      const id = actorId(identity);
+      if (!party.members.some((m) => m.id === id)) return { error: "not_member" };
+      if (party.state !== "playing") return { error: "bad_state" };
+      if (!party.roundRoster.includes(id)) return { error: "not_in_round" };
+      const roundAttempts = this.partyAttempts.filter((row) => row.partyCode === party.code && row.round === party.round);
+      if (roundAttempts.some((row) => row.actorId === id) || party.submitted.includes(id)) return { error: "duplicate" };
+      const usedKey = `party:${party.code}:${party.round}:${runId}`;
+      if (this.usedRuns.has(usedKey) || this.usedRuns.has(`run:${runId}:party`) || this.partyAttempts.some((row) => row.runId === runId)) {
+        return { error: "run_reuse" };
+      }
+      const run = await loadCompetitiveRun(this, identity, runId);
+      if ("error" in run) return { error: run.error };
+      const slot = party.playlist[party.round];
+      if (!slot) return { error: "game_mismatch" };
+      const target = validateCompetitiveRunTarget(run, slot);
+      if (!target.ok) return { error: target.error };
+      if (run.verificationStatus === "flagged") return { error: "invalid_score" };
+      const name = party.members.find((m) => m.id === id)?.name ?? "Player";
+      this.partyAttempts.push({
+        partyCode: party.code,
+        round: party.round,
+        actorId: id,
+        name,
+        runId: run.runId,
+        score: run.score,
+        trust: competitiveTrust(run.verificationStatus),
+        submittedAt: Date.now(),
+      });
+      this.usedRuns.add(usedKey);
+      this.usedRuns.add(`run:${runId}:party`);
+      const attempts = this.partyAttempts.filter((row) => row.partyCode === party.code && row.round === party.round);
+      party.submitted = attempts.map((row) => row.actorId);
+      if (party.roundRoster.every((rid) => attempts.some((row) => row.actorId === rid))) {
+        const ranked = rankPartyRound(
+          attempts.map((row) => ({ id: row.actorId, name: row.name, score: row.score, submittedAt: row.submittedAt })),
+          slot.gameId,
+        );
+        party.standings = applyRoundPoints(party.standings, ranked);
+        for (const row of ranked) {
+          const member = party.members.find((m) => m.id === row.id);
+          const standing = party.standings.find((s) => s.id === row.id);
+          if (member) {
+            member.points = standing?.points ?? member.points;
+            member.lastRoundScore = row.score;
+          }
+        }
+        party.state = "results";
+      }
+      this.persist();
+      return structuredClone(party);
+    });
+  }
+
+  async createChallengeFromRun(identity: Identity, runId: string, type?: string) {
+    const run = await loadCompetitiveRun(this, identity, runId);
+    if ("error" in run) return { error: run.error };
+    const usedKey = `run:${runId}:challenge-create`;
+    if (this.usedRuns.has(usedKey)) return { error: "run_reuse" };
+    if (run.verificationStatus === "flagged") return { error: "invalid_score" };
+    const resolved = resolveChallengeType(run.gameId, type);
+    if (!resolved.ok) return { error: resolved.error };
+    const profile = await this.getOrCreateProfile(identity);
+    const publicCode = makePublicCode();
+    const challenge: ChallengeRecord = {
+      id: crypto.randomUUID(),
+      publicCode,
+      gameId: run.gameId,
+      mode: run.mode,
+      seed: `${run.gameId}:${run.runId}`,
+      type: resolved.type,
+      challengerId: actorId(identity),
+      challengerName: profile.displayName || "Player",
+      targetId: null,
+      targetName: null,
+      challengerRunId: run.runId,
+      challengerScore: run.score,
+      challengerGhostId: null,
+      challengerMeta: {},
+      status: "open",
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
+      metadata: { durationMs: run.durationMs },
+      winnerId: null,
+      targetScore: null,
+      trust: competitiveTrust(run.verificationStatus),
+      gameVersion: run.gameVersion,
+      attempts: [],
+    };
+    this.challenges.set(publicCode, challenge);
+    this.usedRuns.add(usedKey);
+    this.persist();
+    return { challenge: structuredClone(challenge), url: `/c/${publicCode}` };
+  }
+
+  async getChallenge(code: string) {
+    const hit = this.challenges.get(code.toUpperCase());
+    if (hit && hit.expiresAt < Date.now()) {
+      hit.status = "expired";
+    }
+    return hit ? structuredClone(hit) : null;
+  }
+
+  async putChallenge(challenge: ChallengeRecord) {
+    const next = { ...challenge, trust: challenge.trust === "verified" ? "unverified" : challenge.trust };
+    this.challenges.set(next.publicCode.toUpperCase(), next);
+    this.persist();
+  }
+
+  async attemptChallengeFromRun(identity: Identity, code: string, runId: string) {
+    return this.withLock(`challenge:${code.toUpperCase()}`, async () => {
+      const current = this.challenges.get(code.toUpperCase());
+      if (!current) return { ok: false as const, error: "not_found" };
+      if (current.status === "expired" || (current.status === "open" && current.expiresAt < Date.now())) {
+        current.status = "expired";
+        this.persist();
+        return { ok: false as const, error: "expired" };
+      }
+      if (current.status !== "open") return { ok: false as const, error: "challenge_closed" };
+      if (actorId(identity) === current.challengerId) return { ok: false as const, error: "self_challenge" };
+      const usedKey = `run:${runId}:challenge-attempt`;
+      if (this.usedRuns.has(usedKey)) return { ok: false as const, error: "run_reuse" };
+      const run = await loadCompetitiveRun(this, identity, runId);
+      if ("error" in run) return { ok: false as const, error: run.error };
+      const target = validateCompetitiveRunTarget(run, { gameId: current.gameId, mode: current.mode });
+      if (!target.ok) return { ok: false as const, error: target.error };
+      if (run.verificationStatus === "flagged") return { ok: false as const, error: "invalid_score" };
+      const profile = await this.getOrCreateProfile(identity);
+      const applied = applyChallengeAttempt(current, {
+        id: crypto.randomUUID(),
+        challengeId: current.id,
+        playerId: actorId(identity),
+        playerName: profile.displayName || "Player",
+        score: run.score,
+        runId: run.runId,
+        trust: competitiveTrust(run.verificationStatus),
+        createdAt: Date.now(),
+        metadata: { durationMs: run.durationMs },
+      });
+      this.challenges.set(code.toUpperCase(), applied.challenge);
+      this.usedRuns.add(usedKey);
+      if (!applied.duplicate && applied.outcome !== "pending") {
+        this.pushInbox(current.challengerId, {
+          type: "challenge",
+          title: applied.outcome === "win" ? `${profile.displayName || "Player"} beat your score` : applied.outcome === "draw" ? "Challenge draw" : `${profile.displayName || "Player"} tried your challenge`,
+          body: getManifest(current.gameId)?.title ?? current.gameId,
+          href: `/c/${code.toUpperCase()}`,
+        });
+        this.pushInbox(actorId(identity), {
+          type: "challenge",
+          title: applied.outcome === "win" ? "You won the challenge" : applied.outcome === "draw" ? "Draw" : `${current.challengerName} still leads`,
+          body: getManifest(current.gameId)?.title ?? current.gameId,
+          href: `/c/${code.toUpperCase()}`,
+        });
+      }
+      this.persist();
+      return { ok: true as const, ...applied };
+    });
+  }
+
+  async listInbox(identity: Identity) {
+    const id = actorId(identity);
+    return this.inbox.filter((i) => i.userId === id).map((i) => ({ ...i }));
+  }
+
+  async markInboxRead(identity: Identity, id: string) {
+    const hit = this.inbox.find((i) => i.id === id && i.userId === actorId(identity));
+    if (hit) hit.read = true;
+    this.persist();
+    return hit ? { ...hit } : null;
+  }
+
+  async listRivals(identity: Identity) {
+    return rivalsFromChallenges(actorId(identity), [...this.challenges.values()]);
+  }
 }
 
 export function memoryStore(): MemoryBackend {
   const g = globalThis as G;
-  if (!g.__gw_memory) g.__gw_memory = new MemoryBackend();
+  if (!g.__gw_memory) {
+    const store = new MemoryBackend();
+    store.hydrateFromFile();
+    g.__gw_memory = store;
+  }
   return g.__gw_memory;
 }
 

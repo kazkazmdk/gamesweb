@@ -8,11 +8,15 @@ import {
   type LeaderboardEntry,
   type VerifiedStatus,
 } from "@gamesweb/database";
-import { utcDayKey } from "@gamesweb/game-sdk";
+import { getManifest, makePublicCode, QUICK_PARTY_PLAYLIST, utcDayKey, type ChallengeRecord } from "@gamesweb/game-sdk";
+import { actorId } from "@/lib/api/actor";
 import type { Identity } from "@/lib/api/identity";
+import { competitiveTrust, loadCompetitiveRun } from "@/lib/backend/competitive-run";
+import { resolveChallengeType, rivalsFromChallenges, validateCompetitiveRunTarget } from "@/lib/backend/competitive-contract";
+import { defaultAccountUsername, defaultAccountUsernameFallback } from "@/lib/backend/default-username";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { commitSha, APP_VERSION } from "@/lib/version";
-import type { BackendStore, OfflineRun, PublicPlayerPayload, ScoreWriteResult, StoredProfile, StoredSave, StoredSession, SubmitScoreInput } from "@/lib/backend/types";
+import type { BackendStore, OfflineRun, PublicPlayerPayload, ScoreWriteResult, StoredInbox, StoredParty, StoredProfile, StoredRival, StoredSave, StoredScore, StoredSession, SubmitScoreInput } from "@/lib/backend/types";
 
 function admin() {
   const client = createSupabaseAdmin();
@@ -192,19 +196,24 @@ export class SupabaseBackend implements BackendStore {
     const existing = await loadProfileRow(identity.userId);
     if (existing) return existing;
     const sb = admin();
-    const username = `player_${identity.userId.replace(/-/g, "").slice(0, 8)}`;
-    await sb.from("profiles").insert({
+    const row = {
       user_id: identity.userId,
       anonymous_id: identity.anonymousId,
-      username,
+      username: defaultAccountUsername(identity.userId),
       display_name: "Player",
       avatar: "orb-0",
       is_guest: false,
       share_activity: true,
       share_presence: true,
       share_public_activity: true,
-    });
-    return (await loadProfileRow(identity.userId))!;
+    };
+    const first = await sb.from("profiles").upsert(row, { onConflict: "user_id", ignoreDuplicates: true });
+    if (first.error?.code === "23505") {
+      await sb.from("profiles").upsert({ ...row, username: defaultAccountUsernameFallback(identity.userId) }, { onConflict: "user_id", ignoreDuplicates: true });
+    }
+    const created = await loadProfileRow(identity.userId);
+    if (!created) throw new Error("profile_create_failed");
+    return created;
   }
 
   async submitScore(input: SubmitScoreInput): Promise<ScoreWriteResult> {
@@ -744,6 +753,14 @@ export class SupabaseBackend implements BackendStore {
     };
   }
 
+  async deleteAccount(identity: Identity) {
+    if (!identity.userId) return { error: "auth_required" };
+    const sb = admin();
+    const { error } = await sb.rpc("delete_player_account", { p_user_id: identity.userId });
+    if (error) return { error: "delete_failed" };
+    return { ok: true as const };
+  }
+
   async getIdempotency(scope: string, key: string) {
     const sb = admin();
     const { data } = await sb.from("idempotency_keys").select("status, response").eq("scope", scope).eq("key", key).maybeSingle();
@@ -858,6 +875,436 @@ export class SupabaseBackend implements BackendStore {
       achievements: (ach ?? []).map((a: { achievement_id: string }) => a.achievement_id),
       activity,
     };
+  }
+
+  async getScore(id: string): Promise<StoredScore | null> {
+    const sb = admin();
+    const { data } = await sb.from("scores").select("*").eq("id", id).maybeSingle();
+    if (!data) return null;
+    return {
+      id: data.id,
+      sessionId: data.session_id,
+      userId: data.user_id,
+      anonymousId: data.anonymous_id,
+      gameId: data.game_id,
+      mode: data.mode,
+      score: data.score,
+      metadata: data.metadata ?? {},
+      createdAt: new Date(data.created_at).getTime(),
+      verified: data.verified_status,
+      offlineSubmission: Boolean(data.offline_submission),
+      localSessionId: data.local_session_id ?? undefined,
+    };
+  }
+
+  private async assembleParty(row: {
+    id: string;
+    code: string;
+    host_actor: string | null;
+    host_id: string | null;
+    state: StoredParty["state"];
+    current_round: number;
+    playlist: Array<{ gameId: string; mode: string }>;
+    created_at: string;
+    standings?: Array<{ id: string; name: string; points: number }>;
+    round_roster?: string[];
+    submitted?: string[];
+  }): Promise<StoredParty> {
+    const sb = admin();
+    const { data: members } = await sb.from("party_members").select("*").eq("party_id", row.id);
+    const { data: attempts } = await sb
+      .from("party_round_attempts")
+      .select("actor_id, score, round_index, submitted_at")
+      .eq("party_id", row.id)
+      .order("round_index", { ascending: false })
+      .order("submitted_at", { ascending: false });
+    const latestScore = new Map<string, number>();
+    for (const attempt of attempts ?? []) {
+      const actor = String(attempt.actor_id ?? "");
+      if (!actor || latestScore.has(actor)) continue;
+      latestScore.set(actor, Number(attempt.score));
+    }
+    return {
+      id: row.id,
+      code: row.code,
+      host: row.host_actor ?? row.host_id ?? "",
+      members: (members ?? []).map((m: {
+        actor_id?: string | null;
+        user_id?: string | null;
+        display_name?: string | null;
+        ready: boolean;
+        points: number;
+        joined_at?: string;
+      }) => ({
+        id: m.actor_id ?? m.user_id ?? "",
+        name: m.display_name ?? "Player",
+        ready: m.ready,
+        points: m.points,
+        lastRoundScore: latestScore.has(m.actor_id ?? m.user_id ?? "") ? latestScore.get(m.actor_id ?? m.user_id ?? "")! : null,
+        joinedAt: m.joined_at ? new Date(m.joined_at).getTime() : Date.now(),
+      })),
+      playlist: row.playlist ?? [],
+      round: row.current_round ?? 0,
+      state: row.state,
+      standings: row.standings ?? [],
+      createdAt: new Date(row.created_at).getTime(),
+      persistence: "server",
+      roundRoster: row.round_roster ?? [],
+      submitted: row.submitted ?? [],
+    };
+  }
+
+  async createParty(identity: Identity, hostName: string): Promise<StoredParty> {
+    const sb = admin();
+    const host = actorId(identity);
+    const { data, error } = await sb
+      .from("parties")
+      .insert({
+        code: makePublicCode(),
+        host_id: identity.userId,
+        host_actor: host,
+        state: "lobby",
+        current_round: 0,
+        playlist: QUICK_PARTY_PLAYLIST.map((r) => ({ ...r })),
+        standings: [],
+        round_roster: [],
+        submitted: [],
+      })
+      .select("*")
+      .single();
+    if (error || !data) throw new Error("party_insert_failed");
+    await sb.from("party_members").insert({
+      party_id: data.id,
+      user_id: identity.userId,
+      actor_id: host,
+      display_name: hostName,
+      ready: true,
+      points: 0,
+    });
+    return this.assembleParty(data);
+  }
+
+  async getParty(code: string) {
+    const sb = admin();
+    const { data } = await sb.from("parties").select("*").eq("code", code.toUpperCase()).maybeSingle();
+    if (!data) return null;
+    return this.assembleParty(data);
+  }
+
+  async joinParty(identity: Identity, code: string, name: string) {
+    const sb = admin();
+    const { data, error } = await sb.rpc("join_party", {
+      p_code: code,
+      p_actor: actorId(identity),
+      p_name: name,
+      p_user_id: identity.userId,
+    });
+    if (error) throw new Error(error.message);
+    const payload = (data ?? {}) as { ok?: boolean; duplicate?: boolean; error?: "not_found" | "full" | "closed" };
+    if (payload.error || !payload.ok) return { ok: false as const, error: payload.error ?? "not_found" };
+    const party = await this.getParty(code);
+    if (!party) return { ok: false as const, error: "not_found" as const };
+    return { ok: true as const, duplicate: Boolean(payload.duplicate), party };
+  }
+
+  async setPartyReady(identity: Identity, code: string, ready: boolean) {
+    const party = await this.getParty(code);
+    if (!party || !party.members.some((m) => m.id === actorId(identity))) return null;
+    const sb = admin();
+    await sb.from("party_members").update({ ready }).eq("party_id", party.id).eq("actor_id", actorId(identity));
+    return this.getParty(code);
+  }
+
+  async startParty(identity: Identity, code: string) {
+    const sb = admin();
+    const { data, error } = await sb.rpc("start_party", { p_code: code, p_actor: actorId(identity) });
+    if (error) return { error: "bad_state" };
+    const payload = (data ?? {}) as { error?: string };
+    if (payload.error) return { error: payload.error };
+    const party = await this.getParty(code);
+    return party ?? { error: "not_found" };
+  }
+
+  async advanceParty(identity: Identity, code: string) {
+    const sb = admin();
+    const { data, error } = await sb.rpc("advance_party", { p_code: code, p_actor: actorId(identity) });
+    if (error) return { error: "bad_state" };
+    const payload = (data ?? {}) as { error?: string };
+    if (payload.error) return { error: payload.error };
+    const party = await this.getParty(code);
+    return party ?? { error: "not_found" };
+  }
+
+  async submitPartyRound(identity: Identity, code: string, runId: string) {
+    const run = await loadCompetitiveRun(this, identity, runId);
+    if ("error" in run) return { error: run.error };
+    if (run.verificationStatus === "flagged") return { error: "invalid_score" };
+    const sb = admin();
+    const { data, error } = await sb.rpc("submit_party_round_attempt", {
+      p_code: code,
+      p_actor: actorId(identity),
+      p_run_id: run.runId,
+      p_score: run.score,
+      p_trust: competitiveTrust(run.verificationStatus),
+      p_game_id: run.gameId,
+      p_mode: run.mode,
+    });
+    if (error) return { error: "invalid_score" };
+    const payload = (data ?? {}) as { error?: string };
+    if (payload.error) return { error: payload.error };
+    const party = await this.getParty(code);
+    return party ?? { error: "not_found" };
+  }
+
+  private mapChallenge(row: Record<string, unknown>, attempts: ChallengeRecord["attempts"] = []): ChallengeRecord {
+    return {
+      id: String(row.id),
+      publicCode: String(row.public_code),
+      gameId: String(row.game_id),
+      mode: String(row.mode),
+      seed: String(row.seed),
+      type: row.type as ChallengeRecord["type"],
+      challengerId: String(row.challenger_actor ?? row.challenger_id ?? ""),
+      challengerName: String(row.challenger_name ?? "Player"),
+      targetId: (row.target_actor as string | null) ?? (row.target_id ? String(row.target_id) : null),
+      targetName: (row.target_name as string | null) ?? null,
+      challengerRunId: row.challenger_run_id ? String(row.challenger_run_id) : null,
+      challengerScore: Number(row.challenger_score),
+      challengerGhostId: null,
+      challengerMeta: {},
+      status: (row.status as ChallengeRecord["status"]) ?? "open",
+      createdAt: new Date(String(row.created_at)).getTime(),
+      expiresAt: new Date(String(row.expires_at)).getTime(),
+      metadata: (row.metadata as Record<string, number | string | boolean>) ?? {},
+      winnerId: row.winner_id ? String(row.winner_id) : null,
+      targetScore: row.target_score == null ? null : Number(row.target_score),
+      trust: (row.trust as ChallengeRecord["trust"]) ?? "unverified",
+      gameVersion: String(row.game_version ?? "1.0.0"),
+      attempts,
+    };
+  }
+
+  private async loadChallenge(code: string): Promise<ChallengeRecord | null> {
+    const sb = admin();
+    const { data } = await sb.from("challenges").select("*").eq("public_code", code.toUpperCase()).maybeSingle();
+    if (!data) return null;
+    const { data: attempts } = await sb.from("challenge_attempts").select("*").eq("challenge_id", data.id);
+    const mapped = this.mapChallenge(data, (attempts ?? []).map((a: Record<string, unknown>) => ({
+      id: String(a.id),
+      challengeId: String(a.challenge_id),
+      playerId: String(a.player_actor ?? a.player_id ?? ""),
+      playerName: String(a.player_name ?? "Player"),
+      score: Number(a.score),
+      runId: a.run_id ? String(a.run_id) : null,
+      trust: (a.trust as ChallengeRecord["trust"]) ?? "unverified",
+      createdAt: new Date(String(a.created_at)).getTime(),
+      metadata: (a.metadata as Record<string, number | string | boolean>) ?? {},
+    })));
+    if (mapped.expiresAt < Date.now() && mapped.status === "open") {
+      mapped.status = "expired";
+      await sb.from("challenges").update({ status: "expired" }).eq("id", data.id);
+    }
+    return mapped;
+  }
+
+  async createChallengeFromRun(identity: Identity, runId: string, type?: string) {
+    const run = await loadCompetitiveRun(this, identity, runId);
+    if ("error" in run) return { error: run.error };
+    if (run.verificationStatus === "flagged") return { error: "invalid_score" };
+    const resolved = resolveChallengeType(run.gameId, type);
+    if (!resolved.ok) return { error: resolved.error };
+    const profile = await this.getOrCreateProfile(identity);
+    const publicCode = makePublicCode();
+    const sb = admin();
+    const { data, error } = await sb
+      .from("challenges")
+      .insert({
+        public_code: publicCode,
+        game_id: run.gameId,
+        mode: run.mode,
+        seed: `${run.gameId}:${run.runId}`,
+        type: resolved.type,
+        challenger_id: identity.userId,
+        challenger_actor: actorId(identity),
+        challenger_name: profile.displayName || "Player",
+        challenger_run_id: run.runId,
+        challenger_score: run.score,
+        status: "open",
+        trust: competitiveTrust(run.verificationStatus),
+        game_version: run.gameVersion,
+        metadata: { durationMs: run.durationMs },
+        expires_at: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+      })
+      .select("*")
+      .single();
+    if (error || !data) return { error: error?.code === "23505" ? "run_reuse" : "create_failed" };
+    return { challenge: this.mapChallenge(data), url: `/c/${publicCode}` };
+  }
+
+  async getChallenge(code: string) {
+    return this.loadChallenge(code);
+  }
+
+  async putChallenge(challenge: ChallengeRecord) {
+    const sb = admin();
+    const trust = challenge.trust === "verified" ? "unverified" : challenge.trust;
+    await sb.from("challenges").upsert({
+      id: challenge.id,
+      public_code: challenge.publicCode.toUpperCase(),
+      game_id: challenge.gameId,
+      mode: challenge.mode,
+      seed: challenge.seed,
+      type: challenge.type,
+      challenger_actor: challenge.challengerId,
+      challenger_name: challenge.challengerName,
+      challenger_score: challenge.challengerScore,
+      status: challenge.status,
+      trust,
+      game_version: challenge.gameVersion,
+      metadata: challenge.metadata,
+      expires_at: new Date(challenge.expiresAt).toISOString(),
+      created_at: new Date(challenge.createdAt).toISOString(),
+    });
+  }
+
+  async attemptChallengeFromRun(identity: Identity, code: string, runId: string) {
+    const current = await this.loadChallenge(code);
+    if (!current) return { ok: false as const, error: "not_found" };
+    if (current.status === "expired" || (current.status === "open" && current.expiresAt < Date.now())) {
+      return { ok: false as const, error: "expired" };
+    }
+    if (current.status !== "open") return { ok: false as const, error: "challenge_closed" };
+    if (actorId(identity) === current.challengerId) return { ok: false as const, error: "self_challenge" };
+    const run = await loadCompetitiveRun(this, identity, runId);
+    if ("error" in run) return { ok: false as const, error: run.error };
+    const target = validateCompetitiveRunTarget(run, { gameId: current.gameId, mode: current.mode });
+    if (!target.ok) return { ok: false as const, error: target.error };
+    if (run.verificationStatus === "flagged") return { ok: false as const, error: "invalid_score" };
+    const profile = await this.getOrCreateProfile(identity);
+    const sb = admin();
+    const { data, error } = await sb.rpc("submit_challenge_attempt", {
+      p_code: code,
+      p_actor: actorId(identity),
+      p_name: profile.displayName || "Player",
+      p_run_id: run.runId,
+      p_score: run.score,
+      p_trust: competitiveTrust(run.verificationStatus),
+      p_game_id: run.gameId,
+      p_mode: run.mode,
+    });
+    if (error) return { ok: false as const, error: "attempt_failed" };
+    const payload = (data ?? {}) as { error?: string; outcome?: "win" | "loss" | "draw" };
+    if (payload.error) return { ok: false as const, error: payload.error };
+    const challenge = await this.loadChallenge(code);
+    if (!challenge || !payload.outcome) return { ok: false as const, error: "attempt_failed" };
+    await this.pushInbox(current.challengerId, {
+      type: "challenge",
+      title: payload.outcome === "win" ? `${profile.displayName || "Player"} beat your score` : payload.outcome === "draw" ? "Challenge draw" : `${profile.displayName || "Player"} tried your challenge`,
+      body: getManifest(current.gameId)?.title ?? current.gameId,
+      href: `/c/${code.toUpperCase()}`,
+    });
+    await this.pushInbox(actorId(identity), {
+      type: "challenge",
+      title: payload.outcome === "win" ? "You won the challenge" : payload.outcome === "draw" ? "Draw" : `${current.challengerName} still leads`,
+      body: getManifest(current.gameId)?.title ?? current.gameId,
+      href: `/c/${code.toUpperCase()}`,
+    });
+    return { ok: true as const, challenge, outcome: payload.outcome, duplicate: false };
+  }
+
+  private async pushInbox(userId: string, item: Omit<StoredInbox, "id" | "at" | "read" | "userId">) {
+    const sb = admin();
+    await sb.from("notifications").insert({
+      actor_id: userId,
+      type: item.type,
+      title: item.title,
+      body: item.body,
+      href: item.href,
+    });
+  }
+
+  async listInbox(identity: Identity): Promise<StoredInbox[]> {
+    const sb = admin();
+    const { data } = await sb.from("notifications").select("*").eq("actor_id", actorId(identity)).order("created_at", { ascending: false }).limit(60);
+    return (data ?? []).map((row: {
+      id: string;
+      type: StoredInbox["type"];
+      title: string;
+      body: string;
+      href: string | null;
+      created_at: string;
+      read_at: string | null;
+    }) => ({
+      id: row.id,
+      userId: actorId(identity),
+      type: row.type,
+      title: row.title,
+      body: row.body,
+      href: row.href ?? "",
+      at: new Date(row.created_at).getTime(),
+      read: Boolean(row.read_at),
+    }));
+  }
+
+  async markInboxRead(identity: Identity, id: string) {
+    const sb = admin();
+    const { data } = await sb
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("actor_id", actorId(identity))
+      .select("*")
+      .maybeSingle();
+    if (!data) return null;
+    return {
+      id: data.id,
+      userId: actorId(identity),
+      type: data.type,
+      title: data.title,
+      body: data.body,
+      href: data.href ?? "",
+      at: new Date(data.created_at).getTime(),
+      read: true,
+    };
+  }
+
+  async listRivals(identity: Identity): Promise<StoredRival[]> {
+    const me = actorId(identity);
+    const sb = admin();
+    const { data: owned } = await sb.from("challenges").select("*").eq("challenger_actor", me);
+    const ownedRows = (owned ?? []) as Record<string, unknown>[];
+    const ownedIds = ownedRows.map((row) => String(row.id));
+    const { data: ownedAttempts } = ownedIds.length
+      ? await sb.from("challenge_attempts").select("*").in("challenge_id", ownedIds)
+      : { data: [] as Record<string, unknown>[] };
+    const { data: myAttempts } = await sb.from("challenge_attempts").select("*").eq("player_actor", me);
+    const myRows = (myAttempts ?? []) as Record<string, unknown>[];
+    const extraIds = [...new Set(myRows.map((row) => String(row.challenge_id)))].filter((id) => !ownedIds.includes(id));
+    const { data: faced } = extraIds.length
+      ? await sb.from("challenges").select("*").in("id", extraIds)
+      : { data: [] as Record<string, unknown>[] };
+    const challengeRows = [...ownedRows, ...((faced ?? []) as Record<string, unknown>[])];
+    const attemptRows = [...((ownedAttempts ?? []) as Record<string, unknown>[]), ...myRows];
+    const attemptsByChallenge = new Map<string, ChallengeRecord["attempts"]>();
+    for (const attempt of attemptRows) {
+      const challengeId = String(attempt.challenge_id);
+      const list = attemptsByChallenge.get(challengeId) ?? [];
+      if (list.some((row) => row.id === String(attempt.id))) continue;
+      list.push({
+        id: String(attempt.id),
+        challengeId,
+        playerId: String(attempt.player_actor ?? attempt.player_id ?? ""),
+        playerName: String(attempt.player_name ?? "Player"),
+        score: Number(attempt.score),
+        runId: attempt.run_id ? String(attempt.run_id) : null,
+        trust: (attempt.trust as ChallengeRecord["trust"]) ?? "unverified",
+        createdAt: new Date(String(attempt.created_at)).getTime(),
+        metadata: (attempt.metadata as Record<string, number | string | boolean>) ?? {},
+      });
+      attemptsByChallenge.set(challengeId, list);
+    }
+    const challenges = challengeRows.map((row) => this.mapChallenge(row, attemptsByChallenge.get(String(row.id)) ?? []));
+    return rivalsFromChallenges(me, challenges);
   }
 }
 

@@ -39,7 +39,7 @@ test("territory rush boots", async ({ page }) => {
 
 test("guest magic challenge page renders without signup", async ({ page }) => {
   await page.goto("/c/7FQ2K?p=e30");
-  await expect(page.getByText(/expired|challenged|Challenge/i).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: /challenge not found|challenged you/i })).toBeVisible();
 });
 
 test("guest progression persists after refresh", async ({ page }) => {

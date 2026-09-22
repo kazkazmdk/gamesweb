@@ -1,38 +1,28 @@
 # Final platform QA
 
-Base: `cursor/final-platform-games-seo-c08e` @ `f24d352`  
-Head: `cursor/final-product-seo-qa-032a`
+Base: `cursor/final-product-seo-qa-032a` @ `d7a22e3`  
+Head: `cursor/production-social-closure-032a`
 
-## IA kept
+## Social surfaces
 
-| URL | Role |
-| --- | --- |
-| `/` | Product / home |
-| `/arcade` | Personalized command center, noindex |
-| `/games` | Public SEO catalog |
+| Surface | Source of truth | Guest | Cross-device / process |
+| --- | --- | --- | --- |
+| Party | `BackendStore` (memory file or Supabase) | cookie actor | yes on this backend |
+| Challenge | same + `runId` | cookie actor | `/c/CODE` without payload |
+| Inbox | `notifications` / memory inbox | cookie actor; copy says so | read state persists |
+| Rivals | derived from completed challenges | cookie actor | yes on this backend |
+| Crew | local preview | this device | no (P2) |
+| Daily / GP | local | this device | no (P2) |
+| Friends / presence / scores | existing BackendStore | unchanged | unchanged |
 
-Desktop nav: Games → `/`, **Catalog → `/games`**, Arcade → `/arcade`.  
-Home now has a visible public catalog block (not sr-only).
+## Party
 
-## Surfaces
+Host start / advance only. Members submit own `runId`. Round stays `playing` until the ready roster has submitted. Refresh reloads membership, roster, round, standings.
 
-| Surface | State |
-| --- | --- |
-| Party create / join | Server code, 2s poll, ready toggle, honest "not on this instance" |
-| Challenge magic | Fetches by code; payload optional hydrate |
-| Inbox | Hydrates from `/api/inbox`; mark-read hits server |
-| Crew | Empty until the player starts a **local preview** house |
-| Friends / presence | Unchanged, already backend |
-| Daily / GP | Still local, copy already honest |
-| Pause | Resume, Restart, Controls, Settings, Exit to hub |
-| Results | Result / score / PB / Retry / rematch or share / next game |
-| Hubs | Visible Learn the game cluster |
+## Challenge
 
-## Social tests
+Create/attempt from stored run. Spoofed `trust: verified` or client score → 403.
 
-- Unit: `tests/social-arcade.test.ts` — two identities, party + challenge + inbox
-- E2E: `e2e/social.spec.ts` — two Playwright contexts
+## Production caveats
 
-## Persistence caveat
-
-Same Next process = shared social objects. A second serverless isolate will not see the first party's code until `0006_social_arcade.sql` is applied.
+Without a provisioned Gamesweb database, persistence is the Memory backend + optional `GAMESWEB_MEMORY_FILE`. That is still process-shared on one Node instance and file-shared across restarts in tests. Vercel isolates need Supabase.

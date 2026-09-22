@@ -9,7 +9,6 @@ import {
   makePublicCode,
   nextBestAction,
   QUICK_PARTY_PLAYLIST,
-  rankScores,
   roundPoints,
   type ChallengeAttempt,
   type ChallengeRecord,
@@ -17,8 +16,15 @@ import {
   type ChallengeType,
   type NextAction,
 } from "@gamesweb/game-sdk";
-import { lowerIsBetter } from "@gamesweb/database";
 import { playerApi } from "@/lib/player-api";
+import {
+  isServerBackedChallenge,
+  localChallengeFromShare,
+  markLocalChallenge,
+  markServerChallenge,
+  planChallengeAttempt,
+  planChallengeCreate,
+} from "@/lib/social/challenge-integrity";
 
 export type InboxItem = {
   id: string;
@@ -33,13 +39,15 @@ export type InboxItem = {
 export type PartyState = {
   code: string;
   host: string;
-  members: Array<{ id: string; name: string; ready: boolean; score: number }>;
+  members: Array<{ id: string; name: string; ready: boolean; points: number; lastRoundScore: number | null }>;
   playlist: Array<{ gameId: string; mode: string }>;
   round: number;
   state: "lobby" | "playing" | "results" | "done";
   standings: Array<{ id: string; name: string; points: number }>;
   createdAt: number;
   persistence?: "server" | "local";
+  roundRoster?: string[];
+  submitted?: string[];
 };
 
 export type RivalRow = {
@@ -98,7 +106,20 @@ function empty(): ArcadeSnap {
 }
 
 function cacheParty(party: PartyState): PartyState {
-  return { ...party, persistence: party.persistence ?? "server" };
+  return {
+    ...party,
+    persistence: party.persistence ?? "server",
+    members: party.members.map((member) => {
+      const legacy = member as PartyState["members"][number] & { score?: number };
+      return {
+        id: legacy.id,
+        name: legacy.name,
+        ready: legacy.ready,
+        points: typeof legacy.points === "number" ? legacy.points : 0,
+        lastRoundScore: typeof legacy.lastRoundScore === "number" ? legacy.lastRoundScore : null,
+      };
+    }),
+  };
 }
 
 class ArcadeStore {
@@ -157,11 +178,11 @@ class ArcadeStore {
     try {
       const inbox = await playerApi.inbox();
       if (inbox.ok) {
-        const remote = inbox.data.items as InboxItem[];
-        const localOnly = this.snap.inbox.filter((item) => !remote.some((r) => r.id === item.id));
-        this.snap.inbox = [...remote, ...localOnly].slice(0, 60);
-        this.emit();
+        this.snap.inbox = (inbox.data.items as InboxItem[]).slice(0, 60);
       }
+      const rivals = await playerApi.rivals();
+      if (rivals.ok) this.snap.rivals = rivals.data.rows;
+      this.emit();
     } finally {
       this.hydrating = false;
     }
@@ -177,25 +198,34 @@ class ArcadeStore {
     score: number;
     trust?: ChallengeRecord["trust"];
     gameVersion?: string;
-  }): Promise<{ challenge: ChallengeRecord; url: string; persistence: "server" | "local" }> {
-    const remote = await playerApi.createChallenge({
-      gameId: input.gameId,
-      mode: input.mode,
-      seed: input.seed,
-      type: input.type,
-      challengerName: input.challengerName,
-      score: input.score,
-      trust: input.trust,
-    });
-    if (remote.ok && remote.data.challenge) {
-      const challenge = remote.data.challenge;
+    runId?: string | null;
+  }): Promise<
+    | { ok: true; challenge: ChallengeRecord; url: string; persistence: "server" | "local" }
+    | { ok: false; error: string }
+  > {
+    let remote: Awaited<ReturnType<typeof playerApi.createChallenge>> | { ok: false } = { ok: false };
+    if (input.runId) {
+      try {
+        remote = await playerApi.createChallenge({
+          action: "create",
+          runId: input.runId,
+          challengeType: input.type,
+        });
+      } catch {
+        remote = { ok: false };
+      }
+    }
+    const plan = planChallengeCreate(remote);
+    if (plan.action === "use-server" && remote.ok && remote.data.challenge) {
+      const challenge = markServerChallenge(remote.data.challenge);
       this.rememberChallenge(challenge);
       analytics.track("challenge_created", { gameId: input.gameId, code: challenge.publicCode, persistence: "server" });
       this.emit();
-      return { challenge, url: remote.data.url, persistence: "server" };
+      return { ok: true, challenge, url: remote.data.url, persistence: "server" };
     }
+    if (plan.action === "reject") return { ok: false, error: plan.error };
     const local = this.createChallengeLocal(input);
-    return { ...local, persistence: "local" };
+    return { ok: true, ...local, persistence: "local" };
   }
 
   private createChallengeLocal(input: {
@@ -228,14 +258,14 @@ class ArcadeStore {
       status: "open",
       createdAt: Date.now(),
       expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-      metadata: {},
+      metadata: { source: "local-share", persistence: "local" },
       winnerId: null,
       targetScore: null,
-      trust: input.trust ?? "unverified",
+      trust: "unverified",
       gameVersion: input.gameVersion ?? getManifest(input.gameId)?.version ?? "1.0.0",
       attempts: [],
     };
-    this.rememberChallenge(challenge);
+    this.rememberChallenge(markLocalChallenge(challenge));
     const share: ChallengeShare = {
       publicCode,
       gameId: challenge.gameId,
@@ -255,72 +285,72 @@ class ArcadeStore {
     return { challenge, url };
   }
 
-  fromShare(share: ChallengeShare): ChallengeRecord {
-    return {
-      id: uid(),
-      publicCode: share.publicCode,
-      gameId: share.gameId,
-      mode: share.mode,
-      seed: share.seed,
-      type: share.type,
-      challengerId: share.challengerId,
-      challengerName: share.challengerName,
-      targetId: null,
-      targetName: null,
-      challengerRunId: null,
-      challengerScore: share.challengerScore,
-      challengerGhostId: null,
-      challengerMeta: {},
-      status: "open",
-      createdAt: Date.now(),
-      expiresAt: share.expiresAt,
-      metadata: {},
-      winnerId: null,
-      targetScore: null,
-      trust: share.trust,
-      gameVersion: share.gameVersion,
-      attempts: [],
-    };
+  fromShare(share: ChallengeShare, code = share.publicCode): ChallengeRecord | null {
+    const built = localChallengeFromShare(share, code);
+    return built.ok ? built.challenge : null;
   }
 
-  hydrateFromShare(share: ChallengeShare) {
-    if (this.snap.challenges.some((c) => c.publicCode === share.publicCode)) return;
-    this.rememberChallenge(this.fromShare(share));
+  hydrateFromShare(share: ChallengeShare, code = share.publicCode) {
+    const existing = this.snap.challenges.find((c) => c.publicCode === code.toUpperCase());
+    if (existing && isServerBackedChallenge(existing)) return existing;
+    const built = localChallengeFromShare(share, code);
+    if (!built.ok) return null;
+    if (!existing) this.rememberChallenge(built.challenge);
     this.emit();
+    return existing ?? built.challenge;
   }
 
   getChallenge(code: string, payload?: string | null): ChallengeRecord | ChallengeShare | null {
     const local = this.snap.challenges.find((c) => c.publicCode === code);
     if (local) return local;
-    if (payload) {
-      const share = decodeChallengePayload(payload);
-      if (share) this.hydrateFromShare(share);
-      return this.snap.challenges.find((c) => c.publicCode === code) ?? share;
-    }
-    return null;
+    if (!payload) return null;
+    const share = decodeChallengePayload(payload);
+    if (!share) return null;
+    return this.hydrateFromShare(share, code);
   }
 
   async fetchChallenge(code: string, payload?: string | null): Promise<ChallengeRecord | ChallengeShare | null> {
-    const remote = await playerApi.getChallenge(code, payload);
-    if (remote.ok) {
-      this.rememberChallenge(remote.data.challenge);
-      this.emit();
-      return remote.data.challenge;
+    try {
+      const remote = await playerApi.getChallenge(code);
+      if (remote.ok) {
+        const challenge = markServerChallenge(remote.data.challenge);
+        this.rememberChallenge(challenge);
+        this.emit();
+        return challenge;
+      }
+    } catch {
+      /* network: keep a local share if we have one */
     }
     return this.getChallenge(code, payload);
   }
 
   async completeChallenge(code: string, attempt: Omit<ChallengeAttempt, "challengeId">, payload?: string | null) {
-    const remote = await playerApi.attemptChallenge({
-      code,
-      score: attempt.score,
-      playerName: attempt.playerName,
-      trust: attempt.trust,
-      durationMs: typeof attempt.metadata?.durationMs === "number" ? attempt.metadata.durationMs : 0,
-    });
-    if (remote.ok && remote.data.challenge) {
+    const cached = this.snap.challenges.find((c) => c.publicCode === code);
+    const serverBacked = isServerBackedChallenge(cached);
+    let hasLocalShare = Boolean(cached && !serverBacked);
+    if (payload) {
+      const share = decodeChallengePayload(payload);
+      if (share) {
+        const built = localChallengeFromShare(share, code);
+        hasLocalShare = built.ok;
+        if (built.ok && !serverBacked) this.hydrateFromShare(share, code);
+      }
+    }
+    let remote: Awaited<ReturnType<typeof playerApi.attemptChallenge>> | { ok: false } = { ok: false };
+    if (attempt.runId) {
+      try {
+        remote = await playerApi.attemptChallenge({
+          code,
+          runId: attempt.runId,
+        });
+      } catch {
+        remote = { ok: false };
+      }
+    }
+    const plan = planChallengeAttempt({ remote, hasLocalShare, serverBacked });
+    if (plan.action === "use-server" && remote.ok && remote.data.challenge) {
       const applied = remote.data;
-      this.rememberChallenge(applied.challenge);
+      this.rememberChallenge(markServerChallenge(applied.challenge));
       if (!applied.duplicate && applied.outcome !== "pending") {
         this.touchRival(applied.challenge.challengerId, applied.challenge.challengerName, applied.outcome);
       }
@@ -328,15 +358,33 @@ class ArcadeStore {
       this.emit();
       return { ok: true as const, challenge: applied.challenge, outcome: applied.outcome, duplicate: applied.duplicate };
     }
-    if (payload) {
-      const share = decodeChallengePayload(payload);
-      if (share) this.hydrateFromShare(share);
+    if (plan.action === "reject") {
+      if (plan.error === "challenge_closed" || plan.error === "expired") {
+        try {
+          const refreshed = await playerApi.getChallenge(code);
+          if (refreshed.ok) {
+            this.rememberChallenge(markServerChallenge(refreshed.data.challenge));
+            this.emit();
+            return { ok: false as const, error: plan.error, challenge: refreshed.data.challenge };
+          }
+        } catch {
+          /* keep the rejection */
+        }
+      }
+      return { ok: false as const, error: plan.error };
     }
+    if (plan.action === "unavailable") return { ok: false as const, error: plan.error };
     const idx = this.snap.challenges.findIndex((c) => c.publicCode === code);
-    if (idx < 0) return { ok: false as const, duplicate: false, outcome: "pending" as const };
+    if (idx < 0) return { ok: false as const, error: "not_found" };
     const current = this.snap.challenges[idx];
-    const applied = applyChallengeAttempt(current, { ...attempt, challengeId: current.id });
-    this.snap.challenges[idx] = applied.challenge;
+    if (isServerBackedChallenge(current)) return { ok: false as const, error: "server_unavailable" };
+    if (current.status !== "open" || current.expiresAt <= Date.now()) {
+      if (current.expiresAt <= Date.now()) current.status = "expired";
+      this.emit();
+      return { ok: false as const, error: current.status === "expired" ? "expired" : "challenge_closed" };
+    }
+    const applied = applyChallengeAttempt(current, { ...attempt, challengeId: current.id, trust: "unverified" });
+    this.snap.challenges[idx] = markLocalChallenge(applied.challenge);
     if (!applied.duplicate && applied.outcome !== "pending") {
       this.pushInbox({
         type: "challenge",
@@ -396,7 +444,7 @@ class ArcadeStore {
     const party: PartyState = {
       code: makePublicCode(),
       host: hostId,
-      members: [{ id: hostId, name: hostName, ready: true, score: 0 }],
+      members: [{ id: hostId, name: hostName, ready: true, points: 0, lastRoundScore: null }],
       playlist: QUICK_PARTY_PLAYLIST.map((r) => ({ ...r })),
       round: 0,
       state: "lobby",
@@ -423,7 +471,7 @@ class ArcadeStore {
     if (!party) return { ok: false as const, error: "not_found" as const };
     if (party.members.some((m) => m.id === id)) return { ok: true as const, duplicate: true, party };
     if (party.members.length >= 6) return { ok: false as const, error: "full" as const };
-    party.members.push({ id, name, ready: false, score: 0 });
+    party.members.push({ id, name, ready: false, points: 0, lastRoundScore: null });
     analytics.track("party_joined", { code, persistence: "local" });
     this.emit();
     return { ok: true as const, duplicate: false, party };
@@ -452,27 +500,37 @@ class ArcadeStore {
     return party ?? null;
   }
 
-  async scorePartyRound(code: string, rows: Array<{ id: string; name: string; score: number }>, gameId: string) {
-    const remote = await playerApi.scoreParty(code, gameId, rows);
+  async startParty(code: string) {
+    const remote = await playerApi.startParty(code);
+    if (remote.ok) {
+      const party = cacheParty(remote.data.party);
+      this.rememberParty(party);
+      this.emit();
+      return party;
+    }
+    return this.snap.parties.find((p) => p.code === code) ?? null;
+  }
+
+  async advanceParty(code: string) {
+    const remote = await playerApi.advanceParty(code);
+    if (remote.ok) {
+      const party = cacheParty(remote.data.party);
+      this.rememberParty(party);
+      this.emit();
+      return party;
+    }
+    return this.snap.parties.find((p) => p.code === code) ?? null;
+  }
+
+  async submitPartyRound(code: string, runId: string) {
+    const remote = await playerApi.submitPartyRound(code, runId);
     if (remote.ok && remote.data.party) {
       const party = cacheParty(remote.data.party);
       this.rememberParty(party);
       this.emit();
       return party;
     }
-    const party = this.snap.parties.find((p) => p.code === code);
-    if (!party) return null;
-    const ranked = rankScores(rows, lowerIsBetter(gameId));
-    for (const r of ranked) {
-      const m = party.standings.find((s) => s.id === r.id);
-      if (m) m.points += r.points;
-      else party.standings.push({ id: r.id, name: r.name, points: r.points });
-    }
-    party.round += 1;
-    party.state = party.round >= party.playlist.length ? "done" : "results";
-    analytics.track("party_round_finished", { code, round: party.round, persistence: "local" });
-    this.emit();
-    return party;
+    return this.snap.parties.find((p) => p.code === code) ?? null;
   }
 
   dailyProgress(day: string, eventKey: string, normalized: number) {
@@ -529,6 +587,7 @@ class ArcadeStore {
   }
 }
 
+export { ArcadeStore };
 export const arcadeStore = new ArcadeStore();
 export type { ArcadeSnap };
 export const SSR_ARCADE: ArcadeSnap = empty();

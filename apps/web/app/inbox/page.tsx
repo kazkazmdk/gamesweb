@@ -39,7 +39,7 @@ export default function InboxPage() {
             slug="knockout-circuit"
             kicker="Quiet"
             title="Nothing waiting"
-            body="Challenges, crew notes, and party codes land here when someone actually sends one."
+            body="Challenge results land here for this account. Guests keep inbox on the guest cookie for this backend — sign in to keep it across devices."
             action={<ChamferButton href="/friends">Find a rival</ChamferButton>}
           />
         </div>

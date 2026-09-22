@@ -3,12 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { appUrl, supabasePublishableKey, supabaseUrl } from "@/lib/env";
 import { slog } from "@/lib/api/log";
-
-function safePath(raw: string | null): string {
-  if (!raw) return "/";
-  if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\") || raw.includes("://")) return "/";
-  return raw;
-}
+import { safePath } from "@/lib/auth/safe-path";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

@@ -87,6 +87,18 @@ export const playerApi = {
   async updateProfile(patch: { displayName?: string; shareActivity?: boolean; sharePresence?: boolean; sharePublicActivity?: boolean; username?: string; avatar?: string }) {
     return parse(await fetch("/api/player/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }));
   },
+  async logout() {
+    return parse<{ ok: true }>(await fetch("/api/player/logout", { method: "POST" }));
+  },
+  async deleteAccount() {
+    return parse<{ ok: true }>(
+      await fetch("/api/player/me", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: "DELETE" }),
+      }),
+    );
+  },
   async merge(input: {
     offlineRuns?: Array<{
       gameId: string;
@@ -145,21 +157,31 @@ export const playerApi = {
     );
   },
   async createParty(hostName: string) {
-    return parse<{ party: import("@/lib/social/arcade-store").PartyState; persistence: string }>(
+    return parse<{ party: import("@/lib/social/arcade-store").PartyState; persistence: string; you: string }>(
       await fetch("/api/parties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", hostName }) }),
     );
   },
   async joinParty(code: string, name: string) {
-    return parse<{ party: import("@/lib/social/arcade-store").PartyState; persistence: string }>(
+    return parse<{ party: import("@/lib/social/arcade-store").PartyState; persistence: string; you: string }>(
       await fetch("/api/parties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "join", code, name }) }),
     );
   },
   async getParty(code: string) {
-    return parse<{ party: import("@/lib/social/arcade-store").PartyState; persistence: string }>(await fetch(`/api/parties?code=${encodeURIComponent(code)}`));
+    return parse<{ party: import("@/lib/social/arcade-store").PartyState; persistence: string; you: string }>(await fetch(`/api/parties?code=${encodeURIComponent(code)}`));
   },
-  async scoreParty(code: string, gameId: string, rows: Array<{ id: string; name: string; score: number }>) {
+  async startParty(code: string) {
+    return parse<{ party: import("@/lib/social/arcade-store").PartyState; persistence: string }>(
+      await fetch("/api/parties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "start", code }) }),
+    );
+  },
+  async advanceParty(code: string) {
+    return parse<{ party: import("@/lib/social/arcade-store").PartyState; persistence: string }>(
+      await fetch("/api/parties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "advance", code }) }),
+    );
+  },
+  async submitPartyRound(code: string, runId: string) {
     return parse<{ party: import("@/lib/social/arcade-store").PartyState }>(
-      await fetch("/api/parties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "score", code, gameId, rows }) }),
+      await fetch("/api/parties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "submit-round", code, runId }) }),
     );
   },
   async readyParty(code: string, ready: boolean) {
@@ -167,15 +189,18 @@ export const playerApi = {
       await fetch("/api/parties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "ready", code, ready }) }),
     );
   },
+  async rivals() {
+    return parse<{ rows: import("@/lib/social/arcade-store").RivalRow[] }>(await fetch("/api/rivals"));
+  },
   async createChallenge(input: Record<string, unknown>) {
     return parse<{ challenge: import("@gamesweb/game-sdk").ChallengeRecord; url: string; persistence: string }>(
       await fetch("/api/challenges", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", ...input }) }),
     );
   },
-  async getChallenge(code: string, payload?: string | null) {
-    const q = new URLSearchParams({ code });
-    if (payload) q.set("p", payload);
-    return parse<{ challenge: import("@gamesweb/game-sdk").ChallengeRecord; persistence: string }>(await fetch(`/api/challenges?${q}`));
+  async getChallenge(code: string) {
+    return parse<{ challenge: import("@gamesweb/game-sdk").ChallengeRecord; persistence: string }>(
+      await fetch(`/api/challenges?code=${encodeURIComponent(code)}`),
+    );
   },
   async attemptChallenge(input: Record<string, unknown>) {
     return parse<{

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { shot, stabilizeVisual } from "./visual-helpers";
+import { settleVisual, shot, stabilizeVisual, stepCarousel } from "./visual-helpers";
 
 test.describe("visual regression", () => {
   test("Games Home Neon 1440", async ({ page }) => {
@@ -16,7 +16,7 @@ test.describe("visual regression", () => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1, name: "Neon Drift" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Play|Continue/ }).first()).toBeVisible();
-    await page.keyboard.press("ArrowRight");
+    await stepCarousel(page);
     await expect(page.getByRole("heading", { level: 1, name: "Velocity Run" })).toBeVisible();
     await page.screenshot({ path: "test-results/visual-home-velocity-1440.png", fullPage: false });
     await expect(page).toHaveScreenshot("home-velocity-1440.png", shot);
@@ -27,10 +27,11 @@ test.describe("visual regression", () => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1, name: "Neon Drift" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Play|Continue/ }).first()).toBeVisible();
-    await page.keyboard.press("ArrowRight");
+    await stepCarousel(page);
     await expect(page.getByRole("heading", { level: 1, name: "Velocity Run" })).toBeVisible();
-    await page.keyboard.press("ArrowRight");
+    await stepCarousel(page);
     await expect(page.getByRole("heading", { level: 1, name: "Swarm Protocol" })).toBeVisible();
+    await settleVisual(page);
     await page.screenshot({ path: "test-results/visual-home-swarm-1440.png", fullPage: false });
     await expect(page).toHaveScreenshot("home-swarm-1440.png", shot);
   });
@@ -55,8 +56,10 @@ test.describe("visual regression", () => {
     await stabilizeVisual(page, { width: 1440, height: 900 });
     await page.goto("/");
     await page.getByRole("heading", { level: 1, name: "Neon Drift" }).waitFor();
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await expect(page.getByText("Today")).toBeVisible();
+    const today = page.getByRole("region", { name: "Today in the arcade" });
+    await today.evaluate((el) => el.scrollIntoView({ block: "start" }));
+    await expect(today).toBeVisible();
+    await settleVisual(page);
     await page.screenshot({ path: "test-results/visual-home-neon-activities-1440.png", fullPage: false });
     await expect(page).toHaveScreenshot("home-neon-activities-1440.png", shot);
   });

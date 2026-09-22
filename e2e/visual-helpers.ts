@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 const GUEST = {
   id: "visual-guest-0001",
@@ -42,6 +42,7 @@ const GUEST = {
   backend: "local",
   pendingInvite: null,
   syncStatus: "idle",
+  lastScoreId: null,
 };
 
 const POPULATED = {
@@ -118,6 +119,38 @@ export async function stabilizeVisual(
     { player: size.populated ? POPULATED : GUEST },
   );
   await page.clock.setFixedTime(new Date("2026-09-15T12:00:00Z"));
+}
+
+export async function stepCarousel(page: Page) {
+  const before = ((await page.locator("h1").first().textContent()) ?? "").trim();
+  for (let i = 0; i < 5; i += 1) {
+    await page.keyboard.press("ArrowRight");
+    try {
+      await expect
+        .poll(async () => ((await page.locator("h1").first().textContent()) ?? "").trim(), { timeout: 2_000 })
+        .not.toBe(before);
+      return;
+    } catch {
+      /* Home listens for arrows only after hydration. An early press is ignored. */
+    }
+  }
+  throw new Error(`carousel stayed on ${before}`);
+}
+
+export async function settleVisual(page: Page) {
+  await page.evaluate(async () => {
+    const pending = [...document.images].filter((img) => !img.complete);
+    await Promise.all(
+      pending.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            img.addEventListener("load", () => resolve(), { once: true });
+            img.addEventListener("error", () => resolve(), { once: true });
+          }),
+      ),
+    );
+    if (document.fonts?.ready) await document.fonts.ready;
+  });
 }
 
 export const shot = {

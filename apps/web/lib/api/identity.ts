@@ -3,6 +3,16 @@ import { createSupabaseServer } from "@/lib/supabase/server";
 
 export const GUEST_COOKIE = "gw_guest";
 
+export function guestCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.VERCEL_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 400,
+  };
+}
+
 export type Identity = {
   userId: string | null;
   anonymousId: string;
@@ -15,13 +25,7 @@ export async function getIdentity(): Promise<Identity> {
   if (!anonymousId || anonymousId.length < 8) {
     anonymousId = crypto.randomUUID();
     try {
-      jar.set(GUEST_COOKIE, anonymousId, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.VERCEL_ENV === "production",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 400,
-      });
+      jar.set(GUEST_COOKIE, anonymousId, guestCookieOptions());
     } catch {
       // Server Components cannot always set cookies.
     }
@@ -37,6 +41,15 @@ export async function getIdentity(): Promise<Identity> {
   return { userId: null, anonymousId, email: null };
 }
 
+export async function rotateGuestIdentity(): Promise<string> {
+  const jar = await cookies();
+  const anonymousId = crypto.randomUUID();
+  jar.set(GUEST_COOKIE, anonymousId, guestCookieOptions());
+  return anonymousId;
+}
+
 export function identityKey(id: Identity): string {
   return id.userId ?? `anon:${id.anonymousId}`;
 }
+
+export { actorId } from "@/lib/api/actor";
