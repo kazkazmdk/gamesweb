@@ -209,3 +209,22 @@ test("a finished challenge stays closed for a third player", async ({ browser })
   await b.close();
   await a.close();
 });
+
+test("a host cannot take their own server challenge", async ({ request }) => {
+  const runA = await verifiedRun(request, "sky-stack", "climb", 1100);
+  const created = await request.post("/api/challenges", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { action: "create", runId: runA },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const code = ((await created.json()) as { challenge: { publicCode: string; status: string } }).challenge.publicCode;
+  const other = await verifiedRun(request, "sky-stack", "climb", 1800);
+  const self = await request.post("/api/challenges", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { action: "attempt", code, runId: other },
+  });
+  expect(self.status()).toBe(403);
+  expect(((await self.json()) as { error: { message: string } }).error.message).toBe("self_challenge");
+  const stored = await request.get(`/api/challenges?code=${code}`);
+  expect(((await stored.json()) as { challenge: { status: string; attempts: unknown[] } }).challenge.status).toBe("open");
+});

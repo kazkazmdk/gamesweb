@@ -56,3 +56,38 @@ test("browser cannot declare verified trust or steal another run", async ({ brow
   await b.close();
   await a.close();
 });
+
+function untrustedShare(share: Record<string, unknown>) {
+  const json = JSON.stringify(share);
+  const bytes = new TextEncoder().encode(json);
+  let bin = "";
+  for (const byte of bytes) bin += String.fromCharCode(byte);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+test("an unsigned share payload does not create a server challenge", async ({ request, page }) => {
+  const token = untrustedShare({
+    publicCode: "FAKE1",
+    gameId: "sky-stack",
+    mode: "climb",
+    seed: "forged",
+    type: "beat-score",
+    challengerName: "Attacker",
+    challengerScore: 999999,
+    gameVersion: "1.0.0",
+    trust: "verified",
+    expiresAt: Date.now() + 86_400_000,
+    challengerId: "attacker",
+  });
+  const withPayload = await request.get(`/api/challenges?code=FAKE1&p=${encodeURIComponent(token)}`);
+  expect(withPayload.status()).toBe(404);
+  const again = await request.get("/api/challenges?code=FAKE1");
+  expect(again.status()).toBe(404);
+
+  await page.goto(`/c/FAKE1?p=${encodeURIComponent(token)}`);
+  await expect(page.getByTestId("challenge-magic")).toBeVisible();
+  await expect(page.getByText("Attacker challenged you")).toBeVisible();
+  await expect(page.getByText(/local share/)).toBeVisible();
+  const afterView = await request.get("/api/challenges?code=FAKE1");
+  expect(afterView.status()).toBe(404);
+});

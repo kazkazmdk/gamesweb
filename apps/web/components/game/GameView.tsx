@@ -550,6 +550,7 @@ function Results({
         runId: player.lastScoreId,
       })
       .then((made) => {
+        if (!made.ok) return;
         void navigator.clipboard.writeText(`${window.location.origin}${made.url}`);
         setCopied(true);
         analytics.track("challenge_shared", { gameId, code: made.challenge.publicCode });

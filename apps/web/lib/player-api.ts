@@ -185,10 +185,10 @@ export const playerApi = {
       await fetch("/api/challenges", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", ...input }) }),
     );
   },
-  async getChallenge(code: string, payload?: string | null) {
-    const q = new URLSearchParams({ code });
-    if (payload) q.set("p", payload);
-    return parse<{ challenge: import("@gamesweb/game-sdk").ChallengeRecord; persistence: string }>(await fetch(`/api/challenges?${q}`));
+  async getChallenge(code: string) {
+    return parse<{ challenge: import("@gamesweb/game-sdk").ChallengeRecord; persistence: string }>(
+      await fetch(`/api/challenges?code=${encodeURIComponent(code)}`),
+    );
   },
   async attemptChallenge(input: Record<string, unknown>) {
     return parse<{

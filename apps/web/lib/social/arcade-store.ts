@@ -17,6 +17,14 @@ import {
   type NextAction,
 } from "@gamesweb/game-sdk";
 import { playerApi } from "@/lib/player-api";
+import {
+  isServerBackedChallenge,
+  localChallengeFromShare,
+  markLocalChallenge,
+  markServerChallenge,
+  planChallengeAttempt,
+  planChallengeCreate,
+} from "@/lib/social/challenge-integrity";
 
 export type InboxItem = {
   id: string;
@@ -191,23 +199,33 @@ class ArcadeStore {
     trust?: ChallengeRecord["trust"];
     gameVersion?: string;
     runId?: string | null;
-  }): Promise<{ challenge: ChallengeRecord; url: string; persistence: "server" | "local" }> {
-    const remote = input.runId
-      ? await playerApi.createChallenge({
+  }): Promise<
+    | { ok: true; challenge: ChallengeRecord; url: string; persistence: "server" | "local" }
+    | { ok: false; error: string }
+  > {
+    let remote: Awaited<ReturnType<typeof playerApi.createChallenge>> | { ok: false } = { ok: false };
+    if (input.runId) {
+      try {
+        remote = await playerApi.createChallenge({
           action: "create",
           runId: input.runId,
           challengeType: input.type,
-        })
-      : { ok: false as const };
-    if (remote.ok && remote.data.challenge) {
-      const challenge = remote.data.challenge;
+        });
+      } catch {
+        remote = { ok: false };
+      }
+    }
+    const plan = planChallengeCreate(remote);
+    if (plan.action === "use-server" && remote.ok && remote.data.challenge) {
+      const challenge = markServerChallenge(remote.data.challenge);
       this.rememberChallenge(challenge);
       analytics.track("challenge_created", { gameId: input.gameId, code: challenge.publicCode, persistence: "server" });
       this.emit();
-      return { challenge, url: remote.data.url, persistence: "server" };
+      return { ok: true, challenge, url: remote.data.url, persistence: "server" };
     }
+    if (plan.action === "reject") return { ok: false, error: plan.error };
     const local = this.createChallengeLocal(input);
-    return { ...local, persistence: "local" };
+    return { ok: true, ...local, persistence: "local" };
   }
 
   private createChallengeLocal(input: {
@@ -240,14 +258,14 @@ class ArcadeStore {
       status: "open",
       createdAt: Date.now(),
       expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-      metadata: {},
+      metadata: { source: "local-share", persistence: "local" },
       winnerId: null,
       targetScore: null,
       trust: "unverified",
       gameVersion: input.gameVersion ?? getManifest(input.gameId)?.version ?? "1.0.0",
       attempts: [],
     };
-    this.rememberChallenge(challenge);
+    this.rememberChallenge(markLocalChallenge(challenge));
     const share: ChallengeShare = {
       publicCode,
       gameId: challenge.gameId,
@@ -267,71 +285,72 @@ class ArcadeStore {
     return { challenge, url };
   }
 
-  fromShare(share: ChallengeShare): ChallengeRecord {
-    return {
-      id: uid(),
-      publicCode: share.publicCode,
-      gameId: share.gameId,
-      mode: share.mode,
-      seed: share.seed,
-      type: share.type,
-      challengerId: share.challengerId,
-      challengerName: share.challengerName,
-      targetId: null,
-      targetName: null,
-      challengerRunId: null,
-      challengerScore: share.challengerScore,
-      challengerGhostId: null,
-      challengerMeta: {},
-      status: "open",
-      createdAt: Date.now(),
-      expiresAt: share.expiresAt,
-      metadata: {},
-      winnerId: null,
-      targetScore: null,
-      trust: "unverified",
-      gameVersion: share.gameVersion,
-      attempts: [],
-    };
+  fromShare(share: ChallengeShare, code = share.publicCode): ChallengeRecord | null {
+    const built = localChallengeFromShare(share, code);
+    return built.ok ? built.challenge : null;
   }
 
-  hydrateFromShare(share: ChallengeShare) {
-    if (this.snap.challenges.some((c) => c.publicCode === share.publicCode)) return;
-    this.rememberChallenge(this.fromShare(share));
+  hydrateFromShare(share: ChallengeShare, code = share.publicCode) {
+    const existing = this.snap.challenges.find((c) => c.publicCode === code.toUpperCase());
+    if (existing && isServerBackedChallenge(existing)) return existing;
+    const built = localChallengeFromShare(share, code);
+    if (!built.ok) return null;
+    if (!existing) this.rememberChallenge(built.challenge);
     this.emit();
+    return existing ?? built.challenge;
   }
 
   getChallenge(code: string, payload?: string | null): ChallengeRecord | ChallengeShare | null {
     const local = this.snap.challenges.find((c) => c.publicCode === code);
     if (local) return local;
-    if (payload) {
-      const share = decodeChallengePayload(payload);
-      if (share) this.hydrateFromShare(share);
-      return this.snap.challenges.find((c) => c.publicCode === code) ?? share;
-    }
-    return null;
+    if (!payload) return null;
+    const share = decodeChallengePayload(payload);
+    if (!share) return null;
+    return this.hydrateFromShare(share, code);
   }
 
   async fetchChallenge(code: string, payload?: string | null): Promise<ChallengeRecord | ChallengeShare | null> {
-    const remote = await playerApi.getChallenge(code, payload);
-    if (remote.ok) {
-      this.rememberChallenge(remote.data.challenge);
-      this.emit();
-      return remote.data.challenge;
+    try {
+      const remote = await playerApi.getChallenge(code);
+      if (remote.ok) {
+        const challenge = markServerChallenge(remote.data.challenge);
+        this.rememberChallenge(challenge);
+        this.emit();
+        return challenge;
+      }
+    } catch {
+      /* network: keep a local share if we have one */
     }
     return this.getChallenge(code, payload);
   }
 
   async completeChallenge(code: string, attempt: Omit<ChallengeAttempt, "challengeId">, payload?: string | null) {
-    const remote = attempt.runId
-      ? await playerApi.attemptChallenge({
+    const cached = this.snap.challenges.find((c) => c.publicCode === code);
+    const serverBacked = isServerBackedChallenge(cached);
+    let hasLocalShare = Boolean(cached && !serverBacked);
+    if (payload) {
+      const share = decodeChallengePayload(payload);
+      if (share) {
+        const built = localChallengeFromShare(share, code);
+        hasLocalShare = built.ok;
+        if (built.ok && !serverBacked) this.hydrateFromShare(share, code);
+      }
+    }
+    let remote: Awaited<ReturnType<typeof playerApi.attemptChallenge>> | { ok: false } = { ok: false };
+    if (attempt.runId) {
+      try {
+        remote = await playerApi.attemptChallenge({
           code,
           runId: attempt.runId,
-        })
-      : { ok: false as const };
-    if (remote.ok && remote.data.challenge) {
+        });
+      } catch {
+        remote = { ok: false };
+      }
+    }
+    const plan = planChallengeAttempt({ remote, hasLocalShare, serverBacked });
+    if (plan.action === "use-server" && remote.ok && remote.data.challenge) {
       const applied = remote.data;
-      this.rememberChallenge(applied.challenge);
+      this.rememberChallenge(markServerChallenge(applied.challenge));
       if (!applied.duplicate && applied.outcome !== "pending") {
         this.touchRival(applied.challenge.challengerId, applied.challenge.challengerName, applied.outcome);
       }
@@ -339,15 +358,33 @@ class ArcadeStore {
       this.emit();
       return { ok: true as const, challenge: applied.challenge, outcome: applied.outcome, duplicate: applied.duplicate };
     }
-    if (payload) {
-      const share = decodeChallengePayload(payload);
-      if (share) this.hydrateFromShare(share);
+    if (plan.action === "reject") {
+      if (plan.error === "challenge_closed" || plan.error === "expired") {
+        try {
+          const refreshed = await playerApi.getChallenge(code);
+          if (refreshed.ok) {
+            this.rememberChallenge(markServerChallenge(refreshed.data.challenge));
+            this.emit();
+            return { ok: false as const, error: plan.error, challenge: refreshed.data.challenge };
+          }
+        } catch {
+          /* keep the rejection */
+        }
+      }
+      return { ok: false as const, error: plan.error };
     }
+    if (plan.action === "unavailable") return { ok: false as const, error: plan.error };
     const idx = this.snap.challenges.findIndex((c) => c.publicCode === code);
-    if (idx < 0) return { ok: false as const, duplicate: false, outcome: "pending" as const };
+    if (idx < 0) return { ok: false as const, error: "not_found" };
     const current = this.snap.challenges[idx];
-    const applied = applyChallengeAttempt(current, { ...attempt, challengeId: current.id });
-    this.snap.challenges[idx] = applied.challenge;
+    if (isServerBackedChallenge(current)) return { ok: false as const, error: "server_unavailable" };
+    if (current.status !== "open" || current.expiresAt <= Date.now()) {
+      if (current.expiresAt <= Date.now()) current.status = "expired";
+      this.emit();
+      return { ok: false as const, error: current.status === "expired" ? "expired" : "challenge_closed" };
+    }
+    const applied = applyChallengeAttempt(current, { ...attempt, challengeId: current.id, trust: "unverified" });
+    this.snap.challenges[idx] = markLocalChallenge(applied.challenge);
     if (!applied.duplicate && applied.outcome !== "pending") {
       this.pushInbox({
         type: "challenge",
@@ -550,6 +587,7 @@ class ArcadeStore {
   }
 }
 
+export { ArcadeStore };
 export const arcadeStore = new ArcadeStore();
 export type { ArcadeSnap };
 export const SSR_ARCADE: ArcadeSnap = empty();

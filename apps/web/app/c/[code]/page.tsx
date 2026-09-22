@@ -19,7 +19,7 @@ export default function ChallengeMagicPage() {
     analytics.track("challenge_opened", { code });
     if (payload) {
       const share = decodeChallengePayload(payload);
-      if (share) arcadeStore.hydrateFromShare(share);
+      if (share) arcadeStore.hydrateFromShare(share, code);
     }
     const cached = arcadeStore.getChallenge(code, payload);
     if (cached) setChallenge(cached);
@@ -55,6 +55,7 @@ export default function ChallengeMagicPage() {
 
   const game = getManifest(challenge.gameId);
   const href = `/play/${challenge.gameId}?c=${code}&seed=${encodeURIComponent(challenge.seed)}&mode=${challenge.mode}${payload ? `&p=${payload}` : ""}`;
+  const localShare = "metadata" in challenge && challenge.metadata?.persistence === "local";
 
   return (
     <div className="grid min-h-dvh place-items-center px-6" data-testid="challenge-magic">
@@ -64,7 +65,8 @@ export default function ChallengeMagicPage() {
         <p className="mt-4 text-[18px] text-white/80">{game?.title ?? challenge.gameId}</p>
         <p className="display mt-2 text-5xl">{formatScore(challenge.gameId, challenge.challengerScore)}</p>
         <p className="mt-2 text-[13px] text-white/45">
-          Same seed · {challenge.trust} · guests can play
+          Same seed · {challenge.trust}
+          {localShare ? " · local share" : " · guests can play"}
         </p>
         {"status" in challenge && (challenge.status === "completed" || challenge.status === "expired") ? (
           <p className="mt-8 text-[15px] text-white/80" data-testid="challenge-closed">

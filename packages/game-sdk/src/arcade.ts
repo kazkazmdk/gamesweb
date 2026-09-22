@@ -80,6 +80,7 @@ export type ChallengeShare = Pick<
   | "expiresAt"
 > & { challengerId: string };
 
+/** Untrusted local share: JSON as base64url. Not a signature. */
 export function encodeChallengePayload(share: ChallengeShare): string {
   const json = JSON.stringify(share);
   const bytes = new TextEncoder().encode(json);
