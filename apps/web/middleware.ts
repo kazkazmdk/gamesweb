@@ -19,12 +19,13 @@ function csp(n: string, dev: boolean) {
     "https://*.supabase.co",
     "wss://*.supabase.co",
     "https://*.posthog.com",
+    "https://challenges.cloudflare.com",
   ]
     .filter(Boolean)
     .join(" ");
   const script = dev
-    ? `'self' 'nonce-${n}' 'strict-dynamic' 'unsafe-eval' 'unsafe-inline'`
-    : `'self' 'nonce-${n}' 'strict-dynamic' 'unsafe-inline'`;
+    ? `'self' 'nonce-${n}' 'strict-dynamic' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com`
+    : `'self' 'nonce-${n}' 'strict-dynamic' 'unsafe-inline' https://challenges.cloudflare.com`;
   // unsafe-inline stays as a CSP3 fallback. Removing it broke Next hydration + Phaser boot in Playwright.
   return [
     `default-src 'self'`,
@@ -33,9 +34,10 @@ function csp(n: string, dev: boolean) {
     `img-src 'self' data: blob:`,
     `font-src 'self' data:`,
     `connect-src ${connect}`,
+    `frame-src 'self' https://challenges.cloudflare.com`,
     `media-src 'self' blob:`,
     `worker-src 'self' blob:`,
-    `child-src 'self' blob:`,
+    `child-src 'self' blob: https://challenges.cloudflare.com`,
     `frame-ancestors 'self'`,
     `base-uri 'self'`,
     `form-action 'self'`,

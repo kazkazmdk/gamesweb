@@ -13,6 +13,7 @@ import { actorId } from "@/lib/api/actor";
 import type { Identity } from "@/lib/api/identity";
 import { competitiveTrust, loadCompetitiveRun } from "@/lib/backend/competitive-run";
 import { resolveChallengeType, rivalsFromChallenges, validateCompetitiveRunTarget } from "@/lib/backend/competitive-contract";
+import { defaultAccountUsername, defaultAccountUsernameFallback } from "@/lib/backend/default-username";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { commitSha, APP_VERSION } from "@/lib/version";
 import type { BackendStore, OfflineRun, PublicPlayerPayload, ScoreWriteResult, StoredInbox, StoredParty, StoredProfile, StoredRival, StoredSave, StoredScore, StoredSession, SubmitScoreInput } from "@/lib/backend/types";
@@ -195,19 +196,24 @@ export class SupabaseBackend implements BackendStore {
     const existing = await loadProfileRow(identity.userId);
     if (existing) return existing;
     const sb = admin();
-    const username = `player_${identity.userId.replace(/-/g, "").slice(0, 8)}`;
-    await sb.from("profiles").insert({
+    const row = {
       user_id: identity.userId,
       anonymous_id: identity.anonymousId,
-      username,
+      username: defaultAccountUsername(identity.userId),
       display_name: "Player",
       avatar: "orb-0",
       is_guest: false,
       share_activity: true,
       share_presence: true,
       share_public_activity: true,
-    });
-    return (await loadProfileRow(identity.userId))!;
+    };
+    const first = await sb.from("profiles").upsert(row, { onConflict: "user_id", ignoreDuplicates: true });
+    if (first.error?.code === "23505") {
+      await sb.from("profiles").upsert({ ...row, username: defaultAccountUsernameFallback(identity.userId) }, { onConflict: "user_id", ignoreDuplicates: true });
+    }
+    const created = await loadProfileRow(identity.userId);
+    if (!created) throw new Error("profile_create_failed");
+    return created;
   }
 
   async submitScore(input: SubmitScoreInput): Promise<ScoreWriteResult> {
@@ -745,6 +751,14 @@ export class SupabaseBackend implements BackendStore {
         achievements: [...new Set([...profile.achievements, ...extra])],
       },
     };
+  }
+
+  async deleteAccount(identity: Identity) {
+    if (!identity.userId) return { error: "auth_required" };
+    const sb = admin();
+    const { error } = await sb.rpc("delete_player_account", { p_user_id: identity.userId });
+    if (error) return { error: "delete_failed" };
+    return { ok: true as const };
   }
 
   async getIdempotency(scope: string, key: string) {

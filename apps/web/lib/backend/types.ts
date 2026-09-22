@@ -224,6 +224,7 @@ export type BackendStore = {
   getOrCreateProfile(identity: Identity): Promise<StoredProfile>;
   updateProfile(identity: Identity, patch: Partial<Pick<StoredProfile, "username" | "displayName" | "avatar" | "shareActivity" | "sharePresence" | "sharePublicActivity">>): Promise<StoredProfile | { error: string }>;
   mergeGuest(identity: Identity, input?: { offlineRuns?: OfflineRun[] }): Promise<{ ok: true; profile: StoredProfile; alreadyMerged: boolean } | { error: string }>;
+  deleteAccount(identity: Identity): Promise<{ ok: true } | { error: string }>;
   getIdempotency(scope: string, key: string): Promise<{ status: number; response: unknown } | null>;
   putIdempotency(scope: string, key: string, endpoint: string, status: number, response: unknown, identity: Identity): Promise<void>;
   accountProgress(userId: string): Promise<AccountProgress>;

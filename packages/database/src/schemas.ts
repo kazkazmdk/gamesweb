@@ -93,6 +93,12 @@ export const AuthMagicLinkSchema = z.object({
   captchaToken: z.string().max(2048).optional(),
 });
 
+export const AccountDeleteSchema = z
+  .object({
+    confirm: z.literal("DELETE"),
+  })
+  .strict();
+
 export const GameSaveSchema = z.object({
   gameId: z.enum(GAME_IDS),
   version: z.string().min(1).max(32),

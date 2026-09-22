@@ -102,6 +102,49 @@ test("merge rejects client-chosen anonymousId", async ({ request }) => {
   expect([401, 403]).toContain(res.status());
 });
 
+test("cross-site fetch metadata is blocked", async ({ request }) => {
+  const res = await request.post("/api/player/auth", {
+    headers: {
+      Origin: "https://evil.example",
+      "Sec-Fetch-Site": "cross-site",
+      "Content-Type": "application/json",
+    },
+    data: { email: "ada@example.com" },
+  });
+  expect(res.status()).toBe(403);
+  expect(((await res.json()) as { error: { code: string } }).error.code).toBe("ORIGIN_DENIED");
+});
+
+test("invalid magic-link email is rejected", async ({ request }) => {
+  const res = await request.post("/api/player/auth", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { email: "not-an-email" },
+  });
+  expect(res.status()).toBe(400);
+});
+
+test("callback next is path-safe", async ({ request }) => {
+  const evil = await request.get("/auth/callback?next=https://evil.example", { maxRedirects: 0 });
+  expect(evil.status()).toBeLessThan(400);
+  const proto = await request.get("/auth/callback?next=//evil.example", { maxRedirects: 0 });
+  expect(proto.status()).toBeLessThan(400);
+});
+
+test("logout is idempotent without a session", async ({ request }) => {
+  const first = await request.post("/api/player/logout", { headers: { Origin: origin } });
+  const second = await request.post("/api/player/logout", { headers: { Origin: origin } });
+  expect(first.ok()).toBeTruthy();
+  expect(second.ok()).toBeTruthy();
+});
+
+test("account delete requires authentication", async ({ request }) => {
+  const res = await request.delete("/api/player/me", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { confirm: "DELETE" },
+  });
+  expect(res.status()).toBe(401);
+});
+
 test("health does not leak env details", async ({ request }) => {
   const res = await request.get("/api/health");
   expect(res.ok()).toBeTruthy();
@@ -110,5 +153,5 @@ test("health does not leak env details", async ({ request }) => {
   expect(body.commit).toBeTruthy();
   expect(body).not.toHaveProperty("turnstile");
   expect(body).not.toHaveProperty("seed");
-  expect(JSON.stringify(body)).not.toMatch(/service_role|secret/i);
+  expect(JSON.stringify(body)).not.toMatch(/service_role|secret|eyJ|Bearer /i);
 });

@@ -27,6 +27,12 @@ export default function PrivacyPage() {
           provider if configured. Magic-link abuse protection may use Cloudflare Turnstile when enabled.
         </p>
         <p>
+          The guest cookie is a long-lived pseudonymous device id, not a login. You can sign out of an account without
+          wiping this device’s local play. Deleting an account removes the Auth user and personal profile data. Public
+          verified scores may remain as anonymous board rows. Email delivery and analytics providers process only what
+          those services need to send a sign-in link or record product events.
+        </p>
+        <p>
           See also <Link href="/about">About</Link> and <Link href="/terms">Terms</Link>.
         </p>
       </div>

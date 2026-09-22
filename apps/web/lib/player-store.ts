@@ -928,6 +928,29 @@ class PlayerStore {
     void this.hydrateRemote();
   }
 
+  async signOut() {
+    await playerApi.logout();
+    this.snapshot.authId = null;
+    this.snapshot.isGuest = true;
+    this.snapshot.friends = [];
+    this.snapshot.pendingSavePrompt = false;
+    analytics.reset();
+    analytics.identify(this.snapshot.id, { guest: true });
+    this.persist();
+    this.emit();
+  }
+
+  async deleteAccount() {
+    const result = await playerApi.deleteAccount();
+    if (!result.ok) throw new Error(result.error.message);
+    this.snapshot = emptyPlayer();
+    this.queue = [];
+    analytics.reset();
+    analytics.identify(this.snapshot.id, { guest: true });
+    this.persist();
+    this.emit();
+  }
+
   async mergeAccount(authId: string, username: string) {
     this.snapshot = {
       ...this.snapshot,

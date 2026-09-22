@@ -886,6 +886,38 @@ async function main() {
       ),
     );
 
+    const USER_DEL = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    await client.query(
+      `insert into public.profiles (user_id, username, display_name, avatar, is_guest)
+       values ($1, 'player_del', 'Delete Me', 'orb-0', false)`,
+      [USER_DEL],
+    );
+    await client.query(
+      `insert into public.scores (game_id, mode, score, verified_status, user_id)
+       values ('neon-drift', 'circuit', 424242, 'verified', $1)`,
+      [USER_DEL],
+    );
+    checks.push(
+      await asRole(client, "anon", null, async () =>
+        expectDenied("anon cannot execute delete_player_account", () => client.query("select public.delete_player_account($1)", [USER_DEL])),
+      ),
+    );
+    checks.push(
+      await asRole(client, "authenticated", USER_DEL, async () =>
+        expectDenied("authenticated cannot execute delete_player_account", () =>
+          client.query("select public.delete_player_account($1)", [USER_DEL]),
+        ),
+      ),
+    );
+    await client.query("select public.delete_player_account($1)", [USER_DEL]);
+    const deletedProfile = await client.query("select 1 from public.profiles where user_id = $1", [USER_DEL]);
+    const anonymizedScore = await client.query("select user_id from public.scores where score = 424242");
+    checks.push({
+      name: "delete_player_account removes profile and anonymizes scores",
+      ok: deletedProfile.rowCount === 0 && anonymizedScore.rows[0]?.user_id == null,
+      detail: `profiles ${deletedProfile.rowCount} score_user ${String(anonymizedScore.rows[0]?.user_id)}`,
+    });
+
     const cols = await client.query(
       `select column_name from information_schema.columns
        where table_schema = 'public' and table_name = 'profiles'

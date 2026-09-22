@@ -71,13 +71,25 @@ function hasAnyBackendSecrets(): boolean {
   return Boolean(supabaseUrl() || supabasePublishableKey() || supabaseSecretKey() || hasUpstash());
 }
 
+export function allowsInProcessDemo(): boolean {
+  return read("GAMESWEB_BACKEND") === "memory" || read("GAMESWEB_DEMO_MODE") === "true";
+}
+
+export function turnstilePair(): { status: "off" | "on" | "invalid"; siteKey?: string } {
+  const siteKey = read("NEXT_PUBLIC_TURNSTILE_SITE_KEY");
+  const secret = read("TURNSTILE_SECRET_KEY");
+  if (!siteKey && !secret) return { status: "off" };
+  if (siteKey && secret) return { status: "on", siteKey };
+  return { status: "invalid" };
+}
+
 export function resolveBackend(): BackendKind {
   const forced = read("GAMESWEB_BACKEND");
   if (forced === "memory") return "memory";
   if (forced === "supabase") return hasSupabaseAdmin() ? "supabase" : "none";
   if (hasSupabaseAdmin()) return "supabase";
-  // Empty Vercel project (no Supabase/Upstash): playable in-process demo.
-  if (!hasAnyBackendSecrets()) return "memory";
+  if (allowsInProcessDemo()) return "memory";
+  if (!hasAnyBackendSecrets() && !isVercelProduction()) return "memory";
   if (isVercelProduction()) return "none";
   return "memory";
 }
@@ -94,11 +106,12 @@ export function publicEnvFlags() {
 }
 
 export function assertProductionSecrets(): string[] {
-  if (!isVercelProduction()) return [];
-  // Explicit demo, or a fresh Vercel project with no backend secrets yet.
-  if (read("GAMESWEB_BACKEND") === "memory") return [];
-  if (!hasAnyBackendSecrets()) return [];
   const missing: string[] = [];
+  if (turnstilePair().status === "invalid") {
+    missing.push("TURNSTILE_SECRET_KEY and NEXT_PUBLIC_TURNSTILE_SITE_KEY must be set together");
+  }
+  if (!isVercelProduction()) return missing;
+  if (allowsInProcessDemo()) return missing;
   if (!supabaseUrl()) missing.push("NEXT_PUBLIC_SUPABASE_URL");
   if (!supabasePublishableKey()) missing.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
   if (!supabaseSecretKey()) missing.push("SUPABASE_SECRET_KEY");

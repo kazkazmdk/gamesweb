@@ -87,6 +87,18 @@ export const playerApi = {
   async updateProfile(patch: { displayName?: string; shareActivity?: boolean; sharePresence?: boolean; sharePublicActivity?: boolean; username?: string; avatar?: string }) {
     return parse(await fetch("/api/player/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }));
   },
+  async logout() {
+    return parse<{ ok: true }>(await fetch("/api/player/logout", { method: "POST" }));
+  },
+  async deleteAccount() {
+    return parse<{ ok: true }>(
+      await fetch("/api/player/me", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: "DELETE" }),
+      }),
+    );
+  },
   async merge(input: {
     offlineRuns?: Array<{
       gameId: string;

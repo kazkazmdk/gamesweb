@@ -10,6 +10,7 @@ import {
 import { utcDayKey } from "@gamesweb/game-sdk";
 import { actorId } from "@/lib/api/actor";
 import type { Identity } from "@/lib/api/identity";
+import { defaultAccountUsername } from "@/lib/backend/default-username";
 import { competitiveTrust, loadCompetitiveRun } from "@/lib/backend/competitive-run";
 import {
   applyRoundPoints,
@@ -135,7 +136,7 @@ export class MemoryBackend implements BackendStore {
     const existing = this.profiles.get(key);
     if (existing) return existing;
     const username = identity.userId
-      ? `player_${identity.userId.replace(/-/g, "").slice(0, 8)}`
+      ? defaultAccountUsername(identity.userId)
       : `guest_${identity.anonymousId.replace(/-/g, "").slice(0, 6)}`;
     const row: StoredProfile = {
       userId: key,
@@ -692,6 +693,40 @@ export class MemoryBackend implements BackendStore {
     if (guestProfile) this.profiles.delete(guestKey);
     this.migrations.set(anonymousId, userId);
     return { ok: true as const, alreadyMerged: false, profile };
+  }
+
+  async deleteAccount(identity: Identity) {
+    if (!identity.userId) return { error: "auth_required" };
+    const userId = identity.userId;
+    const profile = this.profiles.get(userId);
+    if (profile) this.usernameIndex.delete(profile.username.toLowerCase());
+    this.profiles.delete(userId);
+    this.friends = this.friends.filter((f) => f.requesterId !== userId && f.addresseeId !== userId);
+    this.presence.delete(userId);
+    for (const [key, save] of this.saves) {
+      if (save.userId === userId) this.saves.delete(key);
+    }
+    for (const score of this.scores.values()) {
+      if (score.userId === userId) {
+        score.userId = null;
+        score.anonymousId = null;
+      }
+    }
+    for (const session of this.sessions.values()) {
+      if (session.userId === userId) {
+        session.userId = null;
+        session.anonymousId = null;
+      }
+    }
+    for (const [anon, uid] of this.migrations) {
+      if (uid === userId) this.migrations.delete(anon);
+    }
+    for (const [key, _value] of this.idempotency) {
+      if (key.includes(userId)) this.idempotency.delete(key);
+    }
+    this.inbox = this.inbox.filter((row) => row.userId !== userId);
+    this.rivals = this.rivals.filter((row) => row.selfId !== userId && row.otherId !== userId);
+    return { ok: true as const };
   }
 
   async getIdempotency(scope: string, key: string) {
