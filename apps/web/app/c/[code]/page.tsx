@@ -17,12 +17,16 @@ export default function ChallengeMagicPage() {
 
   useEffect(() => {
     analytics.track("challenge_opened", { code });
-    if (payload) {
-      const share = decodeChallengePayload(payload);
-      if (share) arcadeStore.hydrateFromShare(share, code);
+    try {
+      if (payload) {
+        const share = decodeChallengePayload(payload);
+        if (share) arcadeStore.hydrateFromShare(share, code);
+      }
+      const cached = arcadeStore.getChallenge(code, payload);
+      if (cached) setChallenge(cached);
+    } catch {
+      /* untrusted share */
     }
-    const cached = arcadeStore.getChallenge(code, payload);
-    if (cached) setChallenge(cached);
     void arcadeStore.fetchChallenge(code, payload).then((next) => {
       setChallenge(next);
     });

@@ -114,6 +114,10 @@ describe("untrusted local share", () => {
     expect(localChallengeFromShare(share({ gameId: "nope-game" }), "FAKE1")).toMatchObject({ ok: false, error: "game_mismatch" });
     expect(localChallengeFromShare(share({ type: "beat-time" }), "FAKE1")).toMatchObject({ ok: false, error: "type_mismatch" });
     expect(localChallengeFromShare(share({ mode: "not-a-mode" }), "FAKE1")).toMatchObject({ ok: false, error: "mode_mismatch" });
+    expect(localChallengeFromShare({} as Parameters<typeof localChallengeFromShare>[0], "7FQ2K")).toMatchObject({
+      ok: false,
+      error: "not_found",
+    });
   });
 });
 

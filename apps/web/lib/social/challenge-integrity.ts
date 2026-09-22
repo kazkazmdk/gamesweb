@@ -54,12 +54,17 @@ export function localChallengeFromShare(
   code: string,
   now = Date.now(),
 ): { ok: true; challenge: ChallengeRecord } | { ok: false; error: ChallengeBusinessError } {
-  if (share.publicCode.toUpperCase() !== code.toUpperCase()) return { ok: false, error: "not_found" };
+  if (typeof share.publicCode !== "string" || share.publicCode.toUpperCase() !== code.toUpperCase()) {
+    return { ok: false, error: "not_found" };
+  }
+  if (typeof share.gameId !== "string" || typeof share.mode !== "string" || typeof share.type !== "string") {
+    return { ok: false, error: "game_mismatch" };
+  }
   const game = getManifest(share.gameId);
   if (!game) return { ok: false, error: "game_mismatch" };
   if (!challengeCompatible(game, share.type)) return { ok: false, error: "type_mismatch" };
   if (!game.modes.includes(share.mode)) return { ok: false, error: "mode_mismatch" };
-  if (!Number.isFinite(share.expiresAt)) return { ok: false, error: "expired" };
+  if (typeof share.expiresAt !== "number" || !Number.isFinite(share.expiresAt)) return { ok: false, error: "expired" };
   const expired = share.expiresAt <= now;
   return {
     ok: true,
