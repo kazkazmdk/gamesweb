@@ -26,6 +26,7 @@ import type {
   StoredFriend,
   StoredInbox,
   StoredParty,
+  StoredPartyMember,
   StoredPresence,
   StoredProfile,
   StoredRival,
@@ -820,7 +821,22 @@ export class MemoryBackend implements BackendStore {
       this.scores = new Map(raw.scores ?? []);
       this.profiles = new Map(raw.profiles ?? []);
       this.friends = raw.friends ?? [];
-      this.parties = new Map(raw.parties ?? []);
+      this.parties = new Map(
+        (raw.parties ?? []).map(([code, party]) => {
+          party.members = party.members.map((member) => {
+            const legacy = member as StoredPartyMember & { score?: number };
+            return {
+              id: legacy.id,
+              name: legacy.name,
+              ready: Boolean(legacy.ready),
+              points: typeof legacy.points === "number" ? legacy.points : 0,
+              lastRoundScore: typeof legacy.lastRoundScore === "number" ? legacy.lastRoundScore : null,
+              joinedAt: legacy.joinedAt,
+            };
+          });
+          return [code, party] as [string, StoredParty];
+        }),
+      );
       this.challenges = new Map(raw.challenges ?? []);
       this.inbox = raw.inbox ?? [];
       this.rivals = raw.rivals ?? [];
@@ -843,7 +859,7 @@ export class MemoryBackend implements BackendStore {
       id: crypto.randomUUID(),
       code: makePublicCode(),
       host: id,
-      members: [{ id, name: hostName, ready: true, score: 0, joinedAt: Date.now() }],
+      members: [{ id, name: hostName, ready: true, points: 0, lastRoundScore: null, joinedAt: Date.now() }],
       playlist: QUICK_PARTY_PLAYLIST.map((r) => ({ ...r })),
       round: 0,
       state: "lobby",
@@ -864,57 +880,65 @@ export class MemoryBackend implements BackendStore {
   }
 
   async joinParty(identity: Identity, code: string, name: string) {
-    const party = this.parties.get(code.toUpperCase());
-    if (!party) return { ok: false as const, error: "not_found" as const };
-    const id = actorId(identity);
-    if (party.members.some((m) => m.id === id)) return { ok: true as const, duplicate: true, party: structuredClone(party) };
-    if (party.state !== "lobby") return { ok: false as const, error: "closed" as const };
-    if (party.members.length >= 6) return { ok: false as const, error: "full" as const };
-    party.members.push({ id, name, ready: false, score: 0, joinedAt: Date.now() });
-    this.persist();
-    return { ok: true as const, duplicate: false, party: structuredClone(party) };
+    return this.withLock(`party:${code.toUpperCase()}`, async () => {
+      const party = this.parties.get(code.toUpperCase());
+      if (!party) return { ok: false as const, error: "not_found" as const };
+      const id = actorId(identity);
+      if (party.members.some((m) => m.id === id)) return { ok: true as const, duplicate: true, party: structuredClone(party) };
+      if (party.state !== "lobby") return { ok: false as const, error: "closed" as const };
+      if (party.members.length >= 6) return { ok: false as const, error: "full" as const };
+      party.members.push({ id, name, ready: false, points: 0, lastRoundScore: null, joinedAt: Date.now() });
+      this.persist();
+      return { ok: true as const, duplicate: false, party: structuredClone(party) };
+    });
   }
 
   async setPartyReady(identity: Identity, code: string, ready: boolean) {
-    const party = this.parties.get(code.toUpperCase());
-    if (!party) return null;
-    const m = party.members.find((row) => row.id === actorId(identity));
-    if (!m) return null;
-    m.ready = ready;
-    this.persist();
-    return structuredClone(party);
+    return this.withLock(`party:${code.toUpperCase()}`, async () => {
+      const party = this.parties.get(code.toUpperCase());
+      if (!party) return null;
+      const m = party.members.find((row) => row.id === actorId(identity));
+      if (!m) return null;
+      m.ready = ready;
+      this.persist();
+      return structuredClone(party);
+    });
   }
 
   async startParty(identity: Identity, code: string) {
-    const party = this.parties.get(code.toUpperCase());
-    if (!party) return { error: "not_found" };
-    if (party.host !== actorId(identity)) return { error: "host_only" };
-    if (party.state !== "lobby" && party.state !== "results") return { error: "bad_state" };
-    const roster = party.members.filter((m) => m.ready);
-    if (!roster.length) return { error: "no_ready" };
-    party.roundRoster = roster.map((m) => m.id);
-    party.submitted = [];
-    party.state = "playing";
-    this.persist();
-    return structuredClone(party);
+    return this.withLock(`party:${code.toUpperCase()}`, async () => {
+      const party = this.parties.get(code.toUpperCase());
+      if (!party) return { error: "not_found" };
+      if (party.host !== actorId(identity)) return { error: "host_only" };
+      if (party.state !== "lobby") return { error: "bad_state" };
+      const roster = party.members.filter((m) => m.ready);
+      if (!roster.length) return { error: "no_ready" };
+      party.roundRoster = roster.map((m) => m.id);
+      party.submitted = [];
+      party.state = "playing";
+      this.persist();
+      return structuredClone(party);
+    });
   }
 
   async advanceParty(identity: Identity, code: string) {
-    const party = this.parties.get(code.toUpperCase());
-    if (!party) return { error: "not_found" };
-    if (party.host !== actorId(identity)) return { error: "host_only" };
-    if (party.state !== "results") return { error: "bad_state" };
-    party.round += 1;
-    if (party.round >= party.playlist.length) {
-      party.state = "done";
-    } else {
-      party.state = "playing";
-      party.submitted = [];
-      party.roundRoster = party.members.filter((m) => m.ready).map((m) => m.id);
-      if (!party.roundRoster.length) party.roundRoster = party.members.map((m) => m.id);
-    }
-    this.persist();
-    return structuredClone(party);
+    return this.withLock(`party:${code.toUpperCase()}`, async () => {
+      const party = this.parties.get(code.toUpperCase());
+      if (!party) return { error: "not_found" };
+      if (party.host !== actorId(identity)) return { error: "host_only" };
+      if (party.state !== "results") return { error: "bad_state" };
+      party.round += 1;
+      if (party.round >= party.playlist.length) {
+        party.state = "done";
+      } else {
+        party.state = "playing";
+        party.submitted = [];
+        party.roundRoster = party.members.filter((m) => m.ready).map((m) => m.id);
+        if (!party.roundRoster.length) party.roundRoster = party.members.map((m) => m.id);
+      }
+      this.persist();
+      return structuredClone(party);
+    });
   }
 
   async submitPartyRound(identity: Identity, code: string, runId: string) {
@@ -961,7 +985,11 @@ export class MemoryBackend implements BackendStore {
         party.standings = applyRoundPoints(party.standings, ranked);
         for (const row of ranked) {
           const member = party.members.find((m) => m.id === row.id);
-          if (member) member.score = row.score;
+          const standing = party.standings.find((s) => s.id === row.id);
+          if (member) {
+            member.points = standing?.points ?? member.points;
+            member.lastRoundScore = row.score;
+          }
         }
         party.state = "results";
       }
@@ -1026,49 +1054,54 @@ export class MemoryBackend implements BackendStore {
   }
 
   async attemptChallengeFromRun(identity: Identity, code: string, runId: string) {
-    const current = this.challenges.get(code.toUpperCase());
-    if (!current) return { ok: false as const, error: "not_found" };
-    if (current.expiresAt < Date.now()) {
-      current.status = "expired";
-      return { ok: false as const, error: "expired" };
-    }
-    const usedKey = `run:${runId}:challenge-attempt`;
-    if (this.usedRuns.has(usedKey)) return { ok: false as const, error: "run_reuse" };
-    const run = await loadCompetitiveRun(this, identity, runId);
-    if ("error" in run) return { ok: false as const, error: run.error };
-    const target = validateCompetitiveRunTarget(run, { gameId: current.gameId, mode: current.mode });
-    if (!target.ok) return { ok: false as const, error: target.error };
-    if (run.verificationStatus === "flagged") return { ok: false as const, error: "invalid_score" };
-    const profile = await this.getOrCreateProfile(identity);
-    const applied = applyChallengeAttempt(current, {
-      id: crypto.randomUUID(),
-      challengeId: current.id,
-      playerId: actorId(identity),
-      playerName: profile.displayName || "Player",
-      score: run.score,
-      runId: run.runId,
-      trust: competitiveTrust(run.verificationStatus),
-      createdAt: Date.now(),
-      metadata: { durationMs: run.durationMs },
+    return this.withLock(`challenge:${code.toUpperCase()}`, async () => {
+      const current = this.challenges.get(code.toUpperCase());
+      if (!current) return { ok: false as const, error: "not_found" };
+      if (current.status === "expired" || (current.status === "open" && current.expiresAt < Date.now())) {
+        current.status = "expired";
+        this.persist();
+        return { ok: false as const, error: "expired" };
+      }
+      if (current.status !== "open") return { ok: false as const, error: "challenge_closed" };
+      if (actorId(identity) === current.challengerId) return { ok: false as const, error: "self_challenge" };
+      const usedKey = `run:${runId}:challenge-attempt`;
+      if (this.usedRuns.has(usedKey)) return { ok: false as const, error: "run_reuse" };
+      const run = await loadCompetitiveRun(this, identity, runId);
+      if ("error" in run) return { ok: false as const, error: run.error };
+      const target = validateCompetitiveRunTarget(run, { gameId: current.gameId, mode: current.mode });
+      if (!target.ok) return { ok: false as const, error: target.error };
+      if (run.verificationStatus === "flagged") return { ok: false as const, error: "invalid_score" };
+      const profile = await this.getOrCreateProfile(identity);
+      const applied = applyChallengeAttempt(current, {
+        id: crypto.randomUUID(),
+        challengeId: current.id,
+        playerId: actorId(identity),
+        playerName: profile.displayName || "Player",
+        score: run.score,
+        runId: run.runId,
+        trust: competitiveTrust(run.verificationStatus),
+        createdAt: Date.now(),
+        metadata: { durationMs: run.durationMs },
+      });
+      this.challenges.set(code.toUpperCase(), applied.challenge);
+      this.usedRuns.add(usedKey);
+      if (!applied.duplicate && applied.outcome !== "pending") {
+        this.pushInbox(current.challengerId, {
+          type: "challenge",
+          title: applied.outcome === "win" ? `${profile.displayName || "Player"} beat your score` : applied.outcome === "draw" ? "Challenge draw" : `${profile.displayName || "Player"} tried your challenge`,
+          body: getManifest(current.gameId)?.title ?? current.gameId,
+          href: `/c/${code.toUpperCase()}`,
+        });
+        this.pushInbox(actorId(identity), {
+          type: "challenge",
+          title: applied.outcome === "win" ? "You won the challenge" : applied.outcome === "draw" ? "Draw" : `${current.challengerName} still leads`,
+          body: getManifest(current.gameId)?.title ?? current.gameId,
+          href: `/c/${code.toUpperCase()}`,
+        });
+      }
+      this.persist();
+      return { ok: true as const, ...applied };
     });
-    this.challenges.set(code.toUpperCase(), applied.challenge);
-    this.usedRuns.add(usedKey);
-    if (!applied.duplicate && applied.outcome !== "pending") {
-      this.pushInbox(current.challengerId, {
-        type: "challenge",
-        title: applied.outcome === "win" ? `${profile.displayName || "Player"} beat your score` : applied.outcome === "draw" ? "Challenge draw" : `${profile.displayName || "Player"} tried your challenge`,
-        body: getManifest(current.gameId)?.title ?? current.gameId,
-        href: `/c/${code.toUpperCase()}`,
-      });
-      this.pushInbox(actorId(identity), {
-        type: "challenge",
-        title: applied.outcome === "win" ? "You won the challenge" : applied.outcome === "draw" ? "Draw" : `${current.challengerName} still leads`,
-        body: getManifest(current.gameId)?.title ?? current.gameId,
-        href: `/c/${code.toUpperCase()}`,
-      });
-    }
-    this.persist();
-    return { ok: true as const, ...applied };
   }
 
   async listInbox(identity: Identity) {

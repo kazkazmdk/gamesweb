@@ -7,7 +7,7 @@ import { attemptChallengeFromRun, createChallengeFromRun, getChallenge, putChall
 import { decodeChallengePayload, getManifest } from "@gamesweb/game-sdk";
 
 function challengeFailure(error: string) {
-  if (error === "run_forbidden" || error === "game_mismatch") return jsonError("FORBIDDEN", error, 403);
+  if (error === "run_forbidden" || error === "game_mismatch" || error === "self_challenge") return jsonError("FORBIDDEN", error, 403);
   if (error === "not_found" || error === "run_not_found") return jsonError("NOT_FOUND", error, 404);
   if (
     error === "expired" ||
@@ -15,7 +15,8 @@ function challengeFailure(error: string) {
     error === "type_mismatch" ||
     error === "invalid_score" ||
     error === "run_reuse" ||
-    error === "seed_mismatch"
+    error === "seed_mismatch" ||
+    error === "challenge_closed"
   ) {
     return jsonError("CONFLICT", error, 409);
   }

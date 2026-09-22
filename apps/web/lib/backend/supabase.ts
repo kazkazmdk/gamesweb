@@ -8,7 +8,7 @@ import {
   type LeaderboardEntry,
   type VerifiedStatus,
 } from "@gamesweb/database";
-import { applyChallengeAttempt, getManifest, makePublicCode, QUICK_PARTY_PLAYLIST, utcDayKey, type ChallengeRecord } from "@gamesweb/game-sdk";
+import { getManifest, makePublicCode, QUICK_PARTY_PLAYLIST, utcDayKey, type ChallengeRecord } from "@gamesweb/game-sdk";
 import { actorId } from "@/lib/api/actor";
 import type { Identity } from "@/lib/api/identity";
 import { competitiveTrust, loadCompetitiveRun } from "@/lib/backend/competitive-run";
@@ -898,6 +898,18 @@ export class SupabaseBackend implements BackendStore {
   }): Promise<StoredParty> {
     const sb = admin();
     const { data: members } = await sb.from("party_members").select("*").eq("party_id", row.id);
+    const { data: attempts } = await sb
+      .from("party_round_attempts")
+      .select("actor_id, score, round_index, submitted_at")
+      .eq("party_id", row.id)
+      .order("round_index", { ascending: false })
+      .order("submitted_at", { ascending: false });
+    const latestScore = new Map<string, number>();
+    for (const attempt of attempts ?? []) {
+      const actor = String(attempt.actor_id ?? "");
+      if (!actor || latestScore.has(actor)) continue;
+      latestScore.set(actor, Number(attempt.score));
+    }
     return {
       id: row.id,
       code: row.code,
@@ -913,7 +925,8 @@ export class SupabaseBackend implements BackendStore {
         id: m.actor_id ?? m.user_id ?? "",
         name: m.display_name ?? "Player",
         ready: m.ready,
-        score: m.points,
+        points: m.points,
+        lastRoundScore: latestScore.has(m.actor_id ?? m.user_id ?? "") ? latestScore.get(m.actor_id ?? m.user_id ?? "")! : null,
         joinedAt: m.joined_at ? new Date(m.joined_at).getTime() : Date.now(),
       })),
       playlist: row.playlist ?? [],
@@ -965,22 +978,19 @@ export class SupabaseBackend implements BackendStore {
   }
 
   async joinParty(identity: Identity, code: string, name: string) {
+    const sb = admin();
+    const { data, error } = await sb.rpc("join_party", {
+      p_code: code,
+      p_actor: actorId(identity),
+      p_name: name,
+      p_user_id: identity.userId,
+    });
+    if (error) throw new Error(error.message);
+    const payload = (data ?? {}) as { ok?: boolean; duplicate?: boolean; error?: "not_found" | "full" | "closed" };
+    if (payload.error || !payload.ok) return { ok: false as const, error: payload.error ?? "not_found" };
     const party = await this.getParty(code);
     if (!party) return { ok: false as const, error: "not_found" as const };
-    const id = actorId(identity);
-    if (party.members.some((m) => m.id === id)) return { ok: true as const, duplicate: true, party };
-    if (party.state !== "lobby") return { ok: false as const, error: "closed" as const };
-    if (party.members.length >= 6) return { ok: false as const, error: "full" as const };
-    const sb = admin();
-    await sb.from("party_members").insert({
-      party_id: party.id,
-      user_id: identity.userId,
-      actor_id: id,
-      display_name: name,
-      ready: false,
-      points: 0,
-    });
-    return { ok: true as const, duplicate: false, party: (await this.getParty(code))! };
+    return { ok: true as const, duplicate: Boolean(payload.duplicate), party };
   }
 
   async setPartyReady(identity: Identity, code: string, ready: boolean) {
@@ -992,39 +1002,23 @@ export class SupabaseBackend implements BackendStore {
   }
 
   async startParty(identity: Identity, code: string) {
-    const party = await this.getParty(code);
-    if (!party) return { error: "not_found" };
-    if (party.host !== actorId(identity)) return { error: "host_only" };
-    if (party.state !== "lobby" && party.state !== "results") return { error: "bad_state" };
-    const roster = party.members.filter((m) => m.ready);
-    if (!roster.length) return { error: "no_ready" };
     const sb = admin();
-    await sb
-      .from("parties")
-      .update({ state: "playing", round_roster: roster.map((m) => m.id), submitted: [] })
-      .eq("id", party.id);
-    return (await this.getParty(code))!;
+    const { data, error } = await sb.rpc("start_party", { p_code: code, p_actor: actorId(identity) });
+    if (error) return { error: "bad_state" };
+    const payload = (data ?? {}) as { error?: string };
+    if (payload.error) return { error: payload.error };
+    const party = await this.getParty(code);
+    return party ?? { error: "not_found" };
   }
 
   async advanceParty(identity: Identity, code: string) {
-    const party = await this.getParty(code);
-    if (!party) return { error: "not_found" };
-    if (party.host !== actorId(identity)) return { error: "host_only" };
-    if (party.state !== "results") return { error: "bad_state" };
-    const nextRound = party.round + 1;
-    const done = nextRound >= party.playlist.length;
-    const roster = party.members.filter((m) => m.ready).map((m) => m.id);
     const sb = admin();
-    await sb
-      .from("parties")
-      .update({
-        current_round: nextRound,
-        state: done ? "done" : "playing",
-        submitted: [],
-        round_roster: done ? party.roundRoster : roster.length ? roster : party.members.map((m) => m.id),
-      })
-      .eq("id", party.id);
-    return (await this.getParty(code))!;
+    const { data, error } = await sb.rpc("advance_party", { p_code: code, p_actor: actorId(identity) });
+    if (error) return { error: "bad_state" };
+    const payload = (data ?? {}) as { error?: string };
+    if (payload.error) return { error: payload.error };
+    const party = await this.getParty(code);
+    return party ?? { error: "not_found" };
   }
 
   async submitPartyRound(identity: Identity, code: string, runId: string) {
@@ -1058,8 +1052,8 @@ export class SupabaseBackend implements BackendStore {
       type: row.type as ChallengeRecord["type"],
       challengerId: String(row.challenger_actor ?? row.challenger_id ?? ""),
       challengerName: String(row.challenger_name ?? "Player"),
-      targetId: (row.target_id as string | null) ?? null,
-      targetName: null,
+      targetId: (row.target_actor as string | null) ?? (row.target_id ? String(row.target_id) : null),
+      targetName: (row.target_name as string | null) ?? null,
       challengerRunId: row.challenger_run_id ? String(row.challenger_run_id) : null,
       challengerScore: Number(row.challenger_score),
       challengerGhostId: null,
@@ -1069,7 +1063,7 @@ export class SupabaseBackend implements BackendStore {
       expiresAt: new Date(String(row.expires_at)).getTime(),
       metadata: (row.metadata as Record<string, number | string | boolean>) ?? {},
       winnerId: row.winner_id ? String(row.winner_id) : null,
-      targetScore: null,
+      targetScore: row.target_score == null ? null : Number(row.target_score),
       trust: (row.trust as ChallengeRecord["trust"]) ?? "unverified",
       gameVersion: String(row.game_version ?? "1.0.0"),
       attempts,
@@ -1162,66 +1156,46 @@ export class SupabaseBackend implements BackendStore {
   async attemptChallengeFromRun(identity: Identity, code: string, runId: string) {
     const current = await this.loadChallenge(code);
     if (!current) return { ok: false as const, error: "not_found" };
-    if (current.expiresAt < Date.now()) return { ok: false as const, error: "expired" };
+    if (current.status === "expired" || (current.status === "open" && current.expiresAt < Date.now())) {
+      return { ok: false as const, error: "expired" };
+    }
+    if (current.status !== "open") return { ok: false as const, error: "challenge_closed" };
+    if (actorId(identity) === current.challengerId) return { ok: false as const, error: "self_challenge" };
     const run = await loadCompetitiveRun(this, identity, runId);
     if ("error" in run) return { ok: false as const, error: run.error };
     const target = validateCompetitiveRunTarget(run, { gameId: current.gameId, mode: current.mode });
     if (!target.ok) return { ok: false as const, error: target.error };
     if (run.verificationStatus === "flagged") return { ok: false as const, error: "invalid_score" };
     const profile = await this.getOrCreateProfile(identity);
-    const applied = applyChallengeAttempt(current, {
-      id: crypto.randomUUID(),
-      challengeId: current.id,
-      playerId: actorId(identity),
-      playerName: profile.displayName || "Player",
-      score: run.score,
-      runId: run.runId,
-      trust: competitiveTrust(run.verificationStatus),
-      createdAt: Date.now(),
-      metadata: { durationMs: run.durationMs },
-    });
     const sb = admin();
-    const { error } = await sb.from("challenge_attempts").insert({
-      id: applied.challenge.attempts.at(-1)?.id,
-      challenge_id: current.id,
-      player_id: identity.userId,
-      player_actor: actorId(identity),
-      player_name: profile.displayName || "Player",
-      score: run.score,
-      trust: competitiveTrust(run.verificationStatus),
-      run_id: run.runId,
-      metadata: { durationMs: run.durationMs },
+    const { data, error } = await sb.rpc("submit_challenge_attempt", {
+      p_code: code,
+      p_actor: actorId(identity),
+      p_name: profile.displayName || "Player",
+      p_run_id: run.runId,
+      p_score: run.score,
+      p_trust: competitiveTrust(run.verificationStatus),
+      p_game_id: run.gameId,
+      p_mode: run.mode,
     });
-    if (error) {
-      if (error.code === "23505") {
-        const detail = `${error.message ?? ""} ${error.details ?? ""}`;
-        if (/run_id|challenger_run/i.test(detail)) return { ok: false as const, error: "run_reuse" };
-        return { ok: true as const, challenge: current, outcome: "pending" as const, duplicate: true };
-      }
-      return { ok: false as const, error: "attempt_failed" };
-    }
-    await sb
-      .from("challenges")
-      .update({
-        status: applied.challenge.status,
-        winner_id: applied.challenge.winnerId,
-      })
-      .eq("id", current.id);
-    if (!applied.duplicate && applied.outcome !== "pending") {
-      await this.pushInbox(current.challengerId, {
-        type: "challenge",
-        title: applied.outcome === "win" ? `${profile.displayName || "Player"} beat your score` : applied.outcome === "draw" ? "Challenge draw" : `${profile.displayName || "Player"} tried your challenge`,
-        body: getManifest(current.gameId)?.title ?? current.gameId,
-        href: `/c/${code.toUpperCase()}`,
-      });
-      await this.pushInbox(actorId(identity), {
-        type: "challenge",
-        title: applied.outcome === "win" ? "You won the challenge" : applied.outcome === "draw" ? "Draw" : `${current.challengerName} still leads`,
-        body: getManifest(current.gameId)?.title ?? current.gameId,
-        href: `/c/${code.toUpperCase()}`,
-      });
-    }
-    return { ok: true as const, ...applied };
+    if (error) return { ok: false as const, error: "attempt_failed" };
+    const payload = (data ?? {}) as { error?: string; outcome?: "win" | "loss" | "draw" };
+    if (payload.error) return { ok: false as const, error: payload.error };
+    const challenge = await this.loadChallenge(code);
+    if (!challenge || !payload.outcome) return { ok: false as const, error: "attempt_failed" };
+    await this.pushInbox(current.challengerId, {
+      type: "challenge",
+      title: payload.outcome === "win" ? `${profile.displayName || "Player"} beat your score` : payload.outcome === "draw" ? "Challenge draw" : `${profile.displayName || "Player"} tried your challenge`,
+      body: getManifest(current.gameId)?.title ?? current.gameId,
+      href: `/c/${code.toUpperCase()}`,
+    });
+    await this.pushInbox(actorId(identity), {
+      type: "challenge",
+      title: payload.outcome === "win" ? "You won the challenge" : payload.outcome === "draw" ? "Draw" : `${current.challengerName} still leads`,
+      body: getManifest(current.gameId)?.title ?? current.gameId,
+      href: `/c/${code.toUpperCase()}`,
+    });
+    return { ok: true as const, challenge, outcome: payload.outcome, duplicate: false };
   }
 
   private async pushInbox(userId: string, item: Omit<StoredInbox, "id" | "at" | "read" | "userId">) {

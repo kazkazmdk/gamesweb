@@ -66,13 +66,21 @@ export default function ChallengeMagicPage() {
         <p className="mt-2 text-[13px] text-white/45">
           Same seed · {challenge.trust} · guests can play
         </p>
-        <Link
-          href={href}
-          className="mt-8 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[var(--accent)] text-[15px] text-[#140d12]"
-          onClick={() => analytics.track("challenge_started", { code, gameId: challenge.gameId })}
-        >
-          Beat {challenge.challengerName}
-        </Link>
+        {"status" in challenge && (challenge.status === "completed" || challenge.status === "expired") ? (
+          <p className="mt-8 text-[15px] text-white/80" data-testid="challenge-closed">
+            {challenge.status === "expired"
+              ? "This challenge has expired."
+              : `Closed. ${challenge.targetName ?? "The opponent"} finished this duel.`}
+          </p>
+        ) : (
+          <Link
+            href={href}
+            className="mt-8 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[var(--accent)] text-[15px] text-[#140d12]"
+            onClick={() => analytics.track("challenge_started", { code, gameId: challenge.gameId })}
+          >
+            Beat {challenge.challengerName}
+          </Link>
+        )}
         <p className="mt-4 text-[12px] text-white/40">No signup required to play. Claim a profile to keep the rivalry.</p>
       </div>
     </div>

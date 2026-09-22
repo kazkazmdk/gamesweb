@@ -83,8 +83,9 @@ test("two browser contexts complete a party round without advancing on the first
   await pageB.reload();
   await expect(pageA.getByTestId("party-standings")).toBeVisible();
   await expect(pageB.getByTestId("party-standings")).toBeVisible();
+  await expect(pageA.getByTestId("party-start")).toHaveCount(0);
   await pageA.getByTestId("party-advance").click();
-  await expect(pageA.getByTestId("party-state")).toContainText(/playing|done/);
+  await expect(pageA.getByTestId("party-state")).toContainText("playing");
 
   await pageB.reload();
   await expect(pageB.getByTestId("party")).toBeVisible();
@@ -154,6 +155,57 @@ test("challenge created from a run opens without payload and persists inbox", as
   const inbox3 = (await (await pageA.request.get("/api/inbox")).json()) as { items: Array<{ id: string; read: boolean }> };
   expect(inbox3.items.find((i) => i.id === items.items[0].id)?.read).toBe(true);
 
+  await b.close();
+  await a.close();
+});
+
+test("a finished challenge stays closed for a third player", async ({ browser }) => {
+  const a = await browser.newContext();
+  const b = await browser.newContext();
+  const c = await browser.newContext();
+  const pageA = await a.newPage();
+  const pageB = await b.newPage();
+  const pageC = await c.newPage();
+  await pageA.goto("/");
+  await pageB.goto("/");
+  await pageC.goto("/");
+
+  const runA = await verifiedRun(pageA.request, "sky-stack", "climb", 1500);
+  const created = await pageA.request.post("/api/challenges", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { action: "create", runId: runA },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const code = ((await created.json()) as { challenge: { publicCode: string } }).challenge.publicCode;
+  const runB = await verifiedRun(pageB.request, "sky-stack", "climb", 2600);
+  const attempt = await pageB.request.post("/api/challenges", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { action: "attempt", code, runId: runB },
+  });
+  expect(attempt.ok(), await attempt.text()).toBeTruthy();
+  const finished = (await attempt.json()) as { challenge: { winnerId: string | null; targetId: string | null; targetScore: number | null; attempts: unknown[] } };
+
+  await pageC.goto(`/c/${code}`);
+  await expect(pageC.getByTestId("challenge-closed")).toBeVisible({ timeout: 15_000 });
+  await expect(pageC.getByRole("link", { name: /Beat / })).toHaveCount(0);
+
+  const runC = await verifiedRun(pageC.request, "sky-stack", "climb", 4000);
+  const rejected = await pageC.request.post("/api/challenges", {
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    data: { action: "attempt", code, runId: runC },
+  });
+  expect(rejected.status()).toBe(409);
+  expect(((await rejected.json()) as { error: { message: string } }).error.message).toBe("challenge_closed");
+
+  const stored = await pageC.request.get(`/api/challenges?code=${code}`);
+  expect(stored.ok()).toBeTruthy();
+  const again = (await stored.json()) as { challenge: { winnerId: string | null; targetId: string | null; targetScore: number | null; attempts: unknown[] } };
+  expect(again.challenge.winnerId).toBe(finished.challenge.winnerId);
+  expect(again.challenge.targetId).toBe(finished.challenge.targetId);
+  expect(again.challenge.targetScore).toBe(finished.challenge.targetScore);
+  expect(again.challenge.attempts).toHaveLength(finished.challenge.attempts.length);
+
+  await c.close();
   await b.close();
   await a.close();
 });

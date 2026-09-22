@@ -31,7 +31,7 @@ export type InboxItem = {
 export type PartyState = {
   code: string;
   host: string;
-  members: Array<{ id: string; name: string; ready: boolean; score: number }>;
+  members: Array<{ id: string; name: string; ready: boolean; points: number; lastRoundScore: number | null }>;
   playlist: Array<{ gameId: string; mode: string }>;
   round: number;
   state: "lobby" | "playing" | "results" | "done";
@@ -98,7 +98,20 @@ function empty(): ArcadeSnap {
 }
 
 function cacheParty(party: PartyState): PartyState {
-  return { ...party, persistence: party.persistence ?? "server" };
+  return {
+    ...party,
+    persistence: party.persistence ?? "server",
+    members: party.members.map((member) => {
+      const legacy = member as PartyState["members"][number] & { score?: number };
+      return {
+        id: legacy.id,
+        name: legacy.name,
+        ready: legacy.ready,
+        points: typeof legacy.points === "number" ? legacy.points : 0,
+        lastRoundScore: typeof legacy.lastRoundScore === "number" ? legacy.lastRoundScore : null,
+      };
+    }),
+  };
 }
 
 class ArcadeStore {
@@ -394,7 +407,7 @@ class ArcadeStore {
     const party: PartyState = {
       code: makePublicCode(),
       host: hostId,
-      members: [{ id: hostId, name: hostName, ready: true, score: 0 }],
+      members: [{ id: hostId, name: hostName, ready: true, points: 0, lastRoundScore: null }],
       playlist: QUICK_PARTY_PLAYLIST.map((r) => ({ ...r })),
       round: 0,
       state: "lobby",
@@ -421,7 +434,7 @@ class ArcadeStore {
     if (!party) return { ok: false as const, error: "not_found" as const };
     if (party.members.some((m) => m.id === id)) return { ok: true as const, duplicate: true, party };
     if (party.members.length >= 6) return { ok: false as const, error: "full" as const };
-    party.members.push({ id, name, ready: false, score: 0 });
+    party.members.push({ id, name, ready: false, points: 0, lastRoundScore: null });
     analytics.track("party_joined", { code, persistence: "local" });
     this.emit();
     return { ok: true as const, duplicate: false, party };

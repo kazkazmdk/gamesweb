@@ -364,6 +364,16 @@ async function main() {
     );
     const higherParty = await client.query("select state, standings from public.parties where id = $1", [higherId]);
     const higherStandings = higherParty.rows[0].standings as Array<{ id: string; points: number }>;
+    const higherMembers = await client.query(
+      `select m.actor_id, m.points, a.score
+       from public.party_members m
+       join public.parties p on p.id = m.party_id
+       join public.party_round_attempts a on a.party_id = p.id and a.actor_id = m.actor_id
+       where p.code = 'RANKHI'`,
+    );
+    const memberPoints = Object.fromEntries(
+      higherMembers.rows.map((row: { actor_id: string; points: number; score: string | number }) => [row.actor_id, { points: row.points, score: Number(row.score) }]),
+    );
     checks.push({
       name: "higher-is-better party ranks B 10 and A 7 together",
       ok:
@@ -372,6 +382,11 @@ async function main() {
         pointsOf(higherStandings, "actor-b") === 10 &&
         pointsOf(higherStandings, "actor-a") === 7,
       detail: JSON.stringify(higherStandings),
+    });
+    checks.push({
+      name: "party member points are cumulative and the raw score stays on the attempt",
+      ok: memberPoints["actor-b"]?.points === 10 && memberPoints["actor-b"]?.score === 200 && memberPoints["actor-a"]?.points === 7 && memberPoints["actor-a"]?.score === 100,
+      detail: JSON.stringify(higherMembers.rows),
     });
 
     await partyFixture("RANKLO", [{ gameId: "velocity-run", mode: "course-1" }], ["actor-a", "actor-b"]);
@@ -432,11 +447,12 @@ async function main() {
     );
     await client.query(`select public.submit_party_round_attempt('CUMUL8','actor-a',$1,200,'unverified','sky-stack','climb')`, [crypto.randomUUID()]);
     await client.query(`select public.submit_party_round_attempt('CUMUL8','actor-b',$1,100,'unverified','sky-stack','climb')`, [crypto.randomUUID()]);
-    await client.query(
-      `update public.parties
-         set state = 'playing', current_round = 1, submitted = '[]'::jsonb
-       where code = 'CUMUL8'`,
-    );
+    const advancedRound = await client.query(`select public.advance_party('CUMUL8','actor-a') as payload`);
+    checks.push({
+      name: "advance leaves results for the next round",
+      ok: advancedRound.rows[0].payload.state === "playing",
+      detail: JSON.stringify(advancedRound.rows[0].payload),
+    });
     await client.query(`select public.submit_party_round_attempt('CUMUL8','actor-a',$1,41,'unverified','velocity-run','course-1')`, [crypto.randomUUID()]);
     await client.query(`select public.submit_party_round_attempt('CUMUL8','actor-b',$1,32,'unverified','velocity-run','course-1')`, [crypto.randomUUID()]);
     const cumul = await client.query("select standings, state from public.parties where code = 'CUMUL8'");
@@ -544,12 +560,328 @@ async function main() {
       detail: `actor ${dupActor} run ${dupRun}`,
     });
 
+    async function lobbyParty(code: string, playlist: unknown, roster: string[]) {
+      const inserted = await client.query(
+        `insert into public.parties (code, state, current_round, playlist, round_roster, submitted, standings, host_actor)
+         values ($1, 'lobby', 0, $2::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, $3)
+         returning id`,
+        [code, JSON.stringify(playlist), roster[0]],
+      );
+      for (const actor of roster) {
+        await client.query(
+          `insert into public.party_members (party_id, actor_id, display_name, ready, points)
+           values ($1, $2, $2, true, 0)`,
+          [inserted.rows[0].id, actor],
+        );
+      }
+      return inserted.rows[0].id as string;
+    }
+
+    const playlist = [
+      { gameId: "sky-stack", mode: "climb" },
+      { gameId: "sky-stack", mode: "climb" },
+    ];
+    await lobbyParty("STATE1", playlist, ["actor-a", "actor-b"]);
+    const stateStart = await client.query(`select public.start_party('STATE1','actor-a') as payload`);
+    const stateRestart = await client.query(`select public.start_party('STATE1','actor-a') as payload`);
+    const stateEarly = await client.query(`select public.advance_party('STATE1','actor-a') as payload`);
+    await client.query(
+      `update public.party_members set ready = false
+       where actor_id = 'actor-b' and party_id = (select id from public.parties where code = 'STATE1')`,
+    );
+    const frozen = await client.query(`select round_roster from public.parties where code = 'STATE1'`);
+    const frozenRoster = frozen.rows[0].round_roster as string[];
+    await client.query(`select public.submit_party_round_attempt('STATE1','actor-a',$1,100,'unverified','sky-stack','climb')`, [crypto.randomUUID()]);
+    await client.query(`select public.submit_party_round_attempt('STATE1','actor-b',$1,200,'unverified','sky-stack','climb')`, [crypto.randomUUID()]);
+    const stateResults = await client.query(`select public.start_party('STATE1','actor-a') as payload`);
+    const stillResults = await client.query(`select state, current_round from public.parties where code = 'STATE1'`);
+    await client.query(
+      `update public.party_members set ready = true
+       where actor_id = 'actor-b' and party_id = (select id from public.parties where code = 'STATE1')`,
+    );
+    const stateAdvance = await client.query(`select public.advance_party('STATE1','actor-a') as payload`);
+    const statePlayStart = await client.query(`select public.start_party('STATE1','actor-a') as payload`);
+    const statePlayAdvance = await client.query(`select public.advance_party('STATE1','actor-a') as payload`);
+    await client.query(`select public.submit_party_round_attempt('STATE1','actor-a',$1,300,'unverified','sky-stack','climb')`, [crypto.randomUUID()]);
+    await client.query(`select public.submit_party_round_attempt('STATE1','actor-b',$1,50,'unverified','sky-stack','climb')`, [crypto.randomUUID()]);
+    const stateDone = await client.query(`select public.advance_party('STATE1','actor-a') as payload`);
+    const stateDoneStart = await client.query(`select public.start_party('STATE1','actor-a') as payload`);
+    const stateDoneAdvance = await client.query(`select public.advance_party('STATE1','actor-a') as payload`);
+    const finalState = await client.query(`select state from public.parties where code = 'STATE1'`);
+    checks.push({
+      name: "party start is lobby-only and advance walks results to done",
+      ok:
+        stateStart.rows[0].payload.state === "playing" &&
+        stateRestart.rows[0].payload.error === "bad_state" &&
+        stateEarly.rows[0].payload.error === "bad_state" &&
+        frozenRoster.includes("actor-b") &&
+        stateResults.rows[0].payload.error === "bad_state" &&
+        stillResults.rows[0].state === "results" &&
+        stillResults.rows[0].current_round === 0 &&
+        stateAdvance.rows[0].payload.state === "playing" &&
+        statePlayStart.rows[0].payload.error === "bad_state" &&
+        statePlayAdvance.rows[0].payload.error === "bad_state" &&
+        stateDone.rows[0].payload.state === "done" &&
+        stateDoneStart.rows[0].payload.error === "bad_state" &&
+        stateDoneAdvance.rows[0].payload.error === "bad_state" &&
+        finalState.rows[0].state === "done",
+      detail: JSON.stringify({
+        start: stateStart.rows[0].payload,
+        restart: stateRestart.rows[0].payload,
+        results: stateResults.rows[0].payload,
+        advance: stateAdvance.rows[0].payload,
+        done: stateDone.rows[0].payload,
+      }),
+    });
+
+    await lobbyParty("JOIN6", [{ gameId: "sky-stack", mode: "climb" }], ["host-j", "m1", "m2", "m3", "m4"]);
+    const joinLeft = new pg.Client({ connectionString: url });
+    const joinRight = new pg.Client({ connectionString: url });
+    await joinLeft.connect();
+    await joinRight.connect();
+    try {
+      const [ja, jb] = await Promise.all([
+        joinLeft.query(`select public.join_party('JOIN6','n1','N1', null) as payload`),
+        joinRight.query(`select public.join_party('JOIN6','n2','N2', null) as payload`),
+      ]);
+      const joinCount = await client.query(
+        `select count(*)::int as n from public.party_members m
+         join public.parties p on p.id = m.party_id where p.code = 'JOIN6'`,
+      );
+      const payloads = [ja.rows[0].payload, jb.rows[0].payload] as Array<{ ok?: boolean; error?: string }>;
+      checks.push({
+        name: "concurrent party joins stop at 6",
+        ok: joinCount.rows[0].n === 6 && payloads.filter((row) => row.ok).length === 1 && payloads.filter((row) => row.error === "full").length === 1,
+        detail: JSON.stringify({ payloads, n: joinCount.rows[0].n }),
+      });
+    } finally {
+      await joinLeft.end();
+      await joinRight.end();
+    }
+
+    await lobbyParty("JOINDUP", [{ gameId: "sky-stack", mode: "climb" }], ["host-d"]);
+    const joinOnce = await client.query(`select public.join_party('JOINDUP','actor-z','Z', null) as payload`);
+    const joinTwice = await client.query(`select public.join_party('JOINDUP','actor-z','Z', null) as payload`);
+    const dupCount = await client.query(
+      `select count(*)::int as n from public.party_members m join public.parties p on p.id = m.party_id where p.code = 'JOINDUP'`,
+    );
+    checks.push({
+      name: "duplicate party join is idempotent",
+      ok: joinOnce.rows[0].payload.duplicate === false && joinTwice.rows[0].payload.duplicate === true && dupCount.rows[0].n === 2,
+      detail: JSON.stringify({ once: joinOnce.rows[0].payload, twice: joinTwice.rows[0].payload, n: dupCount.rows[0].n }),
+    });
+
+    await lobbyParty("JOINCL", [{ gameId: "sky-stack", mode: "climb" }], ["host-c"]);
+    await client.query(`select public.start_party('JOINCL','host-c')`);
+    const closedJoin = await client.query(`select public.join_party('JOINCL','actor-z','Z', null) as payload`);
+    const closedCount = await client.query(
+      `select count(*)::int as n, p.state from public.party_members m join public.parties p on p.id = m.party_id where p.code = 'JOINCL' group by p.state`,
+    );
+    checks.push({
+      name: "a playing party refuses a new member",
+      ok: closedJoin.rows[0].payload.error === "closed" && closedCount.rows[0].n === 1 && closedCount.rows[0].state === "playing",
+      detail: JSON.stringify({ closedJoin: closedJoin.rows[0].payload, row: closedCount.rows[0] }),
+    });
+
+    await lobbyParty("JOINRS", [{ gameId: "sky-stack", mode: "climb" }], ["host-r"]);
+    const raceJoin = new pg.Client({ connectionString: url });
+    const raceStart = new pg.Client({ connectionString: url });
+    await raceJoin.connect();
+    await raceStart.connect();
+    try {
+      const [joinedRace, startedRace] = await Promise.all([
+        raceJoin.query(`select public.join_party('JOINRS','actor-z','Z', null) as payload`),
+        raceStart.query(`select public.start_party('JOINRS','host-r') as payload`),
+      ]);
+      const raceParty = await client.query(
+        `select p.state, p.round_roster, count(m.actor_id)::int as n
+         from public.parties p
+         join public.party_members m on m.party_id = p.id
+         where p.code = 'JOINRS'
+         group by p.id`,
+      );
+      const roster = raceParty.rows[0].round_roster as string[];
+      const count = raceParty.rows[0].n as number;
+      const joinPayload = joinedRace.rows[0].payload as { ok?: boolean; error?: string };
+      checks.push({
+        name: "join and start lock the same party",
+        ok:
+          startedRace.rows[0].payload.state === "playing" &&
+          raceParty.rows[0].state === "playing" &&
+          !roster.includes("actor-z") &&
+          ((count === 1 && joinPayload.error === "closed") || (count === 2 && joinPayload.ok === true)),
+        detail: JSON.stringify({ join: joinPayload, start: startedRace.rows[0].payload, count, roster }),
+      });
+    } finally {
+      await raceJoin.end();
+      await raceStart.end();
+    }
+
+    async function openChallenge(code: string, gameId: string, mode: string, type: string, score: number) {
+      const runId = crypto.randomUUID();
+      const inserted = await client.query(
+        `insert into public.challenges (public_code, game_id, mode, seed, type, challenger_actor, challenger_name, challenger_run_id, challenger_score, trust, expires_at)
+         values ($1,$2,$3,$4,$5,'actor-a','A',$6,$7,'unverified', now() + interval '1 day')
+         returning id`,
+        [code, gameId, mode, `${gameId}:seed`, type, runId, score],
+      );
+      return { id: inserted.rows[0].id as string, runId };
+    }
+
+    await openChallenge("CHHI", "sky-stack", "climb", "beat-score", 100);
+    const challengeWin = await client.query(
+      `select public.submit_challenge_attempt('CHHI','actor-b','B',$1,200,'unverified','sky-stack','climb') as payload`,
+      [crypto.randomUUID()],
+    );
+    const challengeClosed = await client.query(
+      `select public.submit_challenge_attempt('CHHI','actor-c','C',$1,999,'unverified','sky-stack','climb') as payload`,
+      [crypto.randomUUID()],
+    );
+    const challengeRow = await client.query(
+      `select c.status, c.winner_id, c.target_actor, c.target_score, count(a.id)::int as attempts
+       from public.challenges c
+       left join public.challenge_attempts a on a.challenge_id = c.id
+       where c.public_code = 'CHHI'
+       group by c.id`,
+    );
+    checks.push({
+      name: "the first challenge attempt completes and the next one is closed",
+      ok:
+        challengeWin.rows[0].payload.outcome === "win" &&
+        challengeWin.rows[0].payload.winnerId === "actor-b" &&
+        challengeClosed.rows[0].payload.error === "challenge_closed" &&
+        challengeRow.rows[0].status === "completed" &&
+        challengeRow.rows[0].winner_id === "actor-b" &&
+        challengeRow.rows[0].target_actor === "actor-b" &&
+        Number(challengeRow.rows[0].target_score) === 200 &&
+        challengeRow.rows[0].attempts === 1,
+      detail: JSON.stringify({ win: challengeWin.rows[0].payload, closed: challengeClosed.rows[0].payload, row: challengeRow.rows[0] }),
+    });
+
+    await openChallenge("CHLO", "velocity-run", "course-1", "beat-time", 40);
+    const lowerWin = await client.query(
+      `select public.submit_challenge_attempt('CHLO','actor-b','B',$1,30,'unverified','velocity-run','course-1') as payload`,
+      [crypto.randomUUID()],
+    );
+    checks.push({
+      name: "challenge lower-is-better lets the faster time win",
+      ok: lowerWin.rows[0].payload.outcome === "win" && lowerWin.rows[0].payload.winnerId === "actor-b",
+      detail: JSON.stringify(lowerWin.rows[0].payload),
+    });
+
+    await openChallenge("CHLOSS", "sky-stack", "climb", "beat-score", 100);
+    const higherLoss = await client.query(
+      `select public.submit_challenge_attempt('CHLOSS','actor-b','B',$1,40,'unverified','sky-stack','climb') as payload`,
+      [crypto.randomUUID()],
+    );
+    checks.push({
+      name: "challenge higher-is-better keeps the challenger ahead",
+      ok: higherLoss.rows[0].payload.outcome === "loss" && higherLoss.rows[0].payload.winnerId === "actor-a",
+      detail: JSON.stringify(higherLoss.rows[0].payload),
+    });
+
+    await openChallenge("CHDRAW", "sky-stack", "climb", "beat-score", 80);
+    const drawAttempt = await client.query(
+      `select public.submit_challenge_attempt('CHDRAW','actor-b','B',$1,80,'unverified','sky-stack','climb') as payload`,
+      [crypto.randomUUID()],
+    );
+    const drawRow = await client.query(`select status, winner_id, target_actor, target_score from public.challenges where public_code = 'CHDRAW'`);
+    checks.push({
+      name: "a drawn challenge completes without a winner",
+      ok:
+        drawAttempt.rows[0].payload.outcome === "draw" &&
+        drawAttempt.rows[0].payload.winnerId == null &&
+        drawRow.rows[0].status === "completed" &&
+        drawRow.rows[0].winner_id == null &&
+        drawRow.rows[0].target_actor === "actor-b" &&
+        Number(drawRow.rows[0].target_score) === 80,
+      detail: JSON.stringify({ payload: drawAttempt.rows[0].payload, row: drawRow.rows[0] }),
+    });
+
+    await openChallenge("CHSELF", "sky-stack", "climb", "beat-score", 10);
+    const selfAttempt = await client.query(
+      `select public.submit_challenge_attempt('CHSELF','actor-a','A',$1,90,'unverified','sky-stack','climb') as payload`,
+      [crypto.randomUUID()],
+    );
+    const selfRow = await client.query(
+      `select c.status, count(a.id)::int as attempts
+       from public.challenges c
+       left join public.challenge_attempts a on a.challenge_id = c.id
+       where c.public_code = 'CHSELF'
+       group by c.id`,
+    );
+    checks.push({
+      name: "a challenger cannot take their own challenge",
+      ok: selfAttempt.rows[0].payload.error === "self_challenge" && selfRow.rows[0].status === "open" && selfRow.rows[0].attempts === 0,
+      detail: JSON.stringify({ payload: selfAttempt.rows[0].payload, row: selfRow.rows[0] }),
+    });
+
+    await openChallenge("CHRACE", "sky-stack", "climb", "beat-score", 100);
+    const challengeLeft = new pg.Client({ connectionString: url });
+    const challengeRight = new pg.Client({ connectionString: url });
+    await challengeLeft.connect();
+    await challengeRight.connect();
+    try {
+      const [ca, cb] = await Promise.all([
+        challengeLeft.query(`select public.submit_challenge_attempt('CHRACE','actor-b','B',$1,250,'unverified','sky-stack','climb') as payload`, [crypto.randomUUID()]),
+        challengeRight.query(`select public.submit_challenge_attempt('CHRACE','actor-c','C',$1,10,'unverified','sky-stack','climb') as payload`, [crypto.randomUUID()]),
+      ]);
+      const raceChallenge = await client.query(
+        `select c.status, c.winner_id, c.target_actor, c.target_score, a.player_actor, a.score, count(*) over ()::int as attempts
+         from public.challenges c
+         join public.challenge_attempts a on a.challenge_id = c.id
+         where c.public_code = 'CHRACE'`,
+      );
+      const accepted = [ca.rows[0].payload, cb.rows[0].payload] as Array<{ ok?: boolean; error?: string; winnerId?: string; outcome?: string }>;
+      const row = raceChallenge.rows[0];
+      const winnerMatches =
+        Number(row?.score) > 100 ? row?.winner_id === row?.player_actor : Number(row?.score) < 100 ? row?.winner_id === "actor-a" : row?.winner_id == null;
+      checks.push({
+        name: "concurrent challenge attempts accept exactly one opponent",
+        ok:
+          raceChallenge.rowCount === 1 &&
+          row?.attempts === 1 &&
+          row?.status === "completed" &&
+          row?.target_actor === row?.player_actor &&
+          Number(row?.target_score) === Number(row?.score) &&
+          winnerMatches &&
+          accepted.filter((item) => item.ok).length === 1 &&
+          accepted.filter((item) => item.error === "challenge_closed").length === 1,
+        detail: JSON.stringify({ accepted, row }),
+      });
+    } finally {
+      await challengeLeft.end();
+      await challengeRight.end();
+    }
+
     checks.push(
       await asRole(client, "anon", null, async () =>
         expectDenied("anon cannot execute submit_party_round_attempt", () =>
           client.query(
             "select public.submit_party_round_attempt('RANKHI','actor-a','run','1','unverified','sky-stack','climb')",
           ),
+        ),
+      ),
+    );
+    checks.push(
+      await asRole(client, "anon", null, async () =>
+        expectDenied("anon cannot execute start_party", () => client.query("select public.start_party('STATE1','actor-a')")),
+      ),
+    );
+    checks.push(
+      await asRole(client, "anon", null, async () =>
+        expectDenied("anon cannot execute advance_party", () => client.query("select public.advance_party('STATE1','actor-a')")),
+      ),
+    );
+    checks.push(
+      await asRole(client, "anon", null, async () =>
+        expectDenied("anon cannot execute join_party", () => client.query("select public.join_party('STATE1','actor-z','Z', null)")),
+      ),
+    );
+    checks.push(
+      await asRole(client, "anon", null, async () =>
+        expectDenied("anon cannot execute submit_challenge_attempt", () =>
+          client.query("select public.submit_challenge_attempt('CHHI','actor-c','C','run',1,'unverified','sky-stack','climb')"),
         ),
       ),
     );

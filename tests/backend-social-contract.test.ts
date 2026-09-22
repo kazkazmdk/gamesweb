@@ -63,6 +63,88 @@ describe("memory social contract", () => {
     expect(afterB.state).toBe("results");
     expect(afterB.standings.find((row) => row.name === "B")?.points).toBe(10);
     expect(afterB.standings.find((row) => row.name === "A")?.points).toBe(7);
+    expect(afterB.members.find((row) => row.name === "B")).toMatchObject({ points: 10, lastRoundScore: 200 });
+    expect(afterB.members.find((row) => row.name === "A")).toMatchObject({ points: 7, lastRoundScore: 100 });
+  });
+
+  it("starts only from the lobby and advances until done", async () => {
+    const store = resetMemoryStore();
+    const host = ident("sm-a");
+    const guest = ident("sm-b");
+    const created = await store.createParty(host, "A");
+    const live = store.parties.get(created.code);
+    if (!live) throw new Error("party missing");
+    live.playlist = [
+      { gameId: "sky-stack", mode: "climb" },
+      { gameId: "sky-stack", mode: "climb" },
+    ];
+    expect((await store.getParty(created.code))?.state).toBe("lobby");
+    await store.joinParty(guest, created.code, "B");
+    await store.setPartyReady(guest, created.code, true);
+    const started = await store.startParty(host, created.code);
+    expect("error" in started).toBe(false);
+    if ("error" in started) return;
+    expect(started.state).toBe("playing");
+    const guestId = started.members.find((row) => row.name === "B")?.id;
+    await store.setPartyReady(guest, created.code, false);
+    expect((await store.getParty(created.code))?.roundRoster).toContain(guestId);
+    expect((await store.startParty(host, created.code)) as { error?: string }).toMatchObject({ error: "bad_state" });
+    expect((await store.advanceParty(host, created.code)) as { error?: string }).toMatchObject({ error: "bad_state" });
+
+    const a1 = await scoreRun(store, host, "sky-stack", "climb", 100);
+    const b1 = await scoreRun(store, guest, "sky-stack", "climb", 200);
+    const afterA = await store.submitPartyRound(host, created.code, a1);
+    expect("error" in afterA).toBe(false);
+    if (!("error" in afterA)) expect(afterA.state).toBe("playing");
+    const afterB = await store.submitPartyRound(guest, created.code, b1);
+    expect("error" in afterB).toBe(false);
+    if ("error" in afterB) return;
+    expect(afterB.state).toBe("results");
+    expect((await store.startParty(host, created.code)) as { error?: string }).toMatchObject({ error: "bad_state" });
+    await store.setPartyReady(guest, created.code, true);
+    const advanced = await store.advanceParty(host, created.code);
+    expect("error" in advanced).toBe(false);
+    if ("error" in advanced) return;
+    expect(advanced.state).toBe("playing");
+    expect(advanced.round).toBe(1);
+    expect((await store.startParty(host, created.code)) as { error?: string }).toMatchObject({ error: "bad_state" });
+    expect((await store.advanceParty(host, created.code)) as { error?: string }).toMatchObject({ error: "bad_state" });
+
+    const a2 = await scoreRun(store, host, "sky-stack", "climb", 300);
+    const b2 = await scoreRun(store, guest, "sky-stack", "climb", 50);
+    await store.submitPartyRound(host, created.code, a2);
+    const round2 = await store.submitPartyRound(guest, created.code, b2);
+    expect("error" in round2).toBe(false);
+    if ("error" in round2) return;
+    expect(round2.state).toBe("results");
+    expect(round2.members.find((row) => row.name === "A")?.points).toBe(17);
+    expect(round2.members.find((row) => row.name === "B")?.points).toBe(17);
+    const done = await store.advanceParty(host, created.code);
+    expect("error" in done).toBe(false);
+    if ("error" in done) return;
+    expect(done.state).toBe("done");
+    expect((await store.startParty(host, created.code)) as { error?: string }).toMatchObject({ error: "bad_state" });
+    expect((await store.advanceParty(host, created.code)) as { error?: string }).toMatchObject({ error: "bad_state" });
+  });
+
+  it("keeps a sixth member out and lets an existing member reconnect", async () => {
+    const store = resetMemoryStore();
+    const host = ident("cap-host");
+    const party = await store.createParty(host, "H");
+    for (let i = 0; i < 5; i += 1) {
+      const joined = await store.joinParty(ident(`cap-${i}`), party.code, `G${i}`);
+      expect(joined.ok).toBe(true);
+    }
+    expect(await store.joinParty(ident("cap-extra"), party.code, "X")).toMatchObject({ ok: false, error: "full" });
+    const reconnectLobby = await store.joinParty(ident("cap-0"), party.code, "G0");
+    expect(reconnectLobby.ok && reconnectLobby.duplicate).toBe(true);
+    expect((await store.getParty(party.code))?.members).toHaveLength(6);
+    const started = await store.startParty(host, party.code);
+    expect("error" in started).toBe(false);
+    expect(await store.joinParty(ident("cap-late"), party.code, "Late")).toMatchObject({ ok: false, error: "closed" });
+    const reconnect = await store.joinParty(ident("cap-0"), party.code, "G0");
+    expect(reconnect.ok && reconnect.duplicate).toBe(true);
+    expect((await store.getParty(party.code))?.members).toHaveLength(6);
   });
 
   it("ranks velocity by lower time and accumulates a second round to 17/17", async () => {
@@ -157,6 +239,32 @@ describe("memory social contract", () => {
     const higherGuest = await scoreRun(store, guest, "sky-stack", "climb", 200);
     const higherAttempt = await store.attemptChallengeFromRun(guest, higher.challenge.publicCode, higherGuest);
     expect(higherAttempt.ok && higherAttempt.outcome).toBe("win");
+    if (!higherAttempt.ok) return;
+    const sealed = await store.getChallenge(higher.challenge.publicCode);
+    const third = ident("third-c");
+    const thirdRun = await scoreRun(store, third, "sky-stack", "climb", 900);
+    expect(await store.attemptChallengeFromRun(third, higher.challenge.publicCode, thirdRun)).toMatchObject({
+      ok: false,
+      error: "challenge_closed",
+    });
+    const still = await store.getChallenge(higher.challenge.publicCode);
+    expect(still?.winnerId).toBe(sealed?.winnerId);
+    expect(still?.targetId).toBe(sealed?.targetId);
+    expect(still?.targetScore).toBe(sealed?.targetScore);
+    expect(still?.attempts).toHaveLength(sealed?.attempts.length ?? 0);
+
+    const selfHost = await scoreRun(store, host, "sky-stack", "climb", 15);
+    const selfChallenge = await store.createChallengeFromRun(host, selfHost);
+    if ("error" in selfChallenge) throw new Error(selfChallenge.error);
+    const selfRun = await scoreRun(store, host, "sky-stack", "climb", 90);
+    expect(await store.attemptChallengeFromRun(host, selfChallenge.challenge.publicCode, selfRun)).toMatchObject({
+      ok: false,
+      error: "self_challenge",
+    });
+    const untouched = await store.getChallenge(selfChallenge.challenge.publicCode);
+    expect(untouched?.status).toBe("open");
+    expect(untouched?.attempts).toHaveLength(0);
+    expect(untouched?.winnerId).toBeNull();
   });
 
   it("ranks the same rows the SQL function is specified to rank", () => {

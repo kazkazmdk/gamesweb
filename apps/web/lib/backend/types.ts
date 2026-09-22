@@ -136,7 +136,14 @@ export type CompetitiveRun = {
   createdAt: number;
 };
 
-export type StoredPartyMember = { id: string; name: string; ready: boolean; score: number; joinedAt: number };
+export type StoredPartyMember = {
+  id: string;
+  name: string;
+  ready: boolean;
+  points: number;
+  lastRoundScore: number | null;
+  joinedAt: number;
+};
 
 export type StoredParty = {
   id: string;
