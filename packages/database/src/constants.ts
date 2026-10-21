@@ -26,7 +26,7 @@ export const GAME_MODES: Record<GameId, readonly string[]> = {
     "course-3c",
     "course-3d",
   ],
-  "swarm-protocol": ["survival", "seed"],
+  "swarm-protocol": ["survival", "seed", "daily"],
   "sky-stack": ["climb", "daily"],
   "knockout-circuit": ["map-a", "map-b", "map-c", "map-d", "map-e", "map-f", "map-g", "map-h", "daily"],
   "pocket-striker": ["layout", "daily"],

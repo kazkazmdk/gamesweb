@@ -60,6 +60,7 @@ export function validateScore(payload: ScorePayload): ScoreValidation {
     "score_exceeds_pace",
     "impossible_time",
     "medal_mismatch",
+    "Pocket Striker table was not cleared",
   ];
   if (reasons.some((r) => hard.includes(r))) {
     return { status: "flagged", reasons };
@@ -107,7 +108,9 @@ function validateVelocity(payload: ScorePayload, reasons: string[]) {
 }
 
 function validateSwarm(payload: ScorePayload, durationSec: number, reasons: string[]) {
-  if (payload.mode !== "survival") reasons.push("invalid_mode");
+  if (payload.mode !== "survival" && payload.mode !== "seed" && payload.mode !== "daily") {
+    reasons.push("invalid_mode");
+  }
   if (payload.score < 0 || payload.score > 1_000_000) reasons.push("score_out_of_range");
   const kills = num(payload.metadata, "kills");
   const level = num(payload.metadata, "level");
@@ -138,6 +141,10 @@ function validateKnockout(payload: ScorePayload, reasons: string[]) {
 }
 
 function validatePocket(payload: ScorePayload, durationSec: number, reasons: string[]) {
+  if (payload.metadata?.result === "death" || payload.metadata?.failed === true) {
+    reasons.push("Pocket Striker table was not cleared");
+    return;
+  }
   if (!["layout", "daily"].includes(payload.mode)) reasons.push("invalid_mode");
   if (payload.score < 1 || payload.score > 40) reasons.push("score_out_of_range");
   if (payload.score === 1 && durationSec < 0.4) reasons.push("duration_too_short");

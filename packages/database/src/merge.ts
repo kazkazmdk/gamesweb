@@ -1,3 +1,4 @@
+import { allAchievements } from "@gamesweb/game-sdk";
 import { xpRewards } from "@gamesweb/config";
 import { reconstructAchievementsFromScores } from "./ownership";
 import type { AccountProgress, GuestSnapshot } from "./types";
@@ -50,7 +51,45 @@ const ACHIEVEMENT_XP: Record<string, number> = {
   "swarm-protocol:kills-200": 40,
   "swarm-protocol:shield": 15,
   "swarm-protocol:chain": 15,
+  "sky-stack:first-place": 10,
+  "sky-stack:perfect-5": 25,
+  "sky-stack:streak-8": 25,
+  "sky-stack:floor-30": 30,
+  "sky-stack:fever": 20,
+  "sky-stack:fever-2": 20,
+  "sky-stack:floor-67": 50,
+  "knockout-circuit:first-gate": 15,
+  "knockout-circuit:all-maps": 40,
+  "knockout-circuit:finish": 25,
+  "knockout-circuit:no-hit": 30,
+  "knockout-circuit:no-fall": 30,
+  "knockout-circuit:shortcut": 20,
+  "knockout-circuit:fast": 35,
+  "pocket-striker:first-pocket": 10,
+  "pocket-striker:perfect": 25,
+  "pocket-striker:bank": 20,
+  "pocket-striker:par-table": 25,
+  "pocket-striker:under-par": 25,
+  "territory-rush:first-claim": 10,
+  "territory-rush:cut": 25,
+  "territory-rush:half-map": 40,
+  "territory-rush:half": 40,
+  "territory-rush:dominate": 50,
+  "crowd-control:pack-gate": 10,
+  "crowd-control:x4": 25,
+  "crowd-control:pack-60": 25,
+  "crowd-control:cut-in": 20,
+  "crowd-control:pack-120": 35,
+  "crowd-control:finish-80": 35,
+  "crowd-control:win-boss": 30,
 };
+
+for (const ach of allAchievements()) {
+  const id = `${ach.gameId ?? "platform"}:${ach.key}`;
+  if (!(id in ACHIEVEMENT_XP)) {
+    ACHIEVEMENT_XP[id] = ach.xp;
+  }
+}
 
 export function achievementXp(id: string): number {
   return ACHIEVEMENT_XP[id] ?? xpRewards.achievement;

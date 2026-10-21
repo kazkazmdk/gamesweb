@@ -10,6 +10,50 @@ values
   ('crowd-control', 'crowd-control', 'Crowd Control', 'live', '{"version":"1.0.0"}'::jsonb)
 on conflict (id) do update set title = excluded.title, slug = excluded.slug, manifest = excluded.manifest;
 
+insert into public.achievements (id, game_id, key, name, description, xp_reward)
+values
+  ('platform:arcade-tourist', null, 'arcade-tourist', 'Arcade Tourist', 'Play 5 different games.', 70),
+  ('platform:world-tour', null, 'world-tour', 'World Tour', 'Play all 8 arcade games.', 120),
+  ('platform:rivalry', null, 'rivalry', 'Rivalry', 'Rematch the same player five times.', 50),
+  ('platform:untouchable', null, 'untouchable', 'Untouchable', 'Win 5 challenges.', 60),
+  ('platform:social-butterfly', null, 'social-butterfly', 'Social Butterfly', 'Challenge 10 unique players.', 55),
+  ('platform:daily-grinder', null, 'daily-grinder', 'Daily Grinder', 'Complete a 7-day Daily Arcade streak.', 80),
+  ('platform:all-rounder', null, 'all-rounder', 'All-Rounder', 'Set a PB in 5 games.', 70),
+  ('platform:grand-prix-winner', null, 'grand-prix-winner', 'Grand Prix Winner', 'Win an Arcade Grand Prix.', 90),
+  ('platform:crew-player', null, 'crew-player', 'Crew Player', 'Contribute to a crew weekly challenge.', 40),
+  ('sky-stack:first-place', 'sky-stack', 'first-place', 'Placed', 'Place your first slab.', 10),
+  ('sky-stack:perfect-5', 'sky-stack', 'perfect-5', 'Clean Five', 'Land 5 perfects in a row.', 25),
+  ('sky-stack:streak-8', 'sky-stack', 'streak-8', 'Streak 8', 'Reach an 8 perfect streak.', 25),
+  ('sky-stack:floor-30', 'sky-stack', 'floor-30', 'High Air', 'Reach floor 30.', 30),
+  ('sky-stack:fever', 'sky-stack', 'fever', 'Fever', 'Enter fever mode.', 20),
+  ('sky-stack:fever-2', 'sky-stack', 'fever-2', 'Double Fever', 'Enter fever mode twice.', 20),
+  ('sky-stack:floor-67', 'sky-stack', 'floor-67', 'Sixty Seven', 'Reach floor 67.', 50),
+  ('knockout-circuit:first-gate', 'knockout-circuit', 'first-gate', 'Through', 'Finish any map.', 15),
+  ('knockout-circuit:all-maps', 'knockout-circuit', 'all-maps', 'Circuit', 'Finish all eight maps.', 40),
+  ('knockout-circuit:finish', 'knockout-circuit', 'finish', 'Finish', 'Finish a map.', 25),
+  ('knockout-circuit:no-hit', 'knockout-circuit', 'no-hit', 'Untouched', 'Finish without a hazard hit.', 30),
+  ('knockout-circuit:no-fall', 'knockout-circuit', 'no-fall', 'No Fall', 'Finish without falling.', 30),
+  ('knockout-circuit:shortcut', 'knockout-circuit', 'shortcut', 'Greedy', 'Take an expert shortcut.', 20),
+  ('knockout-circuit:fast', 'knockout-circuit', 'fast', 'Fast Line', 'Finish under 36s.', 35),
+  ('pocket-striker:first-pocket', 'pocket-striker', 'first-pocket', 'Drop', 'Pocket the striker once.', 10),
+  ('pocket-striker:perfect', 'pocket-striker', 'perfect', 'Ace', 'Hole out in one stroke.', 25),
+  ('pocket-striker:bank', 'pocket-striker', 'bank', 'Cushion', 'Score a bank shot.', 20),
+  ('pocket-striker:par-table', 'pocket-striker', 'par-table', 'Table Manners', 'Finish a layout at par or better.', 25),
+  ('pocket-striker:under-par', 'pocket-striker', 'under-par', 'Under Par', 'Finish under par.', 25),
+  ('territory-rush:first-claim', 'territory-rush', 'first-claim', 'Stake', 'Capture your first loop.', 10),
+  ('territory-rush:cut', 'territory-rush', 'cut', 'Shears', 'Eliminate a bot by cutting its trail.', 25),
+  ('territory-rush:half-map', 'territory-rush', 'half-map', 'Majority', 'Hold 50% of the arena.', 40),
+  ('territory-rush:half', 'territory-rush', 'half', 'Half', 'Hold 50% of the arena.', 40),
+  ('territory-rush:dominate', 'territory-rush', 'dominate', 'Dominate', 'Hold 72% of the arena.', 50),
+  ('crowd-control:pack-gate', 'crowd-control', 'pack-gate', 'Through the gate', 'Take your first gate.', 10),
+  ('crowd-control:x4', 'crowd-control', 'x4', 'Crowd Surge', 'Hit a x4 multiplier.', 25),
+  ('crowd-control:pack-60', 'crowd-control', 'pack-60', 'Pack 60', 'Reach 60 in the pack.', 25),
+  ('crowd-control:cut-in', 'crowd-control', 'cut-in', 'Cut In', 'Take a hidden shortcut.', 20),
+  ('crowd-control:pack-120', 'crowd-control', 'pack-120', 'Pack 120', 'Reach 120 in the pack.', 35),
+  ('crowd-control:finish-80', 'crowd-control', 'finish-80', 'Parade', 'Finish with 80 or more in the pack.', 35),
+  ('crowd-control:win-boss', 'crowd-control', 'win-boss', 'Boss Cleared', 'Finish and clear the boss.', 30)
+on conflict (id) do nothing;
+
 create or replace function public.is_known_game(p_id text)
 returns boolean
 language sql

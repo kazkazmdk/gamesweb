@@ -652,7 +652,7 @@ begin
       if offline_count > 40 then
         exit;
       end if;
-      if coalesce(run ->> 'gameId', '') not in ('neon-drift', 'velocity-run', 'swarm-protocol') then
+      if coalesce(run ->> 'gameId', '') not in ('neon-drift', 'velocity-run', 'swarm-protocol', 'sky-stack', 'knockout-circuit', 'pocket-striker', 'territory-rush', 'crowd-control') then
         continue;
       end if;
       local_id := nullif(left(coalesce(run ->> 'localSessionId', ''), 80), '');

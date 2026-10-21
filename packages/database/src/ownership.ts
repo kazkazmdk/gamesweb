@@ -81,17 +81,58 @@ export function reconstructAchievementsFromScores(scores: ScoreLike[]): string[]
     }
     if (s.gameId === "sky-stack") {
       const floors = Number(s.metadata.floors ?? 0);
-      if (floors >= 1) out.add("sky-stack:first-place");
-      if (floors >= 30) out.add("sky-stack:floor-30");
-      if (floors >= 67) out.add("sky-stack:floor-67");
+      if (floors >= 1 || Number(s.metadata.perfects ?? 0) >= 1 || s.score >= 100) {
+        out.add("sky-stack:first-place");
+      }
+      if (Number(s.metadata.maxStreak ?? s.metadata.streak ?? 0) >= 8) {
+        out.add("sky-stack:streak-8");
+      }
+      if (floors >= 30 || s.score >= 3000) out.add("sky-stack:floor-30");
+      if (floors >= 67 || s.score >= 6700) out.add("sky-stack:floor-67");
+      if (Number(s.metadata.fevers ?? 0) >= 2) out.add("sky-stack:fever-2");
     }
-    if (s.gameId === "knockout-circuit") out.add("knockout-circuit:first-gate");
+    if (s.gameId === "knockout-circuit") {
+      out.add("knockout-circuit:first-gate");
+      if (s.metadata.result !== "death" && s.metadata.result !== "timeout") {
+        out.add("knockout-circuit:finish");
+        if (Number(s.metadata.falls ?? s.metadata.deaths ?? 0) === 0) {
+          out.add("knockout-circuit:no-fall");
+        }
+        if (s.score > 0 && s.score <= 36_000) {
+          out.add("knockout-circuit:fast");
+        }
+      }
+    }
     if (s.gameId === "pocket-striker") {
       out.add("pocket-striker:first-pocket");
+      if (Boolean(s.metadata.banked)) out.add("pocket-striker:bank");
+      if (s.score <= Number(s.metadata.par ?? 3) - 1) out.add("pocket-striker:under-par");
       if (s.score === 1) out.add("pocket-striker:perfect");
     }
-    if (s.gameId === "territory-rush") out.add("territory-rush:first-claim");
-    if (s.gameId === "crowd-control") out.add("crowd-control:pack-gate");
+    if (s.gameId === "territory-rush") {
+      out.add("territory-rush:first-claim");
+      if (s.score >= 50 || Number(s.metadata.territoryPct ?? 0) >= 50) {
+        out.add("territory-rush:half");
+      }
+      if (s.score >= 72 || Number(s.metadata.territoryPct ?? 0) >= 72) {
+        out.add("territory-rush:dominate");
+      }
+    }
+    if (s.gameId === "crowd-control") {
+      out.add("crowd-control:pack-gate");
+      if (s.score >= 60 || Number(s.metadata.pack ?? 0) >= 60) {
+        out.add("crowd-control:pack-60");
+      }
+      if (s.score >= 120 || Number(s.metadata.pack ?? 0) >= 120) {
+        out.add("crowd-control:pack-120");
+      }
+      if (
+        Boolean(s.metadata.bossCleared) ||
+        (s.metadata.result === "finish" && s.metadata.bossCleared !== false)
+      ) {
+        out.add("crowd-control:win-boss");
+      }
+    }
   }
   return [...out];
 }
