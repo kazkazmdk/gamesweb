@@ -4,7 +4,23 @@ import type { Car } from "../systems/vehicle";
 import type { TrackDef, TrackSample } from "../systems/track";
 import type { GhostSample } from "../systems/ghost";
 
-export type Mark = { x: number; y: number; a: number; life: number; slip: number };
+export type Mark = {
+  x: number;
+  y: number;
+  a: number;
+  life: number;
+  maxLife?: number;
+  slip: number;
+  combo?: number;
+  lx?: number;
+  ly?: number;
+  rx?: number;
+  ry?: number;
+  plx?: number;
+  ply?: number;
+  prx?: number;
+  pry?: number;
+};
 
 export function drawWorld(
   g: Phaser.GameObjects.Graphics,
@@ -56,6 +72,84 @@ export function drawWorld(
   }
 
   if (quality !== "low") {
+    // Subtle outer barrier energy rail for high-speed corner readability
+    g.lineStyle(6, theme.accent, 0.2);
+    for (let i = 0; i < samples.length; i += 1) {
+      const s = samples[i];
+      const n = samples[(i + 1) % samples.length];
+      const rail = s.width * 0.5 + 15;
+      g.lineBetween(s.x + s.nx * rail, s.y + s.ny * rail, n.x + n.nx * rail, n.y + n.ny * rail);
+      g.lineBetween(s.x - s.nx * rail, s.y - s.ny * rail, n.x - n.nx * rail, n.y - n.ny * rail);
+    }
+    g.lineStyle(2, mixColor(theme.accent, 0xffffff, 0.45), 0.68);
+    for (let i = 0; i < samples.length; i += 1) {
+      const s = samples[i];
+      const n = samples[(i + 1) % samples.length];
+      const rail = s.width * 0.5 + 15;
+      g.lineBetween(s.x + s.nx * rail, s.y + s.ny * rail, n.x + n.nx * rail, n.y + n.ny * rail);
+      g.lineBetween(s.x - s.nx * rail, s.y - s.ny * rail, n.x - n.nx * rail, n.y - n.ny * rail);
+    }
+
+    // Glowing apex rumble-strip chevrons on high-curvature segments
+    for (let i = 0; i < samples.length; i += 1) {
+      const s = samples[i];
+      const n = samples[(i + 1) % samples.length];
+      const look = samples[(i + 4) % samples.length];
+      const cross = s.tx * look.ty - s.ty * look.tx;
+      const turn = Math.abs(cross);
+      if (turn > 0.042) {
+        const apexSign = cross > 0 ? 1 : -1;
+        const inner = s.width * 0.44 * apexSign;
+        const outerCurb = s.width * 0.51 * apexSign;
+        const curbCol = i % 2 === 0 ? theme.accent : 0xf8f4e8;
+        g.fillStyle(curbCol, 0.9);
+        g.fillTriangle(
+          s.x + s.nx * inner,
+          s.y + s.ny * inner,
+          s.x + s.nx * outerCurb,
+          s.y + s.ny * outerCurb,
+          n.x + n.nx * outerCurb,
+          n.y + n.ny * outerCurb,
+        );
+        g.fillTriangle(
+          s.x + s.nx * inner,
+          s.y + s.ny * inner,
+          n.x + n.nx * outerCurb,
+          n.y + n.ny * outerCurb,
+          n.x + n.nx * inner,
+          n.y + n.ny * inner,
+        );
+        if (i % 2 === 0) {
+          const cx = s.x - s.nx * apexSign * (s.width * 0.5 + 22);
+          const cy = s.y - s.ny * apexSign * (s.width * 0.5 + 22);
+          const pulse = 0.55 + Math.sin(t / 160 + i * 0.6) * 0.3;
+          g.fillStyle(theme.accent, pulse * 0.35);
+          g.fillCircle(cx, cy, 12);
+          g.fillStyle(mixColor(theme.accent, 0x38e8ff, 0.35), pulse);
+          g.fillTriangle(
+            cx + s.tx * 12,
+            cy + s.ty * 12,
+            cx - s.tx * 6 + s.nx * 7,
+            cy - s.ty * 6 + s.ny * 7,
+            cx - s.tx * 6 - s.nx * 7,
+            cy - s.ty * 6 - s.ny * 7,
+          );
+        }
+      }
+      if (s.boost && i % 2 === 0) {
+        const pulse = 0.5 + Math.sin(t / 120 + i) * 0.3;
+        g.fillStyle(0x38e8ff, pulse * 0.65);
+        g.fillTriangle(
+          s.x + s.tx * 18,
+          s.y + s.ty * 18,
+          s.x - s.tx * 8 + s.nx * 24,
+          s.y - s.ty * 8 + s.ny * 24,
+          s.x - s.tx * 8 - s.nx * 24,
+          s.y - s.ty * 8 - s.ny * 24,
+        );
+      }
+    }
+
     g.lineStyle(3, theme.mark, 0.72);
     for (let i = 0; i < samples.length; i += 1) {
       const s = samples[i];
@@ -275,12 +369,45 @@ function fillStrip(
   g.fillTriangle(ax - anx * w, ay - any * w, bx - bnx * w, by - bny * w, bx + bnx * w, by + bny * w);
 }
 
+function ribbonColorForCombo(combo: number): number {
+  if (combo < 3) {
+    return mixColor(0x38e8ff, 0xff44b8, Math.max(0, Math.min(1, (combo - 1) / 2)));
+  }
+  if (combo < 6) {
+    return mixColor(0xff44b8, 0xffd84a, Math.max(0, Math.min(1, (combo - 3) / 3)));
+  }
+  return 0xffd84a;
+}
+
 export function drawMarks(g: Phaser.GameObjects.Graphics, marks: Mark[], dt: number) {
   for (const m of marks) {
     m.life -= dt;
     if (m.life <= 0) continue;
-    g.fillStyle(0x141418, Math.min(0.7, m.life * 0.28 + m.slip * 0.3));
-    g.fillCircle(m.x, m.y, 4.4 + m.slip * 2.4);
+    const maxL = m.maxLife ?? 3.2;
+    const fade = Math.max(0, Math.min(1, m.life / maxL));
+    const heatCol = ribbonColorForCombo(m.combo ?? 1);
+    if (
+      m.lx !== undefined &&
+      m.ly !== undefined &&
+      m.rx !== undefined &&
+      m.ry !== undefined &&
+      m.plx !== undefined &&
+      m.ply !== undefined &&
+      m.prx !== undefined &&
+      m.pry !== undefined
+    ) {
+      g.lineStyle(4.2, 0x121216, fade * (0.55 + m.slip * 0.25));
+      g.lineBetween(m.plx, m.ply, m.lx, m.ly);
+      g.lineBetween(m.prx, m.pry, m.rx, m.ry);
+      g.lineStyle(2.4 + m.slip * 1.4, heatCol, fade * (0.42 + m.slip * 0.38));
+      g.lineBetween(m.plx, m.ply, m.lx, m.ly);
+      g.lineBetween(m.prx, m.pry, m.rx, m.ry);
+    } else {
+      g.fillStyle(0x141418, Math.min(0.7, m.life * 0.28 + m.slip * 0.3));
+      g.fillCircle(m.x, m.y, 4.4 + m.slip * 2.4);
+      g.fillStyle(heatCol, fade * 0.35);
+      g.fillCircle(m.x, m.y, 2.6 + m.slip * 1.5);
+    }
   }
 }
 
@@ -297,6 +424,32 @@ export function drawGhost(g: Phaser.GameObjects.Graphics, pose: GhostSample | nu
 }
 
 export function drawCar(g: Phaser.GameObjects.Graphics, car: Car, accent: number, smash = 0) {
+  if (car.throttle > 0.25 && (car.drifting || car.surface === "boost" || car.speed > 310)) {
+    const c = Math.cos(car.angle);
+    const s = Math.sin(car.angle);
+    const nx = -s;
+    const ny = c;
+    const boostMul = car.surface === "boost" ? 1.45 : 1 + car.driftAmount * 0.55;
+    const len = (14 + (car.speed / 615) * 18) * boostMul * (0.85 + Math.sin(car.x * 0.15 + car.y * 0.15) * 0.15);
+    const outerCol = car.surface === "boost" ? 0x38e8ff : car.driftAmount > 0.45 ? 0xff44b8 : 0xff8a32;
+    for (const side of [-5.5, 5.5]) {
+      const bx = car.x - c * 18 + nx * side;
+      const by = car.y - s * 18 + ny * side;
+      const tx = bx - c * len;
+      const ty = by - s * len;
+      g.fillStyle(outerCol, 0.72);
+      g.fillTriangle(bx + nx * 3.2, by + ny * 3.2, bx - nx * 3.2, by - ny * 3.2, tx, ty);
+      g.fillStyle(0xfff6d8, 0.92);
+      g.fillTriangle(
+        bx + nx * 1.6,
+        by + ny * 1.6,
+        bx - nx * 1.6,
+        by - ny * 1.6,
+        bx - c * (len * 0.58),
+        by - s * (len * 0.58),
+      );
+    }
+  }
   drawArcadeCar(g, car.x, car.y, car.angle, {
     accent,
     drifting: car.drifting,
@@ -315,20 +468,34 @@ export function drawHudChrome(
   h: number,
   touch: boolean,
   flash: number,
-  meters?: { drift: number; combo: number; live: number },
+  meters?: { drift: number; combo: number; live: number; speed?: number },
 ) {
   overlay.clear();
   if (flash > 0) {
     overlay.fillStyle(0xffffff, flash);
     overlay.fillRect(0, 0, w, h);
   }
+  if (meters?.speed && meters.speed > 420) {
+    const spdT = Math.min(1, (meters.speed - 420) / 195);
+    const ribbonCol = ribbonColorForCombo(meters.combo);
+    overlay.lineStyle(1.5, ribbonCol, 0.16 * spdT);
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    for (let i = 0; i < 16; i += 1) {
+      const ang = (i / 16) * Math.PI * 2 + (meters.speed * 0.002);
+      const r0 = Math.min(w, h) * (0.44 - spdT * 0.05);
+      const r1 = Math.max(w, h) * 0.62;
+      overlay.lineBetween(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0, cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1);
+    }
+  }
   if (meters) {
     const drift = Math.min(1, meters.drift);
+    const heatCol = ribbonColorForCombo(meters.combo);
     overlay.fillStyle(0x0a1018, 0.45);
     overlay.fillRect(18, 228, 176, 28);
     overlay.fillStyle(0xffffff, 0.12);
     overlay.fillRect(26, 236, 160, 4);
-    overlay.fillStyle(0xf0b84a, 0.95);
+    overlay.fillStyle(heatCol, 0.95);
     overlay.fillRect(26, 236, 160 * drift, 4);
     overlay.fillStyle(0x8dffc1, meters.live > 8 ? 0.92 : 0.2);
     overlay.fillRect(26, 244, Math.min(160, Math.max(8, meters.live / 28)), 4);

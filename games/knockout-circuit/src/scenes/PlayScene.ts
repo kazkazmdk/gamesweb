@@ -25,6 +25,16 @@ function aabb(ax: number, ay: number, aw: number, ah: number, bx: number, by: nu
   return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
 }
 
+type GhostSample = { t: number; x: number; y: number; vx?: number; vy?: number; grounded?: boolean };
+type GhostRunner = { name: string; color: number; samples: GhostSample[] };
+
+const RIVAL_SPECS: Array<{ name: string; color: number; targetMs: number; seedOffset: number }> = [
+  { name: "BLITZ", color: 0x38bdf8, targetMs: 27000, seedOffset: 11 },
+  { name: "VEX", color: 0xf472b6, targetMs: 32000, seedOffset: 29 },
+  { name: "NOVA", color: 0xa78bfa, targetMs: 37000, seedOffset: 47 },
+  { name: "ECHO", color: 0x34d399, targetMs: 43000, seedOffset: 73 },
+];
+
 export class KnockoutScene extends Phaser.Scene {
   private platform!: PlatformSDK;
   private map!: MapDef;
@@ -35,6 +45,7 @@ export class KnockoutScene extends Phaser.Scene {
   private gfx!: Phaser.GameObjects.Graphics;
   private overlay!: Phaser.GameObjects.Graphics;
   private hud!: Phaser.GameObjects.Text;
+  private ghostLabels: Phaser.GameObjects.Text[] = [];
   private nativeKeys: GameKeyboard | null = null;
   private x = 80;
   private y = 600;
@@ -43,10 +54,13 @@ export class KnockoutScene extends Phaser.Scene {
   private grounded = false;
   private dash = 0;
   private timeMs = 0;
+  private elapsed = 0;
   private running = false;
   private ended = false;
   private dying = 0;
   private hits = 0;
+  private falls = 0;
+  private checkpointIdx = 0;
   private camX = 0;
   private camY = 0;
   private touchMove = 0;
@@ -59,12 +73,15 @@ export class KnockoutScene extends Phaser.Scene {
   private signaledReady = false;
   private ticks = 0;
   private longFrames = 0;
-  private recorder: Array<{ t: number; x: number; y: number }> = [];
-  private ghosts: Array<{ name: string; color: number; samples: Array<{ t: number; x: number; y: number }> }> = [];
+  private recorder: GhostSample[] = [];
+  private ghosts: GhostRunner[] = [];
+  private playerTrail: Array<{ x: number; y: number }> = [];
   private usedExpert = false;
   private spawn = { x: 80, y: 600 };
   private rag = { x: 0, y: 0, vx: 0, vy: 0, rot: 0, av: 0 };
   private paused = false;
+  private rank = 1;
+  private totalRunners = 5;
 
   constructor() {
     super("knockout-play");
@@ -82,19 +99,35 @@ export class KnockoutScene extends Phaser.Scene {
     this.ended = false;
     this.running = false;
     this.timeMs = 0;
+    this.elapsed = 0;
     this.hits = 0;
+    this.falls = 0;
+    this.checkpointIdx = 0;
     this.dash = 0;
     this.dying = 0;
     this.recorder = [];
+    this.playerTrail = [];
     this.usedExpert = false;
-    this.parts = new ParticlePool(120);
+    this.parts = new ParticlePool(160);
     this.synth = (this.game.registry.get("synth") as Synth | undefined) ?? new Synth();
     this.game.registry.set("synth", this.synth);
     this.synth.setSettings(this.platform.audio.getSettings());
     this.cameras.main.setBackgroundColor(this.map.theme.sky);
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
-    this.hud = this.add.text(20, 64, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#2a1a10" }).setScrollFactor(0).setDepth(21);
+    this.hud = this.add
+      .text(20, 64, "", {
+        fontFamily: "ui-sans-serif, system-ui",
+        fontSize: "16px",
+        fontStyle: "800",
+        color: "#fff8ec",
+        stroke: "#1c120c",
+        strokeThickness: 4,
+      })
+      .setScrollFactor(0)
+      .setDepth(21);
+    this.ghostLabels.forEach((lbl) => lbl.destroy());
+    this.ghostLabels = [];
     this.nativeKeys?.destroy();
     this.nativeKeys = createGameKeyboard();
     this.game.canvas.tabIndex = 0;
@@ -130,14 +163,150 @@ export class KnockoutScene extends Phaser.Scene {
     this.platform.events.emit({ name: "gameplay_started", props: { gameId: "knockout-circuit" } });
   }
 
+  private buildRivalSamples(targetMs: number, seedOffset: number): GhostSample[] {
+    const finish = this.map.solids.find((s) => s.kind === "finish");
+    const endX = finish ? finish.x + 8 : this.map.width - 220;
+    const endY = finish ? finish.y + finish.h - 32 : this.spawn.y;
+    const walkable = this.map.solids.filter(
+      (s) => (s.kind === "solid" || s.kind === "mover" || s.kind === "fall") && s.route !== "expert",
+    );
+    const hazards = this.map.solids.filter((s) => s.kind === "spinner" || s.kind === "beam" || s.kind === "gate");
+    const samples: GhostSample[] = [];
+    const stepMs = 80;
+    const steps = Math.max(20, Math.ceil(targetMs / stepMs));
+    const startX = this.spawn.x + ((seedOffset % 5) - 2) * 6;
+    const startY = this.spawn.y;
+
+    let prevX = startX;
+    let prevY = startY;
+    for (let i = 0; i <= steps; i += 1) {
+      const t = Math.min(targetMs, i * stepMs);
+      const u = t / targetMs;
+      const wobble = Math.sin(u * Math.PI * 6 + seedOffset) * 0.008 * (1 - u);
+      const progress = clamp(u + wobble, 0, 1);
+      const x = startX + (endX - startX) * progress;
+
+      // Find supporting platform at x, or interpolate between nearest platforms for jump arcs
+      let groundY = startY + (endY - startY) * progress;
+      let onPlat: Rect | undefined;
+      let prevPlat: Rect | undefined;
+      let nextPlat: Rect | undefined;
+      for (const p of walkable) {
+        if (x >= p.x - 10 && x <= p.x + p.w + 10) {
+          onPlat = p;
+          break;
+        }
+        if (p.x + p.w < x && (!prevPlat || p.x + p.w > prevPlat.x + prevPlat.w)) {
+          prevPlat = p;
+        }
+        if (p.x > x && (!nextPlat || p.x < nextPlat.x)) {
+          nextPlat = p;
+        }
+      }
+
+      let jumpArc = 0;
+      let grounded = true;
+      if (onPlat) {
+        groundY = onPlat.y - 32;
+      } else if (prevPlat && nextPlat) {
+        const gapStart = prevPlat.x + prevPlat.w;
+        const gapEnd = nextPlat.x;
+        const gapU = clamp((x - gapStart) / Math.max(1, gapEnd - gapStart), 0, 1);
+        groundY = (prevPlat.y - 32) * (1 - gapU) + (nextPlat.y - 32) * gapU;
+        jumpArc = Math.sin(gapU * Math.PI) * 74;
+        grounded = false;
+      }
+
+      // Also jump over nearby spinners/beams/gates
+      for (const h of hazards) {
+        const hx = h.x + h.w * 0.5;
+        const dist = Math.abs(x - hx);
+        if (dist < 85) {
+          const hu = 1 - dist / 85;
+          const hop = Math.sin(hu * Math.PI * 0.5) * 68;
+          if (hop > jumpArc) {
+            jumpArc = hop;
+            grounded = false;
+          }
+        }
+      }
+
+      const y = groundY - jumpArc;
+      const dtSec = stepMs / 1000;
+      const vx = i === 0 ? 180 : (x - prevX) / dtSec;
+      const vy = i === 0 ? 0 : (y - prevY) / dtSec;
+      samples.push({ t, x, y, vx, vy, grounded });
+      prevX = x;
+      prevY = y;
+    }
+    return samples;
+  }
+
   private loadGhosts() {
     this.ghosts = [];
+    for (const rival of RIVAL_SPECS) {
+      this.ghosts.push({
+        name: rival.name,
+        color: rival.color,
+        samples: this.buildRivalSamples(rival.targetMs, rival.seedOffset + this.mapIndex * 17),
+      });
+    }
     try {
       const raw = localStorage.getItem(`gw:ko-ghost:${this.map.id}`);
-      if (raw) this.ghosts.push({ name: "PB", color: 0xffe08a, samples: JSON.parse(raw) });
+      if (raw) {
+        const parsed = JSON.parse(raw) as GhostSample[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          this.ghosts.push({ name: "PB", color: 0xffe08a, samples: parsed });
+        }
+      }
     } catch {
       /* noop */
     }
+    this.totalRunners = 1 + this.ghosts.length;
+  }
+
+  private sampleGhostAt(ghost: GhostRunner, tMs: number): GhostSample | null {
+    const pts = ghost.samples;
+    if (!pts.length) return null;
+    if (tMs <= pts[0].t) return pts[0];
+    const last = pts[pts.length - 1];
+    if (tMs >= last.t) return { ...last, vx: 0, vy: 0, grounded: true };
+    let idx = 0;
+    for (let i = 0; i < pts.length - 1; i += 1) {
+      if (pts[i + 1].t >= tMs) {
+        idx = i;
+        break;
+      }
+    }
+    const a = pts[idx];
+    const b = pts[idx + 1] ?? a;
+    const span = Math.max(1, b.t - a.t);
+    const u = clamp((tMs - a.t) / span, 0, 1);
+    return {
+      t: tMs,
+      x: a.x + (b.x - a.x) * u,
+      y: a.y + (b.y - a.y) * u,
+      vx: b.vx ?? ((b.x - a.x) / span) * 1000,
+      vy: b.vy ?? ((b.y - a.y) / span) * 1000,
+      grounded: a.grounded ?? Math.abs((b.y ?? a.y) - a.y) < 1.5,
+    };
+  }
+
+  private formatOrdinal(n: number) {
+    if (n === 1) return "1ST";
+    if (n === 2) return "2ND";
+    if (n === 3) return "3RD";
+    return `${n}TH`;
+  }
+
+  private updateRaceRank() {
+    let ahead = 0;
+    for (const ghost of this.ghosts) {
+      const pose = this.sampleGhostAt(ghost, this.elapsed);
+      if (pose && pose.x > this.x + 2) ahead += 1;
+    }
+    this.rank = 1 + ahead;
+    this.totalRunners = 1 + this.ghosts.length;
   }
 
   update(_: number, delta: number) {
@@ -159,7 +328,7 @@ export class KnockoutScene extends Phaser.Scene {
     if (native?.twoPressed) this.switchMap(1);
     if (native?.threePressed) this.switchMap(2);
     if (this.dying > 0) {
-      this.dying -= dt * 1000;
+      this.dying -= delta;
       this.rag.vy += 1680 * dt;
       this.rag.x += this.rag.vx * dt;
       this.rag.y += this.rag.vy * dt;
@@ -172,7 +341,9 @@ export class KnockoutScene extends Phaser.Scene {
         this.vx = this.vy = 0;
         this.running = false;
         this.timeMs = 0;
+        this.elapsed = 0;
         this.recorder = [];
+        this.playerTrail = [];
       }
       return;
     }
@@ -192,18 +363,38 @@ export class KnockoutScene extends Phaser.Scene {
         this.vy = -620;
         this.grounded = false;
         this.synth.tone(340, 0.04, "square", 0.03, 0.1);
+        this.parts.burst(this.x + 11, this.y + 30, 8, 0xffffff, 45, 160);
       }
       if (dash && this.dash <= 0) {
         this.dash = 180;
         this.synth.noiseBurst(0.08, 0.04, 500);
+        this.parts.burst(this.x + 11, this.y + 16, 10, this.map.theme.accent, 80, 220);
       }
-      this.dash = Math.max(0, this.dash - dt * 1000);
+      this.dash = Math.max(0, this.dash - delta);
       this.vy += 1680 * dt;
       this.x += this.vx * dt;
       this.y += this.vy * dt;
       this.collide();
-      if (this.running) this.timeMs = this.time.now - this.started;
-      if (this.ticks % 4 === 0) this.recorder.push({ t: this.timeMs, x: this.x, y: this.y });
+      if (this.running) {
+        this.timeMs = this.time.now - this.started;
+        this.elapsed = this.timeMs;
+      }
+      if (this.ticks % 2 === 0 && (Math.abs(this.vx) > 20 || Math.abs(this.vy) > 20)) {
+        this.playerTrail.push({ x: this.x, y: this.y });
+        if (this.playerTrail.length > 7) this.playerTrail.shift();
+      }
+      if (this.ticks % 4 === 0) {
+        this.recorder.push({ t: this.timeMs, x: this.x, y: this.y, vx: this.vx, vy: this.vy, grounded: this.grounded });
+      }
+      // Track checkpoint/gate progression
+      let passedGates = 0;
+      for (const s of this.map.solids) {
+        if ((s.kind === "gate" || s.kind === "mover" || s.kind === "spinner") && this.x > s.x + s.w) {
+          passedGates += 1;
+        }
+      }
+      if (passedGates > this.checkpointIdx) this.checkpointIdx = passedGates;
+      this.updateRaceRank();
       const finish = this.map.solids.find((s) => s.kind === "finish");
       if (finish && aabb(this.x, this.y, 22, 32, finish.x, finish.y, finish.w, finish.h)) this.win();
       if (this.y > this.map.height + 40) this.die();
@@ -257,9 +448,10 @@ export class KnockoutScene extends Phaser.Scene {
   private die() {
     if (this.ended || this.dying > 0) return;
     this.hits += 1;
+    this.falls += 1;
     this.dying = 520;
     this.rag = { x: this.x, y: this.y, vx: this.vx * 0.35 + (Math.random() - 0.5) * 140, vy: -340, rot: 0, av: 9 + Math.random() * 6 };
-    this.parts.burst(this.x + 11, this.y + 12, 16, this.map.theme.danger, 140, 380);
+    this.parts.burst(this.x + 11, this.y + 12, 18, this.map.theme.danger, 140, 380);
     this.synth.impact(0.6);
     this.juice.flash(0.2);
     if (this.running) {
@@ -267,7 +459,13 @@ export class KnockoutScene extends Phaser.Scene {
         mode: this.map.id,
         score: Math.floor(this.timeMs),
         result: "attempt-death",
-        metadata: { competitive: false, hideResult: true, attemptDurationMs: Math.floor(this.timeMs) },
+        metadata: {
+          competitive: false,
+          hideResult: true,
+          falls: this.falls,
+          gates: this.checkpointIdx,
+          attemptDurationMs: Math.floor(this.timeMs),
+        },
       });
     }
   }
@@ -277,6 +475,11 @@ export class KnockoutScene extends Phaser.Scene {
     this.ended = true;
     this.synth.finishSting();
     pulseHaptic([8, 20, 8]);
+    // Multi-color confetti burst at finish arch!
+    const confettiColors = [0x38bdf8, 0xf472b6, 0xffe08a, 0x34d399, 0xa78bfa];
+    for (let i = 0; i < confettiColors.length; i += 1) {
+      this.parts.burst(this.x + 11, this.y - 8, 12, confettiColors[i], 120, 420);
+    }
     try {
       localStorage.setItem(`gw:ko-ghost:${this.map.id}`, JSON.stringify(this.recorder));
       const key = "gw:ko-cleared";
@@ -297,9 +500,12 @@ export class KnockoutScene extends Phaser.Scene {
       metadata: {
         lowerIsBetter: true,
         hits: this.hits,
+        falls: this.falls,
+        gates: this.checkpointIdx,
+        rank: this.rank,
         expert: this.usedExpert,
         attemptDurationMs: Math.floor(this.timeMs),
-        retryHint: `${this.map.name} ${(this.timeMs / 1000).toFixed(2)}s`,
+        retryHint: `${this.formatOrdinal(this.rank)} / ${this.totalRunners} · ${this.map.name} ${(this.timeMs / 1000).toFixed(2)}s`,
       },
     });
   }
@@ -309,35 +515,111 @@ export class KnockoutScene extends Phaser.Scene {
     this.scene.restart();
   }
 
+  private ensureGhostLabel(idx: number) {
+    let lbl = this.ghostLabels[idx];
+    if (!lbl) {
+      lbl = this.add
+        .text(0, 0, "", {
+          fontFamily: "ui-sans-serif, system-ui",
+          fontSize: "11px",
+          fontStyle: "800",
+          color: "#ffffff",
+        })
+        .setOrigin(0.5, 0.5)
+        .setDepth(15);
+      this.ghostLabels[idx] = lbl;
+    }
+    return lbl;
+  }
+
+  private drawCapsuleBean(
+    g: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    color: number,
+    opts: { facing: 1 | -1; grounded: boolean; vx: number; vy: number; t: number; dying?: boolean; lean?: number; isPlayer?: boolean },
+  ) {
+    // Base runner legs/capsule
+    drawRunner(g, x, y, 22, 32, { ...opts, color });
+    if (opts.dying) return;
+    // Expressive Fall-Guys style glossy visor face & headband crown
+    const cx = x + 11;
+    const cy = y + 11;
+    const dir = opts.facing;
+    // Headband / ear-muff trim
+    g.fillStyle(mixColor(color, 0xffffff, 0.45), 0.95);
+    g.fillRoundedRect(cx - 10, y + 3, 20, 4, 2);
+    // Faceplate visor
+    g.fillStyle(0x181824, 0.92);
+    g.fillRoundedRect(cx - 6 + dir * 2, cy - 4, 12, 8, 4);
+    // Expressive pill eyes inside visor
+    g.fillStyle(0xffffff, 0.96);
+    g.fillCircle(cx - 2 + dir * 2.5, cy - 0.5, 1.8);
+    g.fillCircle(cx + 3 + dir * 2.5, cy - 0.5, 1.8);
+    if (opts.isPlayer) {
+      // Golden contender crown badge above player bean
+      g.fillStyle(0xffe066, 0.96);
+      g.fillTriangle(cx - 6, y - 2, cx - 4, y - 9, cx - 1, y - 4);
+      g.fillTriangle(cx - 2, y - 2, cx, y - 11, cx + 2, y - 2);
+      g.fillTriangle(cx + 1, y - 4, cx + 4, y - 9, cx + 6, y - 2);
+    }
+  }
+
   private drawPlace(g: Phaser.GameObjects.Graphics, th: MapDef["theme"]) {
     const env = this.map.env;
+    const t = this.time.now / 1000;
+    // Distant TV Game Show Towers & Blimps
     g.fillStyle(mixColor(th.sky, 0xfff0c8, 0.18), 1);
     for (let i = 0; i < 8; i += 1) {
       const x = i * 380 + this.camX * 0.16;
-      g.fillRoundedRect(x, this.map.height * 0.22, 92, this.map.height * 0.28, 10);
+      g.fillRoundedRect(x, this.map.height * 0.22, 92, this.map.height * 0.28, 12);
+      g.fillStyle(0xffffff, 0.18);
+      g.fillRoundedRect(x + 10, this.map.height * 0.24, 18, this.map.height * 0.22, 6);
+      g.fillStyle(mixColor(th.sky, 0xfff0c8, 0.18), 1);
     }
-    g.fillStyle(0xff6b4a, 0.9);
+    // Overhead Broadcast Scoreboard Gantries
     for (let i = 0; i < 6; i += 1) {
-      g.fillRoundedRect(i * 520 + this.camX * 0.06, this.map.height * 0.1, 180, 28, 6);
-      g.fillStyle(0xffe08a, 1);
-      g.fillRoundedRect(i * 520 + 16 + this.camX * 0.06, this.map.height * 0.112, 148, 12, 3);
-      g.fillStyle(0xff6b4a, 0.9);
+      const gx = i * 520 + this.camX * 0.06;
+      g.fillStyle(0xff6b4a, 0.92);
+      g.fillRoundedRect(gx, this.map.height * 0.1, 184, 30, 8);
+      g.fillStyle(0x1f1924, 0.9);
+      g.fillRoundedRect(gx + 10, this.map.height * 0.108, 164, 16, 4);
+      g.fillStyle(0xffe08a, 0.95);
+      g.fillRoundedRect(gx + 16, this.map.height * 0.113, 152, 8, 3);
     }
-    const crowd = [0xff6b4a, 0x4ad4e8, 0xffd166, 0xff8ad4, 0x7d5fff];
+    // Cheering Stadium Bleachers
+    const crowd = [0xff6b4a, 0x38bdf8, 0xffd166, 0xf472b6, 0xa78bfa, 0x34d399];
     for (let i = 0; i < 18; i += 1) {
       const x = 40 + i * 150 + this.camX * 0.08;
-      g.fillStyle(0xffe08a, 1);
-      g.fillRoundedRect(x, this.map.height * 0.16, 70, 36, 6);
+      g.fillStyle(0x2a1f2d, 0.22);
+      g.fillRoundedRect(x - 2, this.map.height * 0.16 + 4, 74, 38, 8);
+      g.fillStyle(0xffe08a, 0.95);
+      g.fillRoundedRect(x, this.map.height * 0.16, 70, 36, 7);
       for (let j = 0; j < 4; j += 1) {
+        const hop = Math.abs(Math.sin(t * 5 + i * 0.7 + j * 1.1)) * 4;
         g.fillStyle(crowd[(i + j) % crowd.length], 1);
-        g.fillCircle(x + 12 + j * 14, this.map.height * 0.17, 6);
+        g.fillCircle(x + 12 + j * 14, this.map.height * 0.172 - hop, 6.2);
       }
     }
-    g.fillStyle(0xf2e6d0, 1);
-    g.fillRect(0, this.map.height - 52, this.map.width, 52);
-    g.fillStyle(th.danger, 0.75);
+    // 3D Abyss Grid & Elimination Slime/Laser Pit at the bottom
+    const abyssY = this.map.height - 56;
+    g.fillStyle(0x181122, 0.96);
+    g.fillRect(0, abyssY, this.map.width, 56);
+    // Perspective Abyss Grid lines
+    g.lineStyle(1.5, th.danger, 0.34);
+    for (let row = 1; row <= 3; row += 1) {
+      const ry = abyssY + row * 13;
+      g.lineBetween(0, ry, this.map.width, ry);
+    }
+    const gridScroll = (t * 48) % 44;
+    for (let gx = -44 + gridScroll; gx < this.map.width; gx += 44) {
+      g.lineBetween(gx, abyssY, gx - 18, this.map.height);
+    }
+    // Glowing top laser rim & hazard saw-teeth
+    g.fillStyle(th.danger, 0.85);
+    g.fillRect(0, abyssY, this.map.width, 4);
     for (let i = 0; i < this.map.width; i += 28) {
-      g.fillTriangle(i, this.map.height - 52, i + 14, this.map.height - 52, i + 14, this.map.height - 34);
+      g.fillTriangle(i, abyssY, i + 14, abyssY, i + 7, abyssY - 12);
     }
     if (env === "factory") {
       for (let i = 0; i < 7; i += 1) {
@@ -348,6 +630,67 @@ export class KnockoutScene extends Phaser.Scene {
     } else if (env === "skyworks") {
       g.fillStyle(0xfff4c8, 0.85);
       g.fillCircle(this.map.width * 0.72, 84, 56);
+    }
+  }
+
+  private drawPlatform3D(
+    g: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    topColor: number,
+    route?: Rect["route"],
+    kind: Rect["kind"] = "solid",
+    t = 0,
+  ) {
+    const extrude = 10;
+    const sideDark = mixColor(topColor, 0x160d1e, 0.46);
+    const lipDark = mixColor(topColor, 0x09050d, 0.62);
+    // Drop shadow into abyss
+    g.fillStyle(0x000000, 0.18);
+    g.fillRoundedRect(x + 4, y + 6, w, h + extrude, 10);
+    // 3D Bottom bevel extrusion
+    g.fillStyle(lipDark, 1);
+    g.fillRoundedRect(x, y + 4, w, h + extrude, 10);
+    // 3D Mid bevel band
+    g.fillStyle(sideDark, 1);
+    g.fillRoundedRect(x, y + 2, w, h + extrude - 4, 9);
+    // Top padded deck
+    g.fillStyle(topColor, 1);
+    g.fillRoundedRect(x, y, w, h, 8);
+    // Specular highlight strip along top lip
+    g.fillStyle(0xffffff, 0.48);
+    g.fillRoundedRect(x + 6, y + 3, Math.max(8, w - 12), 6, 3);
+
+    if (kind === "mover") {
+      // Animated chevron conveyor belt on moving platforms
+      g.fillStyle(0x1f1924, 0.72);
+      g.fillRoundedRect(x + 10, y + 5, Math.max(12, w - 20), h - 8, 4);
+      const scroll = (t * 60) % 24;
+      g.lineStyle(2.5, 0xffe066, 0.92);
+      for (let cx = x + 16 + scroll; cx < x + w - 16; cx += 24) {
+        g.lineBetween(cx - 5, y + 7, cx + 2, y + h * 0.5);
+        g.lineBetween(cx + 2, y + h * 0.5, cx - 5, y + h - 5);
+      }
+    } else if (route === "fast") {
+      // Speed route forward chevrons
+      g.lineStyle(2, 0xffffff, 0.65);
+      for (let cx = x + 22; cx < x + w - 18; cx += 32) {
+        g.lineBetween(cx - 4, y + 6, cx + 3, y + h * 0.5);
+        g.lineBetween(cx + 3, y + h * 0.5, cx - 4, y + h - 6);
+      }
+    } else if (route === "expert") {
+      // High-risk hazard corner badges
+      g.fillStyle(0xffe066, 0.9);
+      for (let sx = x + 12; sx < x + w - 18; sx += 28) {
+        g.fillRect(sx, y + h - 5, 12, 3);
+      }
+    } else {
+      // Rivet accents on standard platforms
+      g.fillStyle(this.map.theme.accent, 0.75);
+      g.fillRoundedRect(x + 8, y + 4, 14, 5, 2);
+      if (w > 80) g.fillRoundedRect(x + w - 22, y + 4, 14, 5, 2);
     }
   }
 
@@ -380,48 +723,78 @@ export class KnockoutScene extends Phaser.Scene {
         const a = t * 2.8 + (s.phase ?? 0);
         const cx = live.x + live.w / 2;
         const cy = live.y + live.h / 2;
+        // Sweeping danger radius & motion-blur arc trail
+        g.lineStyle(3, th.danger, 0.25);
+        g.strokeCircle(cx, cy, 56);
+        g.lineStyle(10, th.danger, 0.22);
+        g.beginPath();
+        g.arc(cx, cy, 46, a - 1.15, a, false);
+        g.strokePath();
+        g.lineStyle(5, 0xffe08a, 0.38);
+        g.beginPath();
+        g.arc(cx, cy, 46, a - 0.65, a, false);
+        g.strokePath();
+        // Pedestal & 3D hub
+        g.fillStyle(0x2a1f2d, 0.85);
+        g.fillRoundedRect(cx - 12, cy + 14, 24, 42, 6);
         g.fillStyle(0xff8a4a, 1);
-        g.fillRect(cx - 10, cy + 16, 20, 40);
+        g.fillRoundedRect(cx - 9, cy + 16, 18, 38, 4);
+        g.fillStyle(0x1f1924, 1);
+        g.fillCircle(cx, cy + 3, 20);
         g.fillStyle(0xffd166, 1);
         g.fillCircle(cx, cy, 18);
         g.save();
         g.translateCanvas(cx, cy);
         g.rotateCanvas(a);
         if (s.prop === "hammer") {
+          g.fillStyle(0x9d174d, 1);
+          g.fillRoundedRect(-18, -14, 36, 122, 14);
           g.fillStyle(0xff8ad4, 1);
           g.fillRoundedRect(-18, -18, 36, 120, 14);
+          g.fillStyle(0xb45309, 1);
+          g.fillRoundedRect(-52, 82, 104, 48, 16);
           g.fillStyle(0xffd166, 1);
           g.fillRoundedRect(-52, 78, 104, 48, 16);
-          g.fillStyle(0xffffff, 0.35);
-          g.fillRoundedRect(-44, 86, 40, 16, 8);
+          g.fillStyle(0xffffff, 0.45);
+          g.fillRoundedRect(-44, 84, 44, 14, 7);
         } else if (s.prop === "disc") {
+          g.fillStyle(0x0369a1, 1);
+          g.fillCircle(0, 4, 62);
           g.fillStyle(0x4ad4e8, 1);
           g.fillCircle(0, 0, 62);
+          g.lineStyle(4, 0xffffff, 0.45);
+          g.strokeCircle(0, 0, 48);
           g.fillStyle(0xffffff, 0.35);
           g.fillCircle(-16, -14, 16);
           g.fillStyle(0xffd166, 1);
           g.fillCircle(0, 0, 18);
         } else {
-          g.fillStyle(th.danger, 0.95);
+          g.fillStyle(0x881337, 0.95);
+          g.fillRoundedRect(-56, -4, 112, 16, 8);
+          g.fillRoundedRect(-8, -52, 16, 112, 8);
+          g.fillStyle(th.danger, 0.98);
           g.fillRoundedRect(-56, -8, 112, 16, 8);
           g.fillRoundedRect(-8, -56, 16, 112, 8);
-          g.fillStyle(0xffe08a, 0.45);
+          g.fillStyle(0xffe08a, 0.65);
           g.fillRect(-48, -4, 20, 8);
+          g.fillRect(28, -4, 20, 8);
         }
-        g.fillStyle(0xffffff, 0.85);
+        g.fillStyle(0xffffff, 0.9);
         g.fillCircle(0, 0, 6);
         g.restore();
         continue;
       }
       if (s.kind === "beam") {
-        const pulse = 0.45 + Math.sin(t * 9 + (s.phase ?? 0)) * 0.3;
-        g.fillStyle(0x2a2a30, 1);
-        g.fillRect(live.x - 10, live.y - 8, 16, live.h + 16);
-        g.fillRect(live.x + live.w - 6, live.y - 8, 16, live.h + 16);
+        const pulse = 0.55 + Math.sin(t * 9 + (s.phase ?? 0)) * 0.3;
+        g.fillStyle(0x1f1924, 1);
+        g.fillRoundedRect(live.x - 12, live.y - 10, 18, live.h + 20, 5);
+        g.fillRoundedRect(live.x + live.w - 6, live.y - 10, 18, live.h + 20, 5);
+        g.fillStyle(th.danger, pulse * 0.45);
+        g.fillRect(live.x, live.y + live.h / 2 - 8, live.w, 16);
         g.fillStyle(th.danger, pulse);
-        g.fillRect(live.x, live.y + live.h / 2 - 3, live.w, 6);
-        g.fillStyle(0xffffff, 0.55);
-        g.fillRect(live.x, live.y + live.h / 2 - 1, live.w, 2);
+        g.fillRect(live.x, live.y + live.h / 2 - 4, live.w, 8);
+        g.fillStyle(0xffffff, 0.85);
+        g.fillRect(live.x, live.y + live.h / 2 - 1.5, live.w, 3);
         continue;
       }
       if (s.kind === "spike") {
@@ -430,90 +803,157 @@ export class KnockoutScene extends Phaser.Scene {
         continue;
       }
       if (s.kind === "finish") {
-        g.fillStyle(0x2a2218, 1);
-        g.fillRect(live.x, live.y, 10, live.h);
-        g.fillRect(live.x + live.w - 10, live.y, 10, live.h);
-        g.fillStyle(0xffe08a, 0.95);
-        g.fillRect(live.x, live.y, live.w, 16);
-        for (let i = 0; i < 6; i += 1) {
-          g.fillStyle(i % 2 ? 0x111113 : 0xf3f1ec, 1);
-          g.fillRect(live.x + 8 + i * 8, live.y, 8, 16);
+        // Glowing Holographic Finish Arch & Checkered Pylons
+        const archW = 68;
+        const archX = live.x - 16;
+        // Holographic energy curtain
+        const holoAlpha = 0.22 + Math.sin(t * 5) * 0.08;
+        g.fillStyle(0x38bdf8, holoAlpha);
+        g.fillRect(archX + 10, live.y + 24, archW - 20, live.h - 24);
+        g.lineStyle(2, 0xffe08a, 0.45);
+        for (let sy = live.y + 36 + ((t * 40) % 28); sy < live.y + live.h; sy += 28) {
+          g.lineBetween(archX + 12, sy, archX + archW - 12, sy);
         }
+        // Left & Right 3D Pylons
+        g.fillStyle(0x1f1924, 1);
+        g.fillRoundedRect(archX, live.y, 14, live.h, 5);
+        g.fillRoundedRect(archX + archW - 14, live.y, 14, live.h, 5);
+        g.fillStyle(0x38bdf8, 0.85);
+        g.fillRect(archX + 4, live.y + 28, 6, live.h - 34);
+        g.fillRect(archX + archW - 10, live.y + 28, 6, live.h - 34);
+        // Overhead Checkered Arch Header
+        g.fillStyle(0x1f1924, 1);
+        g.fillRoundedRect(archX - 8, live.y - 10, archW + 16, 34, 10);
+        g.fillStyle(0xffe08a, 1);
+        g.fillRoundedRect(archX - 4, live.y - 6, archW + 8, 26, 8);
+        for (let i = 0; i < 8; i += 1) {
+          g.fillStyle(i % 2 === 0 ? 0x111118 : 0xffffff, 1);
+          g.fillRect(archX + i * 8, live.y - 2, 8, 9);
+          g.fillStyle(i % 2 === 1 ? 0x111118 : 0xffffff, 1);
+          g.fillRect(archX + i * 8, live.y + 7, 8, 9);
+        }
+        // Floating Crown Emblem atop Finish Arch
+        const crownY = live.y - 22 + Math.sin(t * 4) * 3;
+        g.fillStyle(0xffe066, 0.98);
+        g.fillCircle(archX + archW * 0.5, crownY, 12);
+        g.fillStyle(0xff6b4a, 1);
+        g.fillCircle(archX + archW * 0.5, crownY, 6);
         continue;
       }
       if (s.kind === "gate") {
         if (s.prop === "inflate") {
+          g.fillStyle(0x0284c7, 1);
+          g.fillRoundedRect(live.x - 22, live.y - 4, 28, live.h + 16, 14);
+          g.fillRoundedRect(live.x + live.w - 6, live.y - 4, 28, live.h + 16, 14);
           g.fillStyle(0x4ad4e8, 1);
           g.fillRoundedRect(live.x - 22, live.y - 8, 28, live.h + 16, 14);
           g.fillRoundedRect(live.x + live.w - 6, live.y - 8, 28, live.h + 16, 14);
           g.fillStyle(0xff8ad4, 1);
           g.fillRoundedRect(live.x - 28, live.y - 36, live.w + 56, 42, 18);
-          g.fillStyle(0xffffff, 0.35);
+          g.fillStyle(0xffffff, 0.42);
           g.fillRoundedRect(live.x - 16, live.y - 26, live.w + 32, 14, 8);
         } else {
+          g.fillStyle(0xc2410c, 1);
+          g.fillRoundedRect(live.x - 10, live.y + 4, 12, live.h, 6);
+          g.fillRoundedRect(live.x + live.w - 2, live.y + 4, 12, live.h, 6);
           g.fillStyle(0xff8a4a, 1);
           g.fillRoundedRect(live.x - 10, live.y, 12, live.h, 6);
           g.fillRoundedRect(live.x + live.w - 2, live.y, 12, live.h, 6);
-          g.fillStyle(0xffffff, 0.28 + Math.sin(t * 3) * 0.08);
+          g.fillStyle(0x38bdf8, 0.34 + Math.sin(t * 4) * 0.1);
           g.fillRect(live.x, live.y, live.w, live.h);
         }
         continue;
       }
       if (s.kind === "mover") {
-        g.fillStyle(0x2a2a30, 1);
-        g.fillRect(live.x - 20, live.y + live.h / 2 - 2, live.w + 40, 4);
-        g.fillStyle(th.ground, 1);
-        g.fillRoundedRect(live.x, live.y, live.w, live.h, 4);
-        g.fillStyle(0xffe8b0, 0.4);
-        g.fillRect(live.x, live.y, live.w, 4);
+        g.fillStyle(0x2a2a38, 0.9);
+        g.fillRoundedRect(s.x - 74, live.y + live.h / 2 - 3, s.w + 148, 6, 3);
+        this.drawPlatform3D(g, live.x, live.y, live.w, live.h, th.ground, s.route, "mover", t);
         continue;
       }
       if (s.kind === "fall") {
-        g.fillStyle(mixColor(th.ground, 0x000000, 0.2), 1);
-        g.fillRect(live.x, live.y, live.w, live.h);
-        g.lineStyle(2, th.danger, 0.55);
-        g.lineBetween(live.x + 6, live.y + 4, live.x + live.w - 6, live.y + live.h - 4);
+        const dropColor = mixColor(th.ground, th.danger, 0.35);
+        this.drawPlatform3D(g, live.x, live.y, live.w, live.h, dropColor, s.route, "fall", t);
+        g.lineStyle(2, th.danger, 0.75);
+        g.lineBetween(live.x + 8, live.y + 4, live.x + live.w - 8, live.y + live.h - 4);
         continue;
       }
-      g.fillStyle(s.route === "expert" ? 0xff8a4a : th.ground, 1);
-      g.fillRoundedRect(live.x, live.y, live.w, live.h + 4, 10);
-      g.fillStyle(0xffffff, 0.42);
-      g.fillRoundedRect(live.x + 6, live.y + 3, live.w - 12, 7, 4);
-      g.fillStyle(0x000000, 0.08);
-      g.fillRect(live.x + 8, live.y + live.h - 2, live.w - 16, 4);
-      g.fillStyle(th.accent, 0.7);
-      g.fillRoundedRect(live.x + 8, live.y + 4, 14, 5, 2);
+      const platColor =
+        s.route === "expert"
+          ? 0xff7a3a
+          : s.route === "fast"
+            ? mixColor(th.ground, 0x34d399, 0.38)
+            : th.ground;
+      this.drawPlatform3D(g, live.x, live.y, live.w, live.h, platColor, s.route, "solid", t);
     }
-    for (const ghost of this.ghosts) {
-      const pose = ghost.samples.find((s) => s.t >= this.timeMs) ?? ghost.samples[ghost.samples.length - 1];
+
+    // Draw Pace-Rival & PB Ghosts with motion trails & floating namepills
+    this.ghostLabels.forEach((lbl) => lbl.setVisible(false));
+    for (let gi = 0; gi < this.ghosts.length; gi += 1) {
+      const ghost = this.ghosts[gi];
+      const pose = this.sampleGhostAt(ghost, this.elapsed);
       if (!pose) continue;
-      drawRunner(g, pose.x, pose.y, 22, 32, {
-        facing: 1,
-        grounded: true,
-        vx: 80,
-        vy: 0,
-        t: pose.t,
-        color: ghost.color,
+      // Motion trail behind rival
+      for (let ti = 1; ti <= 3; ti += 1) {
+        const trailPose = this.sampleGhostAt(ghost, Math.max(0, this.elapsed - ti * 65));
+        if (trailPose) {
+          g.fillStyle(ghost.color, 0.24 - ti * 0.06);
+          g.fillCircle(trailPose.x + 11, trailPose.y + 18, 9 - ti * 1.5);
+        }
+      }
+      this.drawCapsuleBean(g, pose.x, pose.y, ghost.color, {
+        facing: (pose.vx ?? 80) >= -5 ? 1 : -1,
+        grounded: pose.grounded ?? true,
+        vx: pose.vx ?? 160,
+        vy: pose.vy ?? 0,
+        t: this.elapsed + gi * 130,
       });
-      g.fillStyle(ghost.color, 0.12);
-      g.fillCircle(pose.x + 11, pose.y + 28, 14);
+      // Floating namepill badge above rival
+      const pillW = Math.max(38, ghost.name.length * 7 + 14);
+      const pillX = pose.x + 11 - pillW / 2;
+      const pillY = pose.y - 22;
+      g.fillStyle(0x14101c, 0.86);
+      g.fillRoundedRect(pillX, pillY, pillW, 15, 7);
+      g.lineStyle(1.5, ghost.color, 0.95);
+      g.strokeRoundedRect(pillX, pillY, pillW, 15, 7);
+      const lbl = this.ensureGhostLabel(gi);
+      lbl.setText(ghost.name).setPosition(pose.x + 11, pillY + 7.5).setVisible(this.hud.visible);
     }
+
     drawParticles(g, this.parts);
+
+    // Player motion trail
+    for (let i = 0; i < this.playerTrail.length; i += 1) {
+      const pt = this.playerTrail[i];
+      const alpha = ((i + 1) / this.playerTrail.length) * (this.dash > 0 ? 0.36 : 0.16);
+      g.fillStyle(this.dash > 0 ? 0xffe066 : th.accent, alpha);
+      g.fillCircle(pt.x + 11, pt.y + 18, 5 + i * 0.8);
+    }
+
     const bodyX = this.dying > 0 ? this.rag.x : this.x;
     const bodyY = this.dying > 0 ? this.rag.y : this.y;
-    drawRunner(g, bodyX, bodyY, 22, 32, {
+    this.drawCapsuleBean(g, bodyX, bodyY, th.accent, {
       facing: this.vx >= 0 ? 1 : -1,
       grounded: this.grounded,
       vx: this.vx,
       vy: this.vy,
       t: this.timeMs,
-      color: th.accent,
       dying: this.dying > 0,
       lean: this.dying > 0 ? this.rag.rot : this.vx * 0.0009,
+      isPlayer: true,
     });
     fillVignette(g, this.map.width, this.map.height, 0.08);
-    this.hud.setText(`GATE  ${this.map.name.toUpperCase()}\n${(this.timeMs / 1000).toFixed(2)}s   LIVE SHOW`);
+
+    const posTag = `${this.formatOrdinal(this.rank)} / ${this.totalRunners}`;
+    this.hud.setText(
+      `POS ${posTag}  ·  ${this.map.name.toUpperCase()}\n${(this.timeMs / 1000).toFixed(2)}s   FALLS ${this.falls}`,
+    );
     this.overlay.clear();
+    if (this.hud.visible) {
+      this.overlay.fillStyle(0x161020, 0.78);
+      this.overlay.fillRoundedRect(12, 56, 286, 52, 12);
+      this.overlay.lineStyle(2, this.rank === 1 ? 0xffe066 : th.accent, 0.9);
+      this.overlay.strokeRoundedRect(12, 56, 286, 52, 12);
+    }
     const fa = this.juice.flashAlpha(0.016);
     if (fa) {
       this.overlay.fillStyle(0xffffff, fa);
@@ -547,13 +987,24 @@ export class KnockoutScene extends Phaser.Scene {
       {
         finishRun: () => this.win(),
         killPlayer: () => this.die(),
-        hideHud: () => this.hud.setVisible(false),
+        setDrive: (v: number) => {
+          this.touchMove = clamp(Number(v) || 0, -1, 1);
+        },
+        jump: () => {
+          this.touchJump = true;
+        },
+        hideHud: () => {
+          this.hud.setVisible(false);
+          this.ghostLabels.forEach((lbl) => lbl.setVisible(false));
+        },
       },
     );
   }
 
   shutdown() {
     this.nativeKeys?.destroy();
+    this.ghostLabels.forEach((lbl) => lbl.destroy());
+    this.ghostLabels = [];
     clearGwDebug();
   }
 }

@@ -57,7 +57,11 @@ export class DriftPlayScene extends Phaser.Scene {
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private cam!: Cam;
   private marks: Mark[] = [];
+  private lastWheelMarks: { lx: number; ly: number; rx: number; ry: number } | null = null;
   private wallHits = 0;
+  private unbanked = 0;
+  private combo = 1;
+  private statusText = "";
   private cleanLap = true;
   private shownHint = true;
   private tutorialStep: "hold" | "combo" | "bank" | "done" = "done";
@@ -114,6 +118,10 @@ export class DriftPlayScene extends Phaser.Scene {
     this.runStart = this.time.now;
     this.cam = createCam(pose.x, pose.y, CAMERA_BY_TRACK[this.def.id]);
     this.marks = [];
+    this.lastWheelMarks = null;
+    this.unbanked = 0;
+    this.combo = 1;
+    this.statusText = "";
     this.recorder.reset();
     this.showGhost = ghostEnabled();
     this.boardMode = this.reverse ? "daily" : this.def.id;
@@ -364,28 +372,42 @@ export class DriftPlayScene extends Phaser.Scene {
     this.publishDebug(delta);
     const q = queryTrack(this.samples, this.car.x, this.car.y);
     this.car.surface = q.surface;
+    const nearest = q;
+    const half = q.half;
 
-    if (q.dist > q.half + 24) {
+    if (nearest.dist > half + 64) {
+      this.wallHits += 1;
+      this.car.yawVel += 2.4;
+      this.finish("crash");
+      return;
+    }
+
+    if (nearest.dist > half + 24) {
       const impactN = clamp(this.car.speed / VEHICLE.maxSpeed, 0.2, 1);
-      this.car.bounce(-q.nx, -q.ny, 10);
+      const pushBack = Math.max(12, nearest.dist - (half + 18));
+      this.car.bounce(-q.nx, -q.ny, pushBack);
+      this.car.vx *= 0.58;
+      this.car.vy *= 0.58;
+      this.car.speed *= 0.58;
+      this.score.total = Math.max(0, this.score.total - this.score.currentDrift);
+      this.score.currentDrift = 0;
+      this.score.combo = 1;
+      this.score.comboHeat = 0;
+      this.unbanked = 0;
+      this.combo = 1;
       this.wallHits += 1;
       this.cleanLap = false;
       this.streakClean = false;
+      this.statusText = "WALL SCRAPE · COMBO LOST";
+      this.comboBreakFlash = 1;
+      this.hint.setText(this.statusText);
+      this.floaters.spawn(this.car.x, this.car.y - 34, this.statusText, "#ff8aa0");
       this.juice.screenShake(5 + impactN * 6, 90);
       this.juice.hitStop(28);
       this.synth.impact(impactN);
       this.smash = 1;
       this.parts.burst(this.car.x, this.car.y, this.quality === "high" ? 16 : 8, 0xffd59a, 180, 240);
       this.parts.burst(this.car.x, this.car.y, this.quality === "low" ? 4 : 10, 0xff8a4a, 220, 180);
-      if (this.tutorialStep !== "done") {
-        this.comboBreakFlash = 1;
-        this.hint.setText("COMBO BROKE");
-      }
-      if (this.car.speed > 390) {
-        this.car.yawVel += 2.4;
-        this.finish("crash");
-        return;
-      }
     }
 
     const near = q.dist > q.half * 0.7 && q.dist < q.half && this.car.drifting;
@@ -437,20 +459,46 @@ export class DriftPlayScene extends Phaser.Scene {
       this.floaters.spawn(this.car.x, this.car.y - 42, "BANKED", "#8dffc1");
       this.completeTutorial();
     }
+    this.unbanked = this.score.currentDrift;
+    this.combo = this.score.combo;
     this.wasDrifting = this.car.drifting;
     this.bankFlash = Math.max(0, this.bankFlash - dt * 1.8);
     this.comboBreakFlash = Math.max(0, this.comboBreakFlash - dt * 1.6);
 
-    if (this.car.driftAmount > 0.12 && this.car.speed > 110) {
+    if (this.car.driftAmount > 0.18 && this.car.speed > 110) {
+      const c = Math.cos(this.car.angle);
+      const s = Math.sin(this.car.angle);
+      const nx = -s;
+      const ny = c;
+      const ax = this.car.x - c * 13;
+      const ay = this.car.y - s * 13;
+      const lx = ax - nx * 7.5;
+      const ly = ay - ny * 7.5;
+      const rx = ax + nx * 7.5;
+      const ry = ay + ny * 7.5;
+      const prev = this.lastWheelMarks;
+      const maxLife = 2.6 + this.car.driftAmount;
       this.marks.push({
         x: this.car.x,
         y: this.car.y,
         a: this.car.angle,
-        life: 2.6 + this.car.driftAmount,
+        life: maxLife,
+        maxLife,
         slip: this.car.driftAmount,
+        combo: this.score.combo,
+        lx,
+        ly,
+        rx,
+        ry,
+        plx: prev ? prev.lx : lx - this.car.vx * dt,
+        ply: prev ? prev.ly : ly - this.car.vy * dt,
+        prx: prev ? prev.rx : rx - this.car.vx * dt,
+        pry: prev ? prev.ry : ry - this.car.vy * dt,
       });
+      this.lastWheelMarks = { lx, ly, rx, ry };
       if (this.marks.length > (this.quality === "high" ? 260 : 110)) this.marks.shift();
       if (this.quality === "high" || this.frames % 2 === 0) {
+        const sparkCol = this.score.combo >= 6 ? 0xffd84a : this.score.combo >= 3 ? 0xff44b8 : 0x38e8ff;
         this.parts.emit({
           x: this.car.x - Math.cos(this.car.angle) * 14,
           y: this.car.y - Math.sin(this.car.angle) * 14,
@@ -458,10 +506,12 @@ export class DriftPlayScene extends Phaser.Scene {
           vy: -this.car.vy * 0.1 + (Math.random() - 0.5) * 18,
           life: 280 + this.car.driftAmount * 120,
           size: 2 + this.car.driftAmount * 3,
-          color: 0xc9c4bf,
+          color: this.car.driftAmount > 0.42 ? sparkCol : 0xc9c4bf,
           drag: 0.93,
         });
       }
+    } else {
+      this.lastWheelMarks = null;
     }
 
     if (this.car.speed > 280 && this.quality === "high") {
@@ -588,6 +638,7 @@ export class DriftPlayScene extends Phaser.Scene {
         drift: this.car.driftAmount,
         combo: this.score.combo,
         live: this.score.currentDrift,
+        speed: this.car.speed,
       },
     );
     if (this.countdown > 0) {
@@ -754,6 +805,9 @@ export class DriftPlayScene extends Phaser.Scene {
       metadata: {
         laps: this.lap,
         combo: Math.floor(this.score.bestCombo),
+        maxCombo: Math.floor(this.score.bestCombo),
+        nearMisses: this.score.nearMisses,
+        boostGates: this.score.perfectGates,
         wallHits: this.wallHits,
         duration: this.time.now - this.runStart,
         bestCombo: Math.floor(this.score.bestCombo),

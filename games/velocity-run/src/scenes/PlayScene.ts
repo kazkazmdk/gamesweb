@@ -63,6 +63,9 @@ export class VelocityPlayScene extends Phaser.Scene {
   private splits: number[] = [];
   private shownHint = true;
   private endedAt = 0;
+  private fastFalls = 0;
+  private wasFastFalling = false;
+  private afterImages: Array<{ x: number; y: number; w: number; h: number; vy: number; vx: number; facing: number }> = [];
   private nativeKeys: GameKeyboard | null = null;
 
   constructor() {
@@ -88,6 +91,9 @@ export class VelocityPlayScene extends Phaser.Scene {
     this.signaledReady = false;
     this.splitIndex = 0;
     this.splits = [];
+    this.fastFalls = 0;
+    this.wasFastFalling = false;
+    this.afterImages = [];
     this.camX = this.spawn.x;
     this.camY = this.spawn.y;
     this.camZ = 1;
@@ -140,6 +146,8 @@ export class VelocityPlayScene extends Phaser.Scene {
       one: kb.addKey("ONE"),
       two: kb.addKey("TWO"),
       three: kb.addKey("THREE"),
+      prevCourse: kb.addKey(Phaser.Input.Keyboard.KeyCodes.OPEN_BRACKET),
+      nextCourse: kb.addKey(Phaser.Input.Keyboard.KeyCodes.CLOSED_BRACKET),
     };
     this.nativeKeys?.destroy();
     this.nativeKeys = createGameKeyboard();
@@ -227,6 +235,8 @@ export class VelocityPlayScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.one) || chrome?.onePressed) this.switchCourse(COURSES.findIndex((c) => c.id === "course-1"));
     else if (Phaser.Input.Keyboard.JustDown(this.keys.two) || chrome?.twoPressed) this.switchCourse(COURSES.findIndex((c) => c.id === "course-2"));
     else if (Phaser.Input.Keyboard.JustDown(this.keys.three) || chrome?.threePressed) this.switchCourse(COURSES.findIndex((c) => c.id === "course-3"));
+    else if (Phaser.Input.Keyboard.JustDown(this.keys.prevCourse)) this.switchCourse((this.courseIndex - 1 + COURSES.length) % COURSES.length);
+    else if (Phaser.Input.Keyboard.JustDown(this.keys.nextCourse)) this.switchCourse((this.courseIndex + 1) % COURSES.length);
     if (this.paused) {
       this.draw(dt);
       return;
@@ -245,6 +255,8 @@ export class VelocityPlayScene extends Phaser.Scene {
         this.deaths = 0;
         this.splitIndex = 0;
         this.splits = [];
+        this.wasFastFalling = false;
+        this.afterImages = [];
         this.recorder.reset();
         this.attemptEpoch += 1;
       }
@@ -286,7 +298,27 @@ export class VelocityPlayScene extends Phaser.Scene {
         this.parts.burst(this.runner.x + 8, this.runner.y + 28, 6, this.course.theme.accent, 70, 200);
         this.synth.tone(220 + Math.random() * 30, 0.035, "triangle", 0.028, 0.08);
       }
-      if (down && this.runner.vy > 80) void this.platform.achievement.unlock("fast-fall");
+      if (down && !wasGround && this.runner.vy > 80) {
+        if (!this.wasFastFalling) {
+          this.wasFastFalling = true;
+          this.fastFalls += 1;
+        }
+        void this.platform.achievement.unlock("fast-fall");
+      } else if (this.runner.grounded || !down) {
+        this.wasFastFalling = false;
+      }
+      if (this.ticks % 2 === 0 && (Math.abs(this.runner.vx) > 20 || Math.abs(this.runner.vy) > 20)) {
+        this.afterImages.push({
+          x: this.runner.x,
+          y: this.runner.y,
+          w: this.runner.w,
+          h: this.runner.h,
+          vy: this.runner.vy,
+          vx: this.runner.vx,
+          facing: this.runner.facing,
+        });
+        if (this.afterImages.length > 7) this.afterImages.shift();
+      }
       if (this.running) this.timeMs = this.time.now - this.startMs;
       this.recorder.tick(dt, this.timeMs, this.runner.x, this.runner.y);
       this.hitCheckpoints();
@@ -393,6 +425,7 @@ export class VelocityPlayScene extends Phaser.Scene {
           attemptDurationMs: Math.floor(this.timeMs),
           verificationLevel: "practice",
           course: this.courseIndex,
+          fastFalls: this.fastFalls,
         },
       });
     }
@@ -458,6 +491,7 @@ export class VelocityPlayScene extends Phaser.Scene {
         nextMedal: next?.name ?? "",
         medalGap: next?.gap ?? 0,
         splits: this.splits.length,
+        fastFalls: this.fastFalls,
       },
     });
   }
@@ -519,17 +553,51 @@ export class VelocityPlayScene extends Phaser.Scene {
       },
       { x: this.camX, y: this.camY },
     );
+    const worldGlow =
+      this.course.world === "training" ? 0x38e8ff : this.course.world === "transit" ? 0xffb038 : 0xb86bff;
+    // Diagonal volumetric cyber-architecture light shafts
+    for (let i = 0; i < 6; i += 1) {
+      const sx = i * 560 + 140 + this.camX * 0.18;
+      g.fillStyle(worldGlow, 0.06 + (i % 2) * 0.025);
+      g.fillTriangle(sx, 0, sx + 140, 0, sx - 210, this.course.height);
+      g.fillTriangle(sx + 140, 0, sx + 10, this.course.height, sx - 210, this.course.height);
+    }
+    // Far depth industrial towers layer
+    const farSkyline =
+      this.course.world === "training"
+        ? mixColor(th.bg, 0x24465c, 0.28)
+        : this.course.world === "transit"
+          ? mixColor(th.bg, 0x283848, 0.42)
+          : mixColor(th.bg, 0x482c64, 0.3);
+    for (let i = 0; i < 20; i += 1) {
+      const fx = i * 220 + this.camX * 0.24;
+      const fh = 240 + ((i * 53) % 160);
+      const fw = 54 + (i % 3) * 18;
+      g.fillStyle(farSkyline, 0.65);
+      g.fillRect(fx, this.course.height - fh - 28, fw, fh);
+      g.fillStyle(worldGlow, 0.22);
+      g.fillRect(fx + 6, this.course.height - fh - 16, fw - 12, 3);
+      g.fillRect(fx + fw * 0.5 - 1, this.course.height - fh - 52, 2, 24);
+    }
     const skyline = this.course.world === "training" ? mixColor(th.bg, 0xc4b498, 0.25) : this.course.world === "transit" ? mixColor(th.bg, 0x8ab0c8, 0.35) : mixColor(th.bg, 0xe8a888, 0.2);
     g.fillStyle(skyline, 1);
     for (let i = 0; i < 16; i += 1) {
       const x = i * 280 + this.camX * 0.42;
       const bh = 180 + (i % 4) * 56;
       g.fillRect(x, this.course.height - bh - 20, 78 + (i % 3) * 16, bh);
-      g.fillStyle(this.course.world === "transit" ? 0xa8d4e8 : 0xffffff, this.course.world === "transit" ? 0.28 : 0.18);
+      g.fillStyle(worldGlow, 0.32);
       g.fillRect(x + 10, this.course.height - bh + 18, 10, 14);
       g.fillRect(x + 30, this.course.height - bh + 46, 10, 14);
       g.fillRect(x + 50, this.course.height - bh + 30, 10, 14);
       g.fillStyle(skyline, 1);
+    }
+    // Rising world-themed ambient cyber particles
+    for (let i = 0; i < 28; i += 1) {
+      const px = ((i * 173 + Math.floor(this.time.now * 0.02)) % Math.max(400, this.course.width));
+      const py = this.course.height - (((this.time.now * (0.045 + (i % 4) * 0.012) + i * 97) % (this.course.height - 60)));
+      const pulse = 0.28 + Math.sin(this.time.now / 260 + i) * 0.16;
+      g.fillStyle(worldGlow, pulse);
+      g.fillCircle(px, py, 2 + (i % 3));
     }
     g.fillStyle(this.course.world === "training" ? 0xd8c8b0 : this.course.world === "transit" ? 0x6a7a88 : 0xe8c4a8, 1);
     g.fillRect(0, this.course.height - 36, this.course.width, 36);
@@ -587,29 +655,59 @@ export class VelocityPlayScene extends Phaser.Scene {
         g.fillStyle(0xffffff, 0.35);
         for (let i = 10; i < live.w; i += 18) g.fillRect(live.x + i, live.y + 1, 8, 3);
       } else if (s.kind === "spike") {
+        g.fillStyle(th.danger, 0.18);
+        g.fillRect(live.x - 2, live.y + live.h - 4, live.w + 4, 6);
         g.fillStyle(th.danger, 1);
         g.fillTriangle(live.x, live.y + live.h, live.x + live.w / 2, live.y, live.x + live.w, live.y + live.h);
         g.fillStyle(0xffffff, 0.35);
         g.fillTriangle(live.x + live.w * 0.3, live.y + live.h * 0.7, live.x + live.w / 2, live.y + 4, live.x + live.w * 0.7, live.y + live.h * 0.7);
       } else if (s.kind === "laser") {
         const pulse = 0.45 + Math.sin(this.time.now / 90) * 0.35;
+        g.fillStyle(th.danger, pulse * 0.22);
+        g.fillRect(live.x - 6, live.y - 4, live.w + 12, live.h + 8);
         g.fillStyle(0x2a2a30, 1);
         g.fillRect(live.x - 8, live.y - 6, 12, live.h + 12);
         g.fillRect(live.x + live.w - 4, live.y - 6, 12, live.h + 12);
+        g.fillStyle(0xffd24a, 0.85);
+        for (let cy = live.y - 2; cy < live.y + live.h + 2; cy += 10) {
+          g.fillRect(live.x - 7, cy, 4, 4);
+          g.fillRect(live.x + live.w + 3, cy, 4, 4);
+        }
         g.fillStyle(th.danger, pulse);
         g.fillRect(live.x, live.y, live.w, live.h);
-        g.fillStyle(0xffffff, 0.7);
-        g.fillRect(live.x, live.y + live.h / 2 - 1, live.w, 2);
+        g.fillStyle(0xffffff, 0.75);
+        g.fillRect(live.x, live.y + live.h / 2 - 1.5, live.w, 3);
+        g.fillStyle(0xff4d6d, 0.85);
+        g.fillCircle(live.x + 2, live.y + live.h / 2, 4);
+        g.fillCircle(live.x + live.w - 2, live.y + live.h / 2, 4);
       } else if (s.kind === "bar") {
+        const warnPulse = 0.25 + Math.sin(this.time.now / 120) * 0.12;
+        g.lineStyle(2, th.danger, 0.38);
+        g.lineBetween(s.x - 18, s.y + s.h / 2, s.x + s.w + 18, s.y + s.h / 2);
+        g.fillStyle(th.danger, warnPulse);
+        g.fillRoundedRect(live.x - 4, live.y - 4, live.w + 8, live.h + 8, 5);
         g.fillStyle(0x2a2a30, 1);
         g.fillCircle(live.x, live.y + live.h / 2, 8);
         g.fillStyle(th.danger, 0.95);
         g.fillRoundedRect(live.x, live.y, live.w, live.h, 3);
+        g.fillStyle(0xffe066, 0.88);
+        for (let cx = live.x + 6; cx < live.x + live.w - 6; cx += 12) {
+          g.fillTriangle(cx, live.y + 2, cx + 6, live.y + live.h / 2, cx, live.y + live.h - 2);
+        }
       } else if (s.kind === "piston") {
+        const warnPulse = 0.22 + Math.sin(this.time.now / 110) * 0.12;
+        g.lineStyle(1.5, th.danger, 0.42);
+        g.strokeRect(s.x - 2, s.y - s.h * 0.35, s.w + 4, s.h * 1.15);
+        g.fillStyle(th.danger, warnPulse);
+        g.fillRoundedRect(live.x - 4, live.y - 4, live.w + 8, live.h + 8, 5);
         g.fillStyle(0x3a3a44, 1);
         g.fillRect(live.x + live.w / 2 - 6, live.y, 12, live.h + 24);
         g.fillStyle(th.danger, 0.95);
         g.fillRoundedRect(live.x, live.y, live.w, live.h, 3);
+        g.fillStyle(0xffe066, 0.88);
+        for (let cx = live.x + 4; cx < live.x + live.w - 6; cx += 10) {
+          g.fillTriangle(cx, live.y + live.h - 3, cx + 4, live.y + 4, cx + 8, live.y + live.h - 3);
+        }
         g.fillStyle(0xffffff, 0.25);
         g.fillRect(live.x + 2, live.y + 2, live.w - 4, 3);
       } else if (s.kind === "finish") {
@@ -648,6 +746,19 @@ export class VelocityPlayScene extends Phaser.Scene {
     }
 
     const r = this.runner;
+    const showTrail =
+      this.dying <= 0 &&
+      (Math.abs(r.vx) > 260 || (r.fastFell && !r.grounded) || (!r.grounded && Math.abs(r.vy) < 95));
+    if (showTrail && this.afterImages.length > 0) {
+      for (let i = 0; i < this.afterImages.length; i += 1) {
+        const pose = this.afterImages[i];
+        const ratio = (i + 1) / (this.afterImages.length + 1);
+        const col = i % 2 === 0 ? 0x38f2ff : 0xff3ca8;
+        g.fillStyle(col, ratio * 0.34);
+        g.fillRoundedRect(pose.x + 1, pose.y + 6, pose.w - 2, pose.h - 6, 4);
+        g.fillCircle(pose.x + pose.w * 0.5, pose.y + 4, 5.5);
+      }
+    }
     drawRunner(g, r.x, r.y, r.w, r.h, {
       facing: r.facing,
       grounded: r.grounded,

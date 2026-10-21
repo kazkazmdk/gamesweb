@@ -20,6 +20,7 @@ import { stepBall, type BallState } from "../systems/physics";
 export class PocketScene extends Phaser.Scene {
   private platform!: PlatformSDK;
   private layout!: Layout;
+  private table!: Layout;
   private layoutIndex = 0;
   private juice = new Juice();
   private parts!: ParticlePool;
@@ -27,11 +28,14 @@ export class PocketScene extends Phaser.Scene {
   private gfx!: Phaser.GameObjects.Graphics;
   private overlay!: Phaser.GameObjects.Graphics;
   private hud!: Phaser.GameObjects.Text;
+  private bannerLabel!: Phaser.GameObjects.Text;
   private native: GameKeyboard | null = null;
   private bx = 0;
   private by = 0;
   private vx = 0;
   private vy = 0;
+  private spinPhase = 0;
+  private spinAngle = 0;
   private strokes = 0;
   private aiming = false;
   private ax = 0;
@@ -49,6 +53,7 @@ export class PocketScene extends Phaser.Scene {
   private portalCd = 0;
   private lastPortal = false;
   private paused = false;
+  private bannerTimer = 0;
 
   constructor() {
     super("pocket-play");
@@ -65,18 +70,47 @@ export class PocketScene extends Phaser.Scene {
       this.layoutIndex = Math.abs(Number(this.game.registry.get("layoutIndex") ?? 0)) % LAYOUTS.length;
     }
     this.layout = LAYOUTS[this.layoutIndex];
+    this.table = this.layout;
     this.bx = this.layout.ball.x;
     this.by = this.layout.ball.y;
     this.vx = this.vy = 0;
+    this.spinPhase = 0;
+    this.spinAngle = 0;
     this.strokes = 0;
+    this.banked = false;
+    this.wallThisShot = false;
     this.ended = false;
-    this.parts = new ParticlePool(80);
+    this.bannerTimer = 0;
+    this.parts = new ParticlePool(120);
     this.synth = (this.game.registry.get("synth") as Synth | undefined) ?? new Synth();
     this.game.registry.set("synth", this.synth);
     this.synth.setSettings(this.platform.audio.getSettings());
     this.gfx = this.add.graphics();
     this.overlay = this.add.graphics().setScrollFactor(0).setDepth(20);
-    this.hud = this.add.text(16, 64, "DRAG → RELEASE", { fontFamily: "ui-sans-serif, system-ui", fontSize: "16px", color: "#3a2414" }).setScrollFactor(0).setDepth(21);
+    this.hud = this.add
+      .text(18, 62, "DRAG → RELEASE", {
+        fontFamily: "ui-sans-serif, system-ui",
+        fontSize: "15px",
+        fontStyle: "800",
+        color: "#fff8ec",
+        stroke: "#1c1208",
+        strokeThickness: 4,
+      })
+      .setScrollFactor(0)
+      .setDepth(21);
+    this.bannerLabel = this.add
+      .text(this.scale.width * 0.5, this.scale.height * 0.42, "", {
+        fontFamily: "ui-sans-serif, system-ui",
+        fontSize: "30px",
+        fontStyle: "900",
+        color: "#ffe066",
+        stroke: "#1a1008",
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(25)
+      .setVisible(false);
     this.trail = [];
     this.native?.destroy();
     this.native = createGameKeyboard();
@@ -122,6 +156,7 @@ export class PocketScene extends Phaser.Scene {
     this.strokes += 1;
     this.wallThisShot = false;
     this.synth.tone(180 + power * 80, 0.06, "triangle", 0.05, 0.16);
+    this.parts.burst(this.bx, this.by, 7, 0xffe08a, 40, 150);
     pulseHaptic(6);
   }
 
@@ -142,27 +177,44 @@ export class PocketScene extends Phaser.Scene {
       this.publishDebug();
       return;
     }
+    if (this.bannerTimer > 0) {
+      this.bannerTimer = Math.max(0, this.bannerTimer - dt);
+    }
     if (!this.ended) {
-      const next = stepBall({ x: this.bx, y: this.by, vx: this.vx, vy: this.vy, portalCd: this.portalCd }, this.layout, dt);
-      if (next.portalCd > this.portalCd) {
+      const res = stepBall({ x: this.bx, y: this.by, vx: this.vx, vy: this.vy, portalCd: this.portalCd }, this.layout, dt);
+      if (res.wallHit) {
+        this.wallThisShot = true;
+        this.synth.tone(520, 0.03, "square", 0.02, 0.08);
+        this.parts.burst(res.x, res.y, 7, 0x7dffc3, 55, 190);
+      }
+      if (res.bumperHit) {
+        this.synth.tone(680, 0.04, "triangle", 0.03, 0.1);
+        this.parts.burst(res.x, res.y, 9, 0xffd166, 70, 210);
+      }
+      if (res.portalCd > this.portalCd) {
         this.synth.tone(720, 0.05, "sine", 0.04, 0.08);
         this.parts.burst(this.bx, this.by, 8, 0x7dffc3, 70, 220);
         this.lastPortal = true;
       }
-      if ((next.broke ?? 0) > 0) {
+      if ((res.broke ?? 0) > 0) {
         this.synth.impact(0.45);
-        this.parts.burst(next.x, next.y, 10, 0xffc18a, 80, 240);
+        this.parts.burst(res.x, res.y, 10, 0xffc18a, 80, 240);
       }
-      this.bx = next.x;
-      this.by = next.y;
-      this.vx = next.vx;
-      this.vy = next.vy;
-      this.portalCd = next.portalCd;
-      if (Math.hypot(this.vx, this.vy) > 20 && this.ticks % 2 === 0) {
+      this.bx = res.x;
+      this.by = res.y;
+      this.vx = res.vx;
+      this.vy = res.vy;
+      this.portalCd = res.portalCd;
+      const spd = Math.hypot(this.vx, this.vy);
+      if (spd > 4) {
+        this.spinPhase += spd * dt * 0.12;
+        this.spinAngle = Math.atan2(this.vy, this.vx);
+      }
+      if (spd > 20 && this.ticks % 2 === 0) {
         this.trail.push({ x: this.bx, y: this.by });
         if (this.trail.length > 18) this.trail.shift();
       }
-      if (Math.hypot(this.vx, this.vy) < 8) {
+      if (spd < 8) {
         this.vx = 0;
         this.vy = 0;
         this.trail = [];
@@ -170,7 +222,7 @@ export class PocketScene extends Phaser.Scene {
       const hole = this.layout.hole;
       const dist = Math.hypot(this.bx - hole.x, this.by - hole.y);
       const speed = Math.hypot(this.vx, this.vy);
-      if (dist < hole.r && speed < 90) this.sink();
+      if (dist < hole.r && speed < 90) this.sink(true);
       if (this.strokes >= 12 && speed < 8) this.sink(false);
     }
     this.parts.update(dt);
@@ -226,74 +278,109 @@ export class PocketScene extends Phaser.Scene {
     }
   }
 
-  private bounce() {
-    for (const w of this.layout.walls) {
-      const nx = Math.max(w.x, Math.min(this.bx, w.x + w.w));
-      const ny = Math.max(w.y, Math.min(this.by, w.y + w.h));
-      const dx = this.bx - nx;
-      const dy = this.by - ny;
-      if (dx * dx + dy * dy > 12 * 12) continue;
-      this.wallThisShot = true;
-      if (Math.abs(dx) > Math.abs(dy)) {
-        this.vx *= -0.72;
-        this.bx += Math.sign(dx) * 3;
-      } else {
-        this.vy *= -0.72;
-        this.by += Math.sign(dy) * 3;
-      }
-      this.synth.tone(520, 0.03, "square", 0.02, 0.08);
-      this.parts.burst(this.bx, this.by, 5, 0xc4f1c2, 50, 180);
-    }
-    for (const b of this.layout.bumpers ?? []) {
-      const dx = this.bx - b.x;
-      const dy = this.by - b.y;
-      const d = Math.hypot(dx, dy);
-      if (d > b.r + 11 || d < 0.1) continue;
-      const nx = dx / d;
-      const ny = dy / d;
-      const vn = this.vx * nx + this.vy * ny;
-      if (vn < 0) {
-        this.vx -= 2.1 * vn * nx;
-        this.vy -= 2.1 * vn * ny;
-      }
-      this.bx = b.x + nx * (b.r + 12);
-      this.by = b.y + ny * (b.r + 12);
-      this.synth.tone(680, 0.04, "triangle", 0.03, 0.1);
-    }
-  }
-
-  private predict() {
-    const pts: Array<{ x: number; y: number }> = [];
-    let x = this.bx;
-    let y = this.by;
+  /**
+   * Raycast the aim vector up to the first wall or bumper collision, and compute
+   * the reflected post-bounce trajectory segment for bank-shot lining up.
+   */
+  private computeBankPreview(): {
+    hitX: number;
+    hitY: number;
+    bounced: boolean;
+    postPts: Array<{ x: number; y: number }>;
+  } | null {
     const dx = this.bx - this.ax;
     const dy = this.by - this.ay;
     const len = Math.hypot(dx, dy);
-    if (len < 8) return pts;
+    if (len < 8) return null;
     const power = Math.min(1, len / 160);
     let vx = (dx / len) * power * 620;
     let vy = (dy / len) * power * 620;
-    const step = 0.028;
-    for (let i = 0; i < 14; i += 1) {
-      x += vx * step;
-      y += vy * step;
-      vx *= Math.pow(0.985, step * 60);
-      vy *= Math.pow(0.985, step * 60);
+    let x = this.bx;
+    let y = this.by;
+    const dt = 0.008;
+    const maxPreSteps = Math.round(65 + power * 95);
+    let bounced = false;
+    let hitX = x;
+    let hitY = y;
+
+    for (let i = 0; i < maxPreSteps; i += 1) {
+      x += vx * dt;
+      y += vy * dt;
+      vx *= Math.pow(0.985, dt * 60);
+      vy *= Math.pow(0.985, dt * 60);
+
       for (const w of this.layout.walls) {
         const nx = Math.max(w.x, Math.min(x, w.x + w.w));
         const ny = Math.max(w.y, Math.min(y, w.y + w.h));
-        if ((x - nx) ** 2 + (y - ny) ** 2 > 12 * 12) continue;
-        if (Math.abs(x - nx) > Math.abs(y - ny)) vx *= -0.72;
-        else vy *= -0.72;
+        const cdx = x - nx;
+        const cdy = y - ny;
+        if (cdx * cdx + cdy * cdy <= 11.5 * 11.5) {
+          hitX = x;
+          hitY = y;
+          if (Math.abs(cdx) > Math.abs(cdy)) vx *= -0.78;
+          else vy *= -0.78;
+          bounced = true;
+          break;
+        }
       }
-      pts.push({ x, y });
+      if (bounced) break;
+
+      for (const b of this.layout.bumpers ?? []) {
+        const bdx = x - b.x;
+        const bdy = y - b.y;
+        const d = Math.hypot(bdx, bdy);
+        if (d <= b.r + 11 && d > 0.1) {
+          hitX = x;
+          hitY = y;
+          const nx = bdx / d;
+          const ny = bdy / d;
+          const vn = vx * nx + vy * ny;
+          if (vn < 0) {
+            vx -= 2.0 * vn * nx;
+            vy -= 2.0 * vn * ny;
+          }
+          bounced = true;
+          break;
+        }
+      }
+      if (bounced) break;
+      hitX = x;
+      hitY = y;
     }
-    return pts;
+
+    const postPts: Array<{ x: number; y: number }> = [];
+    if (bounced) {
+      let px = hitX;
+      let py = hitY;
+      let pvx = vx;
+      let pvy = vy;
+      const postStep = 0.02;
+      for (let j = 0; j < 14; j += 1) {
+        px += pvx * postStep;
+        py += pvy * postStep;
+        pvx *= Math.pow(0.985, postStep * 60);
+        pvy *= Math.pow(0.985, postStep * 60);
+        postPts.push({ x: px, y: py });
+      }
+    }
+
+    return { hitX, hitY, bounced, postPts };
+  }
+
+  private getCalloutTitle(ok: boolean) {
+    if (!ok) return "OUT OF STROKES";
+    if (this.strokes === 1) return "HOLE IN ONE!";
+    const diff = this.strokes - this.layout.par;
+    if (diff <= -2) return `EAGLE · ${diff}`;
+    if (diff === -1) return "BIRDIE · -1";
+    if (diff === 0) return "PAR";
+    return `BOGEY · +${diff}`;
   }
 
   private sink(ok = true) {
     if (this.ended) return;
     this.ended = true;
+    const strokesUsed = Math.max(1, this.strokes);
     if (ok) {
       this.synth.finishSting();
       void this.platform.achievement.unlock("first-pocket");
@@ -303,142 +390,260 @@ export class PocketScene extends Phaser.Scene {
         void this.platform.achievement.unlock("bank");
       }
       if (this.strokes <= this.layout.par) void this.platform.achievement.unlock("par-table");
-    } else this.synth.crash(0.4);
+      this.parts.burst(this.layout.hole.x, this.layout.hole.y, 24, 0xffe066, 90, 320);
+      this.parts.burst(this.layout.hole.x, this.layout.hole.y, 16, 0x7dffc3, 70, 260);
+      try {
+        const pbKey = `gw:pocket-pb:${this.layout.id}`;
+        const prev = Number(localStorage.getItem(pbKey) ?? 0);
+        if (!prev || strokesUsed < prev) {
+          localStorage.setItem(pbKey, String(strokesUsed));
+        }
+      } catch {
+        /* noop */
+      }
+    } else {
+      this.synth.crash(0.4);
+    }
+    const callout = this.getCalloutTitle(ok);
+    this.bannerLabel
+      .setText(this.banked && ok ? `${callout} · BANK SHOT!` : callout)
+      .setColor(ok ? "#ffe066" : "#ff6b8a")
+      .setPosition(this.scale.width * 0.5, this.scale.height * 0.42)
+      .setVisible(this.hud.visible);
+    this.bannerTimer = 2.0;
+
     void this.platform.session.end({
       mode: readRunContext().daily ? "daily" : "layout",
-      score: Math.max(1, this.strokes),
+      score: strokesUsed,
       result: ok ? "finish" : "death",
       metadata: {
         lowerIsBetter: true,
-        strokes: Math.max(1, this.strokes),
-        par: this.layout.par,
+        strokes: strokesUsed,
+        table: this.table.id,
         layout: this.layout.id,
+        par: this.table.par,
+        banked: this.banked,
         bank: this.banked,
-        perfect: this.strokes === 1,
+        failed: !ok,
+        result: ok ? "finish" : "death",
+        perfect: ok && this.strokes === 1,
         attemptDurationMs: Math.round(this.time.now - this.started),
-        retryHint: `${this.layout.name} · ${this.strokes} vs par ${this.layout.par}`,
+        retryHint: `${this.layout.name} · ${strokesUsed} vs par ${this.layout.par}`,
       },
     });
+  }
+
+  private drawDiamondSight(g: Phaser.GameObjects.Graphics, cx: number, cy: number, r: number, color: number) {
+    g.fillStyle(color, 0.92);
+    g.beginPath();
+    g.moveTo(cx, cy - r);
+    g.lineTo(cx + r, cy);
+    g.lineTo(cx, cy + r);
+    g.lineTo(cx - r, cy);
+    g.closePath();
+    g.fillPath();
   }
 
   private draw() {
     const g = this.gfx;
     g.clear();
+    const t = this.time.now / 1000;
     const theme = this.layout.theme ?? "garden";
-    const felt = theme === "workshop" ? 0xc4a06a : theme === "arcade" ? 0x3a6a88 : 0x2f7a4a;
-    const rail = theme === "workshop" ? 0x8a5a2c : theme === "arcade" ? 0x6a3a22 : 0x7a4a24;
+    const felt = theme === "workshop" ? 0x1e6b52 : theme === "arcade" ? 0x162a4a : 0x1b6e44;
+    const feltHighlight = theme === "workshop" ? 0x268265 : theme === "arcade" ? 0x1f3b66 : 0x238653;
+    const rail = theme === "workshop" ? 0x5c3418 : theme === "arcade" ? 0x28183e : 0x4e2c16;
+    const cushion = theme === "workshop" ? 0x144d3a : theme === "arcade" ? 0x2c4c7e : 0x135232;
+    const brass = theme === "arcade" ? 0x38bdf8 : 0xeab308;
+
     fillBackdrop(g, this.scale.width, this.scale.height, {
-      top: 0xf2e6d0,
-      mid: 0xe8d4b0,
-      bottom: 0xd4b888,
+      top: 0x1c1410,
+      mid: 0x261b14,
+      bottom: 0x120c08,
       grain: 0.03,
-      blobs: [{ color: 0xffe08a, x: 0.18, y: 0.12, r: 80, alpha: 0.18 }],
+      blobs: [{ color: 0xffe08a, x: 0.18, y: 0.12, r: 90, alpha: 0.14 }],
     });
     g.save();
     g.scaleCanvas(this.scaleX, this.scaleY);
-    g.fillStyle(0x4a2c14, 1);
+
+    // Outer table cabinet & mahogany/anodized-neon frame
+    g.fillStyle(0x0d0806, 0.65);
+    g.fillRoundedRect(4, 6, this.layout.w - 4, this.layout.h - 4, 26);
+    g.fillStyle(0x361e0f, 1);
     g.fillRoundedRect(0, 0, this.layout.w, this.layout.h, 24);
     g.fillStyle(rail, 1);
-    g.fillRoundedRect(6, 6, this.layout.w - 12, this.layout.h - 12, 18);
-    g.fillStyle(0x6a3e1c, 1);
-    g.fillRoundedRect(14, 14, this.layout.w - 28, this.layout.h - 28, 14);
+    g.fillRoundedRect(5, 5, this.layout.w - 10, this.layout.h - 10, 20);
+
+    // Anodized / brass trim border along rails
+    g.lineStyle(2, brass, theme === "arcade" ? 0.65 : 0.45);
+    g.strokeRoundedRect(6, 6, this.layout.w - 12, this.layout.h - 12, 19);
+
+    // Cushion bevel & rich woven baize felt
+    g.fillStyle(cushion, 1);
+    g.fillRoundedRect(16, 16, this.layout.w - 32, this.layout.h - 32, 14);
     g.fillStyle(felt, 1);
-    g.fillRoundedRect(26, 26, this.layout.w - 52, this.layout.h - 52, 12);
-    g.fillStyle(0xa06a38, 1);
-    g.fillRect(10, 10, this.layout.w - 20, 16);
-    g.fillRect(10, this.layout.h - 26, this.layout.w - 20, 16);
-    g.fillRect(10, 10, 16, this.layout.h - 20);
-    g.fillRect(this.layout.w - 26, 10, 16, this.layout.h - 20);
-    const pockets = [
-      [22, 22],
-      [this.layout.w - 22, 22],
-      [22, this.layout.h - 22],
-      [this.layout.w - 22, this.layout.h - 22],
-      [this.layout.w / 2, 16],
-      [this.layout.w / 2, this.layout.h - 16],
+    g.fillRoundedRect(24, 24, this.layout.w - 48, this.layout.h - 48, 10);
+
+    // Subtle woven baize felt crosshatch & center table spotlight
+    g.fillStyle(feltHighlight, 0.35);
+    g.fillEllipse(this.layout.w * 0.5, this.layout.h * 0.5, this.layout.w * 0.66, this.layout.h * 0.58);
+    g.lineStyle(1, 0xffffff, 0.04);
+    for (let x = 48; x < this.layout.w - 32; x += 24) {
+      g.lineBetween(x, 24, x, this.layout.h - 24);
+    }
+    for (let y = 48; y < this.layout.h - 32; y += 24) {
+      g.lineBetween(24, y, this.layout.w - 24, y);
+    }
+    // Baize head-string & center spot markings
+    g.lineStyle(1.5, 0xffffff, 0.14);
+    g.lineBetween(160, 26, 160, this.layout.h - 26);
+    g.strokeCircle(this.layout.w * 0.5, this.layout.h * 0.5, 36);
+
+    // Brass / Neon Corner & Side Plates
+    const cornerPlates = [
+      [18, 18],
+      [this.layout.w - 18, 18],
+      [18, this.layout.h - 18],
+      [this.layout.w - 18, this.layout.h - 18],
+      [this.layout.w / 2, 14],
+      [this.layout.w / 2, this.layout.h - 14],
     ];
-    for (const [px, py] of pockets) {
-      g.fillStyle(0x1a1008, 1);
-      g.fillCircle(px, py, 11);
-      g.fillStyle(0x3a2414, 0.7);
-      g.fillCircle(px - 2, py - 2, 4);
+    for (const [px, py] of cornerPlates) {
+      g.fillStyle(brass, 0.88);
+      g.fillCircle(px, py, 15);
+      g.fillStyle(0x0c0908, 1);
+      g.fillCircle(px, py, 11.5);
+      g.fillStyle(0xffffff, 0.22);
+      g.fillCircle(px - 3, py - 3, 3.5);
     }
+
     this.drawFurniture(g, theme);
-    g.fillStyle(theme === "arcade" ? 0xff6ad5 : 0xc4b48a, 0.34);
-    for (let i = 0; i < 10; i += 1) {
-      g.fillCircle(28 + i * 70, 18, 3.4);
-      g.fillCircle(28 + i * 70, this.layout.h - 18, 3.4);
+
+    // Diamond sight-markers along the cushion rails
+    const sightColor = theme === "arcade" ? 0xf472b6 : 0xfef08a;
+    for (let i = 1; i <= 7; i += 1) {
+      if (i === 4) continue;
+      const sx = i * (this.layout.w / 8);
+      this.drawDiamondSight(g, sx, 11, 3.2, sightColor);
+      this.drawDiamondSight(g, sx, this.layout.h - 11, 3.2, sightColor);
     }
-    for (let i = 0; i < 6; i += 1) {
-      g.fillCircle(16, 48 + i * 64, 2.6);
-      g.fillCircle(this.layout.w - 16, 48 + i * 64, 2.6);
+    for (let i = 1; i <= 3; i += 1) {
+      const sy = i * (this.layout.h / 4);
+      this.drawDiamondSight(g, 11, sy, 3.2, sightColor);
+      this.drawDiamondSight(g, this.layout.w - 11, sy, 3.2, sightColor);
     }
-    g.fillStyle(theme === "workshop" ? 0x2a1c12 : theme === "arcade" ? 0x1a1028 : 0x0f2418, 1);
+
+    // Interior cushion walls with 3D shadow and neon/brass bumper strips
     for (const w of this.layout.walls) {
       if (w.x === 0 || w.y === 0 || w.w >= this.layout.w - 2 || w.h >= this.layout.h - 2) continue;
-      g.fillRoundedRect(w.x, w.y, w.w, w.h, theme === "garden" ? 8 : 3);
-      if (theme === "workshop") {
-        g.fillStyle(0x8a6a40, 0.7);
-        g.fillCircle(w.x + 6, w.y + 6, 2);
-        g.fillCircle(w.x + w.w - 6, w.y + 6, 2);
-        g.fillStyle(0x2a1c12, 1);
-      } else if (theme === "garden") {
-        g.fillStyle(0x2a6a3c, 0.55);
-        g.fillRect(w.x, w.y, w.w, 5);
-        g.fillStyle(0x0f2418, 1);
-      } else {
-        g.fillStyle(0xff6ad5, 0.35);
-        g.fillRect(w.x, w.y, w.w, 3);
-        g.fillStyle(0x1a1028, 1);
-      }
+      g.fillStyle(0x000000, 0.28);
+      g.fillRoundedRect(w.x + 3, w.y + 4, w.w, w.h, 6);
+      g.fillStyle(rail, 1);
+      g.fillRoundedRect(w.x, w.y, w.w, w.h, 6);
+      g.lineStyle(2, brass, 0.78);
+      g.strokeRoundedRect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 5);
+      g.fillStyle(0xffffff, 0.2);
+      g.fillRect(w.x + 4, w.y + 2, Math.max(4, w.w - 8), 3);
     }
+
+    // Target Pocket with Spinning Gravity Vortex
     const hole = this.layout.hole;
-    g.fillStyle(0x3a6a48, 0.9);
-    g.fillCircle(hole.x, hole.y, hole.r + 6);
-    g.fillStyle(0x08140c, 1);
-    g.fillCircle(hole.x, hole.y, hole.r);
-    g.fillStyle(0xffffff, 0.12);
-    g.fillCircle(hole.x - 3, hole.y - 3, hole.r * 0.35);
+    const pulse = 0.7 + Math.sin(t * 5) * 0.25;
+    g.fillStyle(0x34d399, 0.18 * pulse);
+    g.fillCircle(hole.x, hole.y, hole.r + 12);
+    g.fillStyle(brass, 0.92);
+    g.fillCircle(hole.x, hole.y, hole.r + 5);
+    g.fillStyle(0x050b09, 1);
+    g.fillCircle(hole.x, hole.y, hole.r + 1);
+    // Spinning vortex rings & spokes inside target pocket
+    g.save();
+    g.translateCanvas(hole.x, hole.y);
+    g.rotateCanvas(t * 2.8);
+    g.lineStyle(2, 0x34d399, 0.65);
+    for (let s = 0; s < 4; s += 1) {
+      const a = (s * Math.PI) / 2;
+      g.beginPath();
+      g.arc(0, 0, hole.r * 0.68, a, a + 0.9);
+      g.strokePath();
+    }
+    g.rotateCanvas(-t * 4.6);
+    g.lineStyle(1.8, 0xffe066, 0.72);
+    for (let s = 0; s < 3; s += 1) {
+      const a = (s * Math.PI * 2) / 3;
+      g.beginPath();
+      g.arc(0, 0, hole.r * 0.38, a, a + 1.0);
+      g.strokePath();
+    }
+    g.restore();
+    g.fillStyle(0xffffff, 0.25);
+    g.fillCircle(hole.x - 3, hole.y - 3, hole.r * 0.24);
+
+    // Ball motion trail
     for (let i = 0; i < this.trail.length; i += 1) {
       const p = this.trail[i];
-      g.fillStyle(0xc4f1c2, 0.08 + (i / this.trail.length) * 0.28);
-      g.fillCircle(p.x, p.y, 4 + (i / this.trail.length) * 4);
+      const u = (i + 1) / this.trail.length;
+      g.fillStyle(0x7dffc3, 0.08 + u * 0.28);
+      g.fillCircle(p.x, p.y, 3.5 + u * 4.5);
     }
+
+    // Reflective Bank-Shot Aim Preview
     if (this.aiming) {
       const dx = this.bx - this.ax;
       const dy = this.by - this.ay;
       const len = Math.hypot(dx, dy);
       const power = Math.min(1, len / 160);
-      g.lineStyle(3, 0xffffff, 0.35 + power * 0.45);
-      g.lineBetween(this.bx, this.by, this.bx + dx, this.by + dy);
-      g.fillStyle(0xffe08a, 0.85);
-      g.fillCircle(this.bx + dx, this.by + dy, 4 + power * 5);
-      const pts = this.predict();
-      for (let i = 0; i < pts.length; i += 1) {
-        g.fillStyle(0xffffff, 0.18 + (1 - i / pts.length) * 0.35);
-        g.fillCircle(pts[i].x, pts[i].y, 2.4);
+      // Pull-back power handle
+      g.lineStyle(2.5, 0xffe066, 0.55);
+      g.lineBetween(this.bx, this.by, this.ax, this.ay);
+      g.fillStyle(0xffe066, 0.9);
+      g.fillCircle(this.ax, this.ay, 4 + power * 4);
+
+      const bank = this.computeBankPreview();
+      if (bank) {
+        // Primary raycast aim line up to first wall/obstacle
+        g.lineStyle(3, 0xffffff, 0.55 + power * 0.35);
+        g.lineBetween(this.bx, this.by, bank.hitX, bank.hitY);
+        // Ghost impact ring at first bounce point
+        g.lineStyle(2, bank.bounced ? 0x38bdf8 : 0xffe066, 0.9);
+        g.strokeCircle(bank.hitX, bank.hitY, 8);
+        // Reflected post-bounce dotted neon trajectory segment
+        for (let i = 0; i < bank.postPts.length; i += 1) {
+          const pt = bank.postPts[i];
+          const fade = 1 - i / bank.postPts.length;
+          g.fillStyle(0x38bdf8, 0.25 + fade * 0.65);
+          g.fillCircle(pt.x, pt.y, 2.8);
+        }
       }
     }
+
     for (const b of this.layout.bumpers ?? []) {
-      g.fillStyle(theme === "arcade" ? 0xff6ad5 : theme === "workshop" ? 0xc47a28 : 0x7ab86a, 1);
+      const bCol = theme === "arcade" ? 0xff6ad5 : theme === "workshop" ? 0xf59e0b : 0x34d399;
+      g.fillStyle(0x000000, 0.28);
+      g.fillCircle(b.x + 2, b.y + 3, b.r + 1);
+      g.fillStyle(bCol, 1);
       g.fillCircle(b.x, b.y, b.r);
-      g.fillStyle(0xffffff, 0.25);
+      g.lineStyle(2.5, 0xffffff, 0.65);
+      g.strokeCircle(b.x, b.y, b.r - 3);
+      g.fillStyle(0xffffff, 0.45);
       g.fillCircle(b.x - 4, b.y - 4, 5);
     }
     for (const m of this.layout.movingBlockers ?? []) {
-      g.fillStyle(theme === "arcade" ? 0x6ad4ff : 0x8a6a40, 1);
-      g.fillRoundedRect(m.x, m.y, m.w, m.h, 4);
-      g.fillStyle(0xffffff, 0.2);
+      g.fillStyle(0x000000, 0.25);
+      g.fillRoundedRect(m.x + 2, m.y + 3, m.w, m.h, 5);
+      g.fillStyle(theme === "arcade" ? 0x38bdf8 : 0xd97706, 1);
+      g.fillRoundedRect(m.x, m.y, m.w, m.h, 5);
+      g.fillStyle(0xffffff, 0.32);
       g.fillRect(m.x + 3, m.y + 3, m.w - 6, 3);
     }
     for (const r of this.layout.rotators ?? []) {
       g.save();
       g.translateCanvas(r.x, r.y);
       g.rotateCanvas(r.a);
-      g.fillStyle(0xc4c4c8, 1);
-      g.fillRect(0, -5, r.len, 10);
-      g.fillStyle(0x3a3a40, 1);
-      g.fillCircle(0, 0, 8);
+      g.fillStyle(0x000000, 0.28);
+      g.fillRoundedRect(0, -3, r.len, 10, 4);
+      g.fillStyle(0xe2e8f0, 1);
+      g.fillRoundedRect(0, -5, r.len, 10, 4);
+      g.fillStyle(brass, 1);
+      g.fillCircle(0, 0, 9);
       g.restore();
     }
     for (const p of this.layout.portals ?? []) {
@@ -473,11 +678,35 @@ export class PocketScene extends Phaser.Scene {
         g.fillRect(gate.x, gate.y, gate.w, gate.h);
       }
     }
-    drawShinyBall(g, this.bx, this.by, 11, theme === "arcade" ? 0xffd0f0 : 0xe8f6e6, this.time.now / 80);
+
+    // Cue Ball Drop Shadow, Specular Roll Highlight & Spin Stripe
+    g.fillStyle(0x000000, 0.36);
+    g.fillEllipse(this.bx + 3.5, this.by + 4.5, 22, 18);
+    drawShinyBall(g, this.bx, this.by, 11, theme === "arcade" ? 0xfdf4ff : 0xfefce8, this.spinPhase);
+    // Rolling spin dot / equator indicator
+    const rollOff = Math.sin(this.spinPhase) * 5.2;
+    const rx = this.bx + Math.cos(this.spinAngle) * rollOff;
+    const ry = this.by + Math.sin(this.spinAngle) * rollOff;
+    g.fillStyle(0xef4444, 0.85);
+    g.fillCircle(rx, ry, 2.2);
+    g.fillStyle(0xffffff, 0.88);
+    g.fillCircle(this.bx - 3.5, this.by - 3.8, 3.2);
+
     drawParticles(g, this.parts);
     g.restore();
-    this.hud.setText(`TABLE  ${this.layout.name.toUpperCase()}\n${this.strokes}  ·  PAR ${this.layout.par}`);
+
+    const bankTag = this.wallThisShot || this.banked ? "  ·  BANK ACTIVE" : "";
+    this.hud.setText(
+      `TABLE  ${this.layout.name.toUpperCase()}\nSTROKES ${this.strokes}/12  ·  PAR ${this.layout.par}${bankTag}`,
+    );
     this.overlay.clear();
+    if (this.hud.visible) {
+      this.overlay.fillStyle(0x140e0a, 0.78);
+      this.overlay.fillRoundedRect(10, 54, 300, 50, 10);
+      this.overlay.lineStyle(1.5, brass, 0.8);
+      this.overlay.strokeRoundedRect(10, 54, 300, 50, 10);
+    }
+    this.bannerLabel.setVisible(this.hud.visible && this.bannerTimer > 0);
   }
 
   private publishDebug() {
@@ -498,13 +727,17 @@ export class PocketScene extends Phaser.Scene {
       },
       {
         finishRun: () => this.sink(true),
-        hideHud: () => this.hud.setVisible(false),
+        hideHud: () => {
+          this.hud.setVisible(false);
+          this.bannerLabel.setVisible(false);
+        },
       },
     );
   }
 
   shutdown() {
     this.native?.destroy();
+    this.bannerLabel?.destroy();
     clearGwDebug();
   }
 }
