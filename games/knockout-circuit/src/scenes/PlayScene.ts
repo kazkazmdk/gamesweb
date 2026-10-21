@@ -45,6 +45,7 @@ export class KnockoutScene extends Phaser.Scene {
   private gfx!: Phaser.GameObjects.Graphics;
   private overlay!: Phaser.GameObjects.Graphics;
   private hud!: Phaser.GameObjects.Text;
+  private checkpointLabel!: Phaser.GameObjects.Text;
   private ghostLabels: Phaser.GameObjects.Text[] = [];
   private nativeKeys: GameKeyboard | null = null;
   private x = 80;
@@ -61,6 +62,7 @@ export class KnockoutScene extends Phaser.Scene {
   private hits = 0;
   private falls = 0;
   private checkpointIdx = 0;
+  private checkpointBannerTimer = 0;
   private camX = 0;
   private camY = 0;
   private touchMove = 0;
@@ -103,6 +105,7 @@ export class KnockoutScene extends Phaser.Scene {
     this.hits = 0;
     this.falls = 0;
     this.checkpointIdx = 0;
+    this.checkpointBannerTimer = 0;
     this.dash = 0;
     this.dying = 0;
     this.recorder = [];
@@ -126,6 +129,19 @@ export class KnockoutScene extends Phaser.Scene {
       })
       .setScrollFactor(0)
       .setDepth(21);
+    this.checkpointLabel = this.add
+      .text(this.scale.width * 0.5, 58, "CHECKPOINT ✓", {
+        fontFamily: "ui-sans-serif, system-ui",
+        fontSize: "14px",
+        fontStyle: "900",
+        color: "#38bdf8",
+        stroke: "#091524",
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5, 0.5)
+      .setScrollFactor(0)
+      .setDepth(22)
+      .setVisible(false);
     this.ghostLabels.forEach((lbl) => lbl.destroy());
     this.ghostLabels = [];
     this.nativeKeys?.destroy();
@@ -310,7 +326,8 @@ export class KnockoutScene extends Phaser.Scene {
   }
 
   update(_: number, delta: number) {
-    const dt = Math.min(0.033, delta / 1000);
+    const rawDt = Math.min(0.033, delta / 1000);
+    const dt = rawDt * this.juice.timeScale(this.time.now);
     this.ticks += 1;
     this.longFrames = countLongFrame(delta, this.longFrames);
     if (!this.signaledReady) {
@@ -324,15 +341,22 @@ export class KnockoutScene extends Phaser.Scene {
       this.publishDebug();
       return;
     }
+    if (this.checkpointBannerTimer > 0) {
+      this.checkpointBannerTimer = Math.max(0, this.checkpointBannerTimer - rawDt);
+    }
     if (native?.onePressed) this.switchMap(0);
     if (native?.twoPressed) this.switchMap(1);
     if (native?.threePressed) this.switchMap(2);
     if (this.dying > 0) {
       this.dying -= delta;
-      this.rag.vy += 1680 * dt;
-      this.rag.x += this.rag.vx * dt;
-      this.rag.y += this.rag.vy * dt;
-      this.rag.rot += this.rag.av * dt;
+      if (!this.juice.isFrozen(this.time.now)) {
+        this.rag.vy += 1680 * dt;
+        this.rag.x += this.rag.vx * dt;
+        this.rag.y += this.rag.vy * dt;
+        this.rag.rot += this.rag.av * dt;
+      }
+      const shaken = this.juice.applyCamera({ x: this.camX, y: this.camY }, this.time.now);
+      this.cameras.main.centerOn(shaken.x, shaken.y);
       this.parts.update(dt);
       this.draw();
       if (this.dying <= 0) {
@@ -367,6 +391,7 @@ export class KnockoutScene extends Phaser.Scene {
       }
       if (dash && this.dash <= 0) {
         this.dash = 180;
+        this.juice.cameraPunch(0.55);
         this.synth.noiseBurst(0.08, 0.04, 500);
         this.parts.burst(this.x + 11, this.y + 16, 10, this.map.theme.accent, 80, 220);
       }
@@ -393,7 +418,12 @@ export class KnockoutScene extends Phaser.Scene {
           passedGates += 1;
         }
       }
-      if (passedGates > this.checkpointIdx) this.checkpointIdx = passedGates;
+      if (passedGates > this.checkpointIdx) {
+        this.checkpointIdx = passedGates;
+        this.checkpointBannerTimer = 1.35;
+        this.parts.burst(this.x + 11, this.y - 6, 16, 0x38bdf8, 95, 360);
+        this.synth.tone(580, 0.05, "triangle", 0.03, 0.12);
+      }
       this.updateRaceRank();
       const finish = this.map.solids.find((s) => s.kind === "finish");
       if (finish && aabb(this.x, this.y, 22, 32, finish.x, finish.y, finish.w, finish.h)) this.win();
@@ -403,7 +433,8 @@ export class KnockoutScene extends Phaser.Scene {
     this.camY += (this.y - 40 - this.camY) * (1 - Math.exp(-dt * 4));
     this.camX = clamp(this.camX, this.scale.width / 2, Math.max(this.scale.width / 2, this.map.width - this.scale.width / 2));
     this.camY = clamp(this.camY, this.scale.height / 2, Math.max(this.scale.height / 2, this.map.height - this.scale.height / 2));
-    this.cameras.main.centerOn(this.camX, this.camY);
+    const shaken = this.juice.applyCamera({ x: this.camX, y: this.camY }, this.time.now);
+    this.cameras.main.centerOn(shaken.x, shaken.y);
     this.parts.update(dt);
     this.draw();
     this.publishDebug();
@@ -453,6 +484,8 @@ export class KnockoutScene extends Phaser.Scene {
     this.rag = { x: this.x, y: this.y, vx: this.vx * 0.35 + (Math.random() - 0.5) * 140, vy: -340, rot: 0, av: 9 + Math.random() * 6 };
     this.parts.burst(this.x + 11, this.y + 12, 18, this.map.theme.danger, 140, 380);
     this.synth.impact(0.6);
+    this.juice.screenShake(0.35, 110);
+    this.juice.hitStop(35);
     this.juice.flash(0.2);
     if (this.running) {
       void this.platform.session.end({
@@ -474,6 +507,9 @@ export class KnockoutScene extends Phaser.Scene {
     if (this.ended) return;
     this.ended = true;
     this.synth.finishSting();
+    this.juice.flash(0.32);
+    this.juice.cameraPunch(0.75);
+    this.juice.slowMo(0.35, 320);
     pulseHaptic([8, 20, 8]);
     // Multi-color confetti burst at finish arch!
     const confettiColors = [0x38bdf8, 0xf472b6, 0xffe08a, 0x34d399, 0xa78bfa];
@@ -694,6 +730,91 @@ export class KnockoutScene extends Phaser.Scene {
     }
   }
 
+  private drawRaceProgressBar() {
+    const o = this.overlay;
+    const w = this.scale.width;
+    const barW = Math.min(340, w - 32);
+    const barH = 22;
+    const barX = w * 0.5 - barW * 0.5;
+    const barY = 18;
+    const th = this.map.theme;
+
+    o.fillStyle(0x161020, 0.82);
+    o.fillRoundedRect(barX, barY, barW, barH, 11);
+    o.lineStyle(1.8, this.rank === 1 ? 0xffe066 : th.accent, 0.92);
+    o.strokeRoundedRect(barX, barY, barW, barH, 11);
+
+    const trackLeft = barX + 14;
+    const trackRight = barX + barW - 24;
+    const trackSpan = Math.max(1, trackRight - trackLeft);
+    const midY = barY + barH * 0.5;
+
+    const finish = this.map.solids.find((s) => s.kind === "finish");
+    const finishX = finish ? finish.x : this.map.width - 220;
+    const spanX = Math.max(1, finishX - this.spawn.x);
+    const norm = (rx: number) => clamp((rx - this.spawn.x) / spanX, 0, 1);
+    const playerU = norm(this.x);
+
+    // Base track groove & player progress fill
+    o.fillStyle(0xffffff, 0.14);
+    o.fillRoundedRect(trackLeft, midY - 2, trackSpan, 4, 2);
+    o.fillStyle(this.rank === 1 ? 0xffe066 : th.accent, 0.55);
+    o.fillRoundedRect(trackLeft, midY - 2, Math.max(4, trackSpan * playerU), 4, 2);
+
+    // Checkpoint tick marks along the progress track
+    for (const s of this.map.solids) {
+      if (s.kind === "gate" || s.kind === "mover" || s.kind === "spinner") {
+        const cu = norm(s.x + s.w * 0.5);
+        const cx = trackLeft + cu * trackSpan;
+        const passed = this.x > s.x + s.w;
+        o.fillStyle(passed ? 0x38bdf8 : 0xffffff, passed ? 0.95 : 0.35);
+        o.fillRect(cx - 1, midY - 4, 2, 8);
+      }
+    }
+
+    // Checkered finish flag icon on the right
+    const flagX = trackRight + 6;
+    const flagY = barY + 5;
+    o.fillStyle(0xffe08a, 0.95);
+    o.fillRect(flagX - 2, flagY, 1.8, 12);
+    for (let r = 0; r < 2; r += 1) {
+      for (let c = 0; c < 3; c += 1) {
+        o.fillStyle((r + c) % 2 === 0 ? 0xffffff : 0x111118, 0.95);
+        o.fillRect(flagX + c * 3, flagY + r * 3.5, 3, 3.5);
+      }
+    }
+
+    // Rivals (BLITZ, VEX, NOVA, ECHO) + PB ghost pips
+    for (const ghost of this.ghosts) {
+      const pose = this.sampleGhostAt(ghost, this.elapsed);
+      if (!pose) continue;
+      const gu = norm(pose.x);
+      const gx = trackLeft + gu * trackSpan;
+      const isPb = ghost.name === "PB";
+      o.fillStyle(0x14101c, 0.9);
+      o.fillCircle(gx, midY, isPb ? 4.8 : 5.5);
+      o.fillStyle(ghost.color, isPb ? 0.78 : 0.96);
+      o.fillCircle(gx, midY, isPb ? 3.4 : 4.2);
+      o.fillStyle(0xffffff, 0.55);
+      o.fillCircle(gx - 1, midY - 1, 1.2);
+    }
+
+    // Player cursor (YOU in gold #ffe066, larger + mini-crown when 1st)
+    const px = trackLeft + playerU * trackSpan;
+    o.fillStyle(0x14101c, 0.95);
+    o.fillCircle(px, midY, 7.2);
+    o.fillStyle(0xffe066, 1);
+    o.fillCircle(px, midY, 5.6);
+    o.fillStyle(th.accent, 0.95);
+    o.fillCircle(px, midY, 2.5);
+    if (this.rank === 1) {
+      o.fillStyle(0xffe066, 0.98);
+      o.fillTriangle(px - 5, midY - 6, px - 3.5, midY - 11, px - 1, midY - 7);
+      o.fillTriangle(px - 2, midY - 6, px, midY - 12.5, px + 2, midY - 6);
+      o.fillTriangle(px + 1, midY - 7, px + 3.5, midY - 11, px + 5, midY - 6);
+    }
+  }
+
   private draw() {
     const g = this.gfx;
     const th = this.map.theme;
@@ -886,6 +1007,23 @@ export class KnockoutScene extends Phaser.Scene {
       this.drawPlatform3D(g, live.x, live.y, live.w, live.h, platColor, s.route, "solid", t);
     }
 
+    // Luminous Checkpoint Beacons on course gates/obstacles
+    for (const s of this.map.solids) {
+      if (s.kind === "gate" || s.kind === "mover" || s.kind === "spinner") {
+        const passed = this.x > s.x + s.w;
+        const bx = s.x + s.w + 8;
+        const by = s.y - 18;
+        g.fillStyle(0x1f1924, 0.9);
+        g.fillRect(bx - 1.5, by - 14, 3, 18);
+        g.fillStyle(passed ? 0x38bdf8 : 0xffffff, passed ? 0.95 : 0.35);
+        g.fillTriangle(bx + 1.5, by - 14, bx + 14, by - 9, bx + 1.5, by - 4);
+        if (passed) {
+          g.fillStyle(0x38bdf8, 0.28 + Math.sin(t * 7) * 0.1);
+          g.fillCircle(bx + 4, by - 9, 10);
+        }
+      }
+    }
+
     // Draw Pace-Rival & PB Ghosts with motion trails & floating namepills
     this.ghostLabels.forEach((lbl) => lbl.setVisible(false));
     for (let gi = 0; gi < this.ghosts.length; gi += 1) {
@@ -949,10 +1087,28 @@ export class KnockoutScene extends Phaser.Scene {
     );
     this.overlay.clear();
     if (this.hud.visible) {
+      this.drawRaceProgressBar();
       this.overlay.fillStyle(0x161020, 0.78);
       this.overlay.fillRoundedRect(12, 56, 286, 52, 12);
       this.overlay.lineStyle(2, this.rank === 1 ? 0xffe066 : th.accent, 0.9);
       this.overlay.strokeRoundedRect(12, 56, 286, 52, 12);
+      if (this.checkpointBannerTimer > 0) {
+        const popAlpha = clamp(this.checkpointBannerTimer / 0.35, 0, 1);
+        const floatY = 58 - (1 - clamp(this.checkpointBannerTimer / 1.35, 0, 1)) * 8;
+        const badgeW = 148;
+        const badgeH = 24;
+        const badgeX = this.scale.width * 0.5 - badgeW * 0.5;
+        const badgeY = floatY - badgeH * 0.5;
+        this.overlay.fillStyle(0x091524, 0.88 * popAlpha);
+        this.overlay.fillRoundedRect(badgeX, badgeY, badgeW, badgeH, 12);
+        this.overlay.lineStyle(1.8, 0x38bdf8, 0.95 * popAlpha);
+        this.overlay.strokeRoundedRect(badgeX, badgeY, badgeW, badgeH, 12);
+        this.checkpointLabel.setPosition(this.scale.width * 0.5, floatY).setAlpha(popAlpha).setVisible(true);
+      } else {
+        this.checkpointLabel.setVisible(false);
+      }
+    } else {
+      this.checkpointLabel.setVisible(false);
     }
     const fa = this.juice.flashAlpha(0.016);
     if (fa) {
@@ -995,6 +1151,7 @@ export class KnockoutScene extends Phaser.Scene {
         },
         hideHud: () => {
           this.hud.setVisible(false);
+          this.checkpointLabel.setVisible(false);
           this.ghostLabels.forEach((lbl) => lbl.setVisible(false));
         },
       },
@@ -1003,6 +1160,7 @@ export class KnockoutScene extends Phaser.Scene {
 
   shutdown() {
     this.nativeKeys?.destroy();
+    this.checkpointLabel?.destroy();
     this.ghostLabels.forEach((lbl) => lbl.destroy());
     this.ghostLabels = [];
     clearGwDebug();

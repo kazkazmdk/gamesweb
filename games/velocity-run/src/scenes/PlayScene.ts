@@ -61,11 +61,14 @@ export class VelocityPlayScene extends Phaser.Scene {
   private showGhost = true;
   private splitIndex = 0;
   private splits: number[] = [];
+  private splitTimer = 0;
+  private splitDelta: number | null = null;
   private shownHint = true;
   private endedAt = 0;
   private fastFalls = 0;
   private wasFastFalling = false;
   private afterImages: Array<{ x: number; y: number; w: number; h: number; vy: number; vx: number; facing: number }> = [];
+  private landingRings: Array<{ x: number; y: number; rx: number; ry: number; maxRx: number; alpha: number; color: number }> = [];
   private nativeKeys: GameKeyboard | null = null;
 
   constructor() {
@@ -91,9 +94,12 @@ export class VelocityPlayScene extends Phaser.Scene {
     this.signaledReady = false;
     this.splitIndex = 0;
     this.splits = [];
+    this.splitTimer = 0;
+    this.splitDelta = null;
     this.fastFalls = 0;
     this.wasFastFalling = false;
     this.afterImages = [];
+    this.landingRings = [];
     this.camX = this.spawn.x;
     this.camY = this.spawn.y;
     this.camZ = 1;
@@ -255,8 +261,11 @@ export class VelocityPlayScene extends Phaser.Scene {
         this.deaths = 0;
         this.splitIndex = 0;
         this.splits = [];
+        this.splitTimer = 0;
+        this.splitDelta = null;
         this.wasFastFalling = false;
         this.afterImages = [];
+        this.landingRings = [];
         this.recorder.reset();
         this.attemptEpoch += 1;
       }
@@ -293,9 +302,38 @@ export class VelocityPlayScene extends Phaser.Scene {
       this.runner.grounded = false;
       if (wasGround) this.runner.coyote = this.time.now + MOVE.coyoteMs;
       this.runner.input(dt, move, jumpDown, jumpHeld, jumpReleased, down, this.time.now);
+      const prevVy = this.runner.vy;
       this.collide();
       if (this.runner.grounded && !wasGround) {
-        this.parts.burst(this.runner.x + 8, this.runner.y + 28, 6, this.course.theme.accent, 70, 200);
+        const impact = Math.min(1, Math.abs(prevVy) / 720);
+        this.juice.cameraPunch(impact * 0.65);
+        const footX = this.runner.x + this.runner.w * 0.5;
+        const footY = this.runner.y + this.runner.h;
+        this.landingRings.push({
+          x: footX,
+          y: footY,
+          rx: 6 + impact * 10,
+          ry: 2 + impact * 2,
+          maxRx: 24 + impact * 34,
+          alpha: 0.58 + impact * 0.38,
+          color: impact > 0.68 ? 0x38f2ff : this.course.theme.accent,
+        });
+        const dustCount = Math.max(3, Math.round(4 + impact * 8));
+        for (let i = 0; i < dustCount; i += 1) {
+          const dir = i % 2 === 0 ? -1 : 1;
+          const speed = (48 + Math.random() * 85) * (0.55 + impact * 0.85);
+          this.parts.emit({
+            x: footX + dir * (2 + Math.random() * 4),
+            y: footY - 1,
+            vx: dir * speed + this.runner.vx * 0.18,
+            vy: -(12 + Math.random() * 38 * impact),
+            life: 160 + impact * 140,
+            size: 1.8 + impact * 2.2,
+            color: i % 3 === 0 ? 0xffffff : this.course.theme.accent,
+            drag: 0.9,
+          });
+        }
+        this.parts.burst(footX, footY, 6, this.course.theme.accent, 70 + impact * 60, 200);
         this.synth.tone(220 + Math.random() * 30, 0.035, "triangle", 0.028, 0.08);
       }
       if (down && !wasGround && this.runner.vy > 80) {
@@ -393,10 +431,18 @@ export class VelocityPlayScene extends Phaser.Scene {
     const pb = this.tape?.splits[this.splitIndex];
     const d = pb !== undefined ? this.timeMs - pb : 0;
     const sign = d >= 0 ? "+" : "";
-    this.splitTxt.setText(pb === undefined ? "SPLIT" : `${sign}${(d / 1000).toFixed(2)}`);
-    this.splitTxt.setColor(d <= 0 ? "#3dff8a" : "#ff4d6d");
+    const badge = pb === undefined ? "PACE" : d <= 0 ? "AHEAD" : "BEHIND";
+    this.splitDelta = pb !== undefined ? d : null;
+    this.splitTimer = 1100;
+    this.splitTxt.setText(
+      pb === undefined
+        ? `SPLIT  ${(this.timeMs / 1000).toFixed(2)}s  ·  ${badge}`
+        : `${sign}${(d / 1000).toFixed(2)}s   ${badge}`,
+    );
+    this.splitTxt.setColor(pb === undefined ? "#38f2ff" : d <= 0 ? "#3dff8a" : "#ff4d6d");
+    this.tweens.killTweensOf(this.splitTxt);
     this.splitTxt.setAlpha(1);
-    this.tweens.add({ targets: this.splitTxt, alpha: 0, delay: 360, duration: 140 });
+    this.tweens.add({ targets: this.splitTxt, alpha: 0, delay: 1100, duration: 240 });
     this.synth.gateChime();
     this.splitIndex += 1;
   }
@@ -682,8 +728,24 @@ export class VelocityPlayScene extends Phaser.Scene {
         g.fillCircle(live.x + live.w - 2, live.y + live.h / 2, 4);
       } else if (s.kind === "bar") {
         const warnPulse = 0.25 + Math.sin(this.time.now / 120) * 0.12;
-        g.lineStyle(2, th.danger, 0.38);
-        g.lineBetween(s.x - 18, s.y + s.h / 2, s.x + s.w + 18, s.y + s.h / 2);
+        const amp = 18;
+        const railMinX = s.x - amp;
+        const railMaxX = s.x + s.w + amp;
+        const railY = s.y + s.h / 2;
+        g.lineStyle(1, th.danger, 0.22);
+        g.strokeRoundedRect(railMinX, s.y, s.w + amp * 2, s.h, 3);
+        g.lineStyle(2, th.danger, 0.55);
+        for (let dx = railMinX + 4; dx < railMaxX - 4; dx += 9) {
+          g.lineBetween(dx, railY, Math.min(railMaxX - 4, dx + 5), railY);
+        }
+        for (const endX of [railMinX, railMaxX]) {
+          g.fillStyle(th.danger, 0.22 + warnPulse * 0.5);
+          g.fillCircle(endX, railY, 6);
+          g.lineStyle(2, 0xffe066, 0.85);
+          g.lineBetween(endX, s.y - 2, endX, s.y + s.h + 2);
+          g.fillStyle(0xffe066, 0.95);
+          g.fillCircle(endX, railY, 2.5);
+        }
         g.fillStyle(th.danger, warnPulse);
         g.fillRoundedRect(live.x - 4, live.y - 4, live.w + 8, live.h + 8, 5);
         g.fillStyle(0x2a2a30, 1);
@@ -696,8 +758,23 @@ export class VelocityPlayScene extends Phaser.Scene {
         }
       } else if (s.kind === "piston") {
         const warnPulse = 0.22 + Math.sin(this.time.now / 110) * 0.12;
-        g.lineStyle(1.5, th.danger, 0.42);
-        g.strokeRect(s.x - 2, s.y - s.h * 0.35, s.w + 4, s.h * 1.15);
+        const railMinY = s.y - s.h * 0.35;
+        const railMaxY = s.y + s.h * 0.8;
+        const railX = s.x + s.w / 2;
+        g.lineStyle(1.2, th.danger, 0.32);
+        g.strokeRect(s.x - 2, railMinY, s.w + 4, railMaxY - railMinY);
+        g.lineStyle(2, th.danger, 0.55);
+        for (let dy = railMinY + 4; dy < railMaxY - 4; dy += 9) {
+          g.lineBetween(railX, dy, railX, Math.min(railMaxY - 4, dy + 5));
+        }
+        for (const endY of [railMinY, railMaxY]) {
+          g.fillStyle(th.danger, 0.22 + warnPulse * 0.5);
+          g.fillCircle(railX, endY, 6);
+          g.lineStyle(2, 0xffe066, 0.85);
+          g.lineBetween(s.x - 3, endY, s.x + s.w + 3, endY);
+          g.fillStyle(0xffe066, 0.95);
+          g.fillCircle(railX, endY, 2.5);
+        }
         g.fillStyle(th.danger, warnPulse);
         g.fillRoundedRect(live.x - 4, live.y - 4, live.w + 8, live.h + 8, 5);
         g.fillStyle(0x3a3a44, 1);
@@ -745,6 +822,21 @@ export class VelocityPlayScene extends Phaser.Scene {
       g.fillCircle(p.x, p.y, p.size);
     }
 
+    for (let i = this.landingRings.length - 1; i >= 0; i -= 1) {
+      const ring = this.landingRings[i];
+      ring.rx += (ring.maxRx - ring.rx) * Math.min(1, dt * 14) + dt * 42;
+      ring.ry += dt * 10;
+      ring.alpha -= dt * 3.1;
+      if (ring.alpha <= 0) {
+        this.landingRings.splice(i, 1);
+        continue;
+      }
+      g.lineStyle(2.2, ring.color, ring.alpha * 0.85);
+      g.strokeEllipse(ring.x, ring.y - 1, ring.rx * 2, ring.ry * 2);
+      g.lineStyle(1.2, 0xffffff, ring.alpha * 0.65);
+      g.lineBetween(ring.x - ring.rx * 0.85, ring.y, ring.x + ring.rx * 0.85, ring.y);
+    }
+
     const r = this.runner;
     const showTrail =
       this.dying <= 0 &&
@@ -785,6 +877,7 @@ export class VelocityPlayScene extends Phaser.Scene {
       this.overlay.fillStyle(0xffffff, fa);
       this.overlay.fillRect(0, 0, this.scale.width, this.scale.height);
     }
+    this.drawCourseProgressBar(dt);
     if (this.sys.game.device.input.touch) {
       this.overlay.fillStyle(0xffffff, 0.05);
       this.overlay.fillRoundedRect(16, this.scale.height * 0.28, this.scale.width * 0.3, this.scale.height * 0.5, 16);
@@ -801,6 +894,72 @@ export class VelocityPlayScene extends Phaser.Scene {
       }
     }
     this.publishDebug();
+  }
+
+  private drawCourseProgressBar(dt: number) {
+    const w = this.scale.width;
+    const goalX = Math.max(1, this.finish?.x ?? this.course.width);
+    const barW = Math.min(340, Math.max(180, w * 0.34));
+    const barH = 6;
+    const barX = w * 0.5 - barW * 0.5;
+    const barY = 26;
+    const th = this.course.theme;
+    const runnerRatio = clamp(this.runner.x / goalX, 0, 1);
+
+    this.overlay.fillStyle(0x0c141e, 0.58);
+    this.overlay.fillRoundedRect(barX - 4, barY - 4, barW + 8, barH + 8, 6);
+    this.overlay.fillStyle(0xffffff, 0.14);
+    this.overlay.fillRoundedRect(barX, barY, barW, barH, 3);
+    this.overlay.fillStyle(th.accent, 0.72);
+    this.overlay.fillRoundedRect(barX, barY, Math.max(4, barW * runnerRatio), barH, 3);
+
+    const gates = this.course.solids.filter((s) => s.kind === "checkpoint");
+    for (let i = 0; i < gates.length; i += 1) {
+      const cpRatio = clamp(gates[i].x / goalX, 0, 1);
+      const cpX = barX + barW * cpRatio;
+      const cleared = i < this.splitIndex;
+      this.overlay.fillStyle(cleared ? 0x3dff8a : 0xffffff, cleared ? 0.95 : 0.55);
+      this.overlay.fillRect(cpX - 1, barY - 3, 2, barH + 6);
+    }
+
+    if (this.showGhost && this.tape && this.running) {
+      const gp = ghostPose(this.tape.samples, this.timeMs);
+      if (gp) {
+        const ghostRatio = clamp(gp.x / goalX, 0, 1);
+        const gx = barX + barW * ghostRatio;
+        const gy = barY + barH * 0.5;
+        this.overlay.fillStyle(0xb86bff, 0.45);
+        this.overlay.fillCircle(gx, gy, 6.5);
+        this.overlay.fillStyle(0x38f2ff, 0.95);
+        this.overlay.fillCircle(gx, gy, 3.8);
+      }
+    }
+
+    const px = barX + barW * runnerRatio;
+    const py = barY + barH * 0.5;
+    this.overlay.fillStyle(th.accent, 0.45);
+    this.overlay.fillCircle(px, py, 7.5);
+    this.overlay.fillStyle(0xff6a32, 1);
+    this.overlay.fillCircle(px, py, 4.6);
+    this.overlay.fillStyle(0xffffff, 0.95);
+    this.overlay.fillCircle(px, py, 2);
+
+    if (this.splitTimer > 0) {
+      this.splitTimer = Math.max(0, this.splitTimer - dt * 1000);
+      const badgeColor =
+        this.splitDelta === null ? 0x38f2ff : this.splitDelta <= 0 ? 0x3dff8a : 0xff4d6d;
+      const fade = Math.min(1, this.splitTimer / 220);
+      const pillW = 192;
+      const pillH = 26;
+      const cx = w * 0.5;
+      const cy = 92;
+      this.overlay.fillStyle(0x0c141e, 0.68 * fade);
+      this.overlay.fillRoundedRect(cx - pillW * 0.5, cy - pillH * 0.5, pillW, pillH, 13);
+      this.overlay.lineStyle(1.6, badgeColor, 0.85 * fade);
+      this.overlay.strokeRoundedRect(cx - pillW * 0.5, cy - pillH * 0.5, pillW, pillH, 13);
+      this.overlay.fillStyle(badgeColor, 0.22 * fade);
+      this.overlay.fillRoundedRect(cx + pillW * 0.5 - 68, cy - 9, 60, 18, 9);
+    }
   }
 
   private handleChromeTap(x: number, y: number) {
@@ -875,6 +1034,8 @@ export class VelocityPlayScene extends Phaser.Scene {
         hideHud: () => {
           this.hud.setVisible(false);
           this.overlay.setVisible(false);
+          this.splitTxt.setVisible(false);
+          this.hint.setVisible(false);
         },
         setCourse: (id: string) => {
           const key = id.trim().toLowerCase();

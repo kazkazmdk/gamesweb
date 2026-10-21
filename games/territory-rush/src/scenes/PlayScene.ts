@@ -41,11 +41,15 @@ export class TerritoryScene extends Phaser.Scene {
   private gfx!: Phaser.GameObjects.Graphics;
   private hud!: Phaser.GameObjects.Text;
   private playerLabel!: Phaser.GameObjects.Text;
+  private dangerLabel!: Phaser.GameObjects.Text;
+  private standingLabels: Phaser.GameObjects.Text[] = [];
+  private standingPctLabels: Phaser.GameObjects.Text[] = [];
   private native: GameKeyboard | null = null;
   private grid: Owner[] = [];
   private px = 8;
   private py = 14;
   private trail: Array<{ x: number; y: number }> = [];
+  private trailThreat = false;
   private bots: Array<{
     x: number;
     y: number;
@@ -135,6 +139,7 @@ export class TerritoryScene extends Phaser.Scene {
     this.px = 8;
     this.py = 14;
     this.trail = [];
+    this.trailThreat = false;
     this.t = 0;
     this.ended = false;
     this.claims = 0;
@@ -171,6 +176,49 @@ export class TerritoryScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 1)
       .setDepth(18);
+    this.dangerLabel?.destroy();
+    this.dangerLabel = this.add
+      .text(0, 0, "⚠ TRAIL DANGER!", {
+        fontFamily: "ui-sans-serif, system-ui",
+        fontSize: "12px",
+        fontStyle: "900",
+        color: "#ff2a5a",
+        stroke: "#fff8ec",
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(22)
+      .setVisible(false);
+    this.standingLabels.forEach((t) => t.destroy());
+    this.standingPctLabels.forEach((t) => t.destroy());
+    this.standingLabels = [0, 1, 2, 3].map(() =>
+      this.add
+        .text(0, 0, "", {
+          fontFamily: "ui-sans-serif, system-ui",
+          fontSize: "11px",
+          fontStyle: "800",
+          color: "#f8fafc",
+          stroke: "#0f172a",
+          strokeThickness: 3,
+        })
+        .setOrigin(0, 0)
+        .setScrollFactor(0)
+        .setDepth(22),
+    );
+    this.standingPctLabels = [0, 1, 2, 3].map(() =>
+      this.add
+        .text(0, 0, "", {
+          fontFamily: "ui-sans-serif, system-ui",
+          fontSize: "11px",
+          fontStyle: "900",
+          color: "#f8fafc",
+          stroke: "#0f172a",
+          strokeThickness: 3,
+        })
+        .setOrigin(1, 0)
+        .setScrollFactor(0)
+        .setDepth(22),
+    );
     this.names.forEach((t) => t.destroy());
     this.names = this.bots.map((b) =>
       this.add
@@ -529,6 +577,70 @@ export class TerritoryScene extends Phaser.Scene {
     g.fillCircle(cx, cy - 3, 1.8);
   }
 
+  private drawLiveStandings(g: Phaser.GameObjects.Graphics, colors: number[]) {
+    if (!this.hud.visible) {
+      this.standingLabels.forEach((t) => t.setVisible(false));
+      this.standingPctLabels.forEach((t) => t.setVisible(false));
+      return;
+    }
+    const px = Math.max(12, this.scale.width - 178);
+    const py = 44;
+    const pw = 164;
+    const ph = 98;
+
+    const entries: Array<{ id: Owner; name: string; pct: number; color: number }> = [
+      { id: 1 as Owner, name: "YOU", pct: this.pct(1), color: colors[1] },
+      ...this.bots.map((b) => ({ id: b.id, name: b.name, pct: this.pct(b.id), color: colors[b.id] })),
+    ].sort((a, b) => b.pct - a.pct);
+
+    // Compact dark Paper.io 2 live leaderboard plate
+    g.fillStyle(0x140f1d, 0.84);
+    g.fillRoundedRect(px, py, pw, ph, 10);
+    g.lineStyle(1.8, entries[0]?.color ?? 0xffffff, 0.55);
+    g.strokeRoundedRect(px, py, pw, ph, 10);
+
+    for (let i = 0; i < entries.length; i += 1) {
+      const e = entries[i];
+      const ry = py + 6 + i * 22;
+      const isYou = e.id === 1;
+
+      if (isYou) {
+        g.fillStyle(e.color, 0.24);
+        g.fillRoundedRect(px + 4, ry - 1, pw - 8, 20, 5);
+        g.lineStyle(1.2, 0xffffff, 0.55);
+        g.strokeRoundedRect(px + 4, ry - 1, pw - 8, 20, 5);
+      }
+
+      // Faction color swatch
+      g.fillStyle(e.color, 1);
+      g.fillCircle(px + 13, ry + 9, 4.5);
+      g.lineStyle(1.2, 0xffffff, 0.85);
+      g.strokeCircle(px + 13, ry + 9, 4.5);
+
+      // Proportional territory progress bar
+      const barX = px + 23;
+      const barW = pw - 31;
+      const ratio = Phaser.Math.Clamp(e.pct / 100, 0.03, 1);
+      g.fillStyle(0x000000, 0.48);
+      g.fillRoundedRect(barX, ry + 13, barW, 4, 2);
+      g.fillStyle(e.color, 1);
+      g.fillRoundedRect(barX, ry + 13, barW * ratio, 4, 2);
+
+      const rankCrown = i === 0 ? "👑 " : "";
+      this.standingLabels[i]
+        ?.setPosition(barX, ry - 1)
+        .setText(`#${i + 1} ${rankCrown}${e.name}`)
+        .setColor(isYou ? "#fde047" : i === 0 ? "#ffffff" : "#e2e8f0")
+        .setVisible(true);
+
+      this.standingPctLabels[i]
+        ?.setPosition(px + pw - 8, ry - 1)
+        .setText(`${Math.round(e.pct)}%`)
+        .setColor(isYou ? "#fde047" : "#f8fafc")
+        .setVisible(true);
+    }
+  }
+
   private finish() {
     if (this.ended) return;
     this.ended = true;
@@ -653,8 +765,39 @@ export class TerritoryScene extends Phaser.Scene {
       g.strokeCircle(ox, oy, Math.max(10, waveR * 0.72));
     }
 
-    // Active Unbanked Trails
-    drawRibbon(g, ribbonPoints(this.trail, c), this.shield > 0 ? 0x8fe8ff : colors[1], this.trail.length > 8 ? 1.55 : 1.35);
+    // Evaluate Trail Danger Radar (minimum bot distance to any unbanked player trail segment)
+    let minTrailDist = Infinity;
+    let threatCell: { x: number; y: number } | null = null;
+    if (this.trail.length > 0) {
+      for (const b of this.bots) {
+        for (const seg of this.trail) {
+          const d = Math.hypot(b.x - seg.x, b.y - seg.y);
+          if (d < minTrailDist) {
+            minTrailDist = d;
+            threatCell = seg;
+          }
+        }
+      }
+    }
+    this.trailThreat = this.trail.length > 0 && minTrailDist <= 3;
+
+    // Active Unbanked Trails (pulses urgent red/white when threatened)
+    const dangerWave = 0.5 + 0.5 * Math.sin(tSec * 24);
+    const playerTrailColor = this.trailThreat
+      ? dangerWave > 0.5
+        ? 0xff1e42
+        : 0xffffff
+      : this.shield > 0
+        ? 0x8fe8ff
+        : colors[1];
+    const playerTrailPulse = this.trailThreat ? 1.55 + dangerWave * 0.45 : this.trail.length > 8 ? 1.55 : 1.35;
+    drawRibbon(g, ribbonPoints(this.trail, c), playerTrailColor, playerTrailPulse);
+    if (this.trailThreat && threatCell) {
+      const tx = threatCell.x * c + c / 2;
+      const ty = threatCell.y * c + c / 2;
+      g.lineStyle(2.5, 0xff1e42, 0.85);
+      g.strokeCircle(tx, ty, c * (0.65 + dangerWave * 0.45));
+    }
     for (const b of this.bots) drawRibbon(g, ribbonPoints(b.trail, c), colors[b.id], 0.85);
 
     // Arena Pickups (Speed, Shield, Claim) with animated halos
@@ -695,10 +838,20 @@ export class TerritoryScene extends Phaser.Scene {
       g.fillStyle(0x38bdf8, 0.16);
       g.fillCircle(px, py, c * 0.72);
     }
-    drawHoverBlade(g, px, py, colors[1], heading, this.trail.length > 2, this.time.now);
+    drawHoverBlade(g, px, py, colors[1], heading, this.trailThreat, this.time.now);
     this.playerLabel?.setPosition(px, py - c * 0.72).setVisible(this.hud.visible);
     if (leaderId === 1) {
       this.drawLeaderCrown(g, px, py - c * 1.55);
+    }
+    if (this.trailThreat && this.hud.visible) {
+      const warnY = py - c * (leaderId === 1 ? 2.25 : 1.55);
+      this.dangerLabel
+        ?.setPosition(px, warnY)
+        .setColor(dangerWave > 0.5 ? "#ff1e42" : "#ffffff")
+        .setScale(0.96 + dangerWave * 0.14)
+        .setVisible(true);
+    } else {
+      this.dangerLabel?.setVisible(false);
     }
 
     // Draw Bot Rivals + Leader Crown
@@ -721,6 +874,7 @@ export class TerritoryScene extends Phaser.Scene {
 
     drawParticles(g, this.parts);
     fillVignette(g, this.scale.width, this.scale.height, 0.06);
+    this.drawLiveStandings(g, colors);
     const shieldTag = this.shield > 0 ? `  ·  SHIELD ${this.shield.toFixed(1)}s` : "";
     const boostTag = this.boost > 0 ? `  ·  BOOST` : "";
     this.hud.setText(
@@ -797,6 +951,9 @@ export class TerritoryScene extends Phaser.Scene {
         hideHud: () => {
           this.hud.setVisible(false);
           this.playerLabel?.setVisible(false);
+          this.dangerLabel?.setVisible(false);
+          this.standingLabels.forEach((t) => t.setVisible(false));
+          this.standingPctLabels.forEach((t) => t.setVisible(false));
           this.names.forEach((t) => t.setVisible(false));
         },
       },
@@ -806,6 +963,11 @@ export class TerritoryScene extends Phaser.Scene {
   shutdown() {
     this.native?.destroy();
     this.playerLabel?.destroy();
+    this.dangerLabel?.destroy();
+    this.standingLabels.forEach((t) => t.destroy());
+    this.standingLabels = [];
+    this.standingPctLabels.forEach((t) => t.destroy());
+    this.standingPctLabels = [];
     this.names.forEach((t) => t.destroy());
     this.names = [];
     clearGwDebug();

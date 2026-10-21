@@ -606,6 +606,61 @@ export class CrowdScene extends Phaser.Scene {
     g.fillCircle(mx - scale * 0.2, my - scale * 0.95, Math.max(1.2, scale * 0.26));
   }
 
+  private drawRouteProgressBar(w: number) {
+    const barW = Math.min(320, Math.max(180, w - 48));
+    const barX = w * 0.5 - barW * 0.5;
+    const barY = 18;
+    const barH = 12;
+    const finishSeg = this.segs[this.segs.length - 1];
+    const finishZ = Math.max(1, finishSeg?.z ?? 900);
+    const progress = Phaser.Math.Clamp(this.z / finishZ, 0, 1);
+
+    // Outer dark stadium pill casing
+    this.overlay.fillStyle(0x0f172a, 0.86);
+    this.overlay.fillRoundedRect(barX - 6, barY - 5, barW + 12, barH + 10, 10);
+    this.overlay.lineStyle(2, 0x334155, 0.92);
+    this.overlay.strokeRoundedRect(barX - 6, barY - 5, barW + 12, barH + 10, 10);
+
+    // Track background & filled progress bar
+    this.overlay.fillStyle(0x1e293b, 0.96);
+    this.overlay.fillRoundedRect(barX, barY, barW, barH, 6);
+    const fillW = Math.max(8, barW * progress);
+    this.overlay.fillStyle(0x38bdf8, 0.96);
+    this.overlay.fillRoundedRect(barX, barY, fillW, barH, 6);
+    this.overlay.fillStyle(0xffffff, 0.35);
+    this.overlay.fillRoundedRect(barX + 2, barY + 2, Math.max(4, fillW - 4), 3, 2);
+
+    // Route landmarks: gates (cyan/green), enemy squads (red), boss/finish (gold)
+    const midY = barY + barH * 0.5;
+    for (const s of this.segs) {
+      const sx = barX + Phaser.Math.Clamp(s.z / finishZ, 0, 1) * barW;
+      const passed = this.z >= s.z;
+      if (s.type === "gate") {
+        this.overlay.fillStyle(passed ? 0x4ade80 : 0x38bdf8, 0.95);
+        this.overlay.fillRoundedRect(sx - 2, barY - 2, 4, barH + 4, 2);
+      } else if (s.type === "enemy") {
+        this.overlay.fillStyle(0x0f172a, 0.92);
+        this.overlay.fillCircle(sx, midY, 6);
+        this.overlay.fillStyle(passed ? 0x64748b : 0xff4d6d, 1);
+        this.overlay.fillCircle(sx, midY, 4.2);
+      } else if (s.type === "boss" || s.type === "finish") {
+        this.overlay.fillStyle(0x0f172a, 0.95);
+        this.overlay.fillCircle(sx, midY, 7.5);
+        this.overlay.fillStyle(0xfacc15, 1);
+        this.overlay.fillCircle(sx, midY, 5.5);
+        this.overlay.fillStyle(s.type === "boss" ? 0xff2a5a : 0xffffff, 0.95);
+        this.overlay.fillCircle(sx, midY, 2.4);
+      }
+    }
+
+    // Current player squad marker puck
+    const headX = barX + barW * progress;
+    this.overlay.fillStyle(0xffffff, 1);
+    this.overlay.fillCircle(headX, midY, 6.2);
+    this.overlay.fillStyle(0xfacc15, 1);
+    this.overlay.fillCircle(headX, midY, 3.8);
+  }
+
   private draw() {
     const g = this.gfx;
     const w = this.scale.width;
@@ -756,12 +811,71 @@ export class CrowdScene extends Phaser.Scene {
     g.fillEllipse(cx, cy + 20, massW, massH);
 
     // Draw squad members (back-to-front so Commander Unit #0 stands out cleanly)
+    const frontUnits: Array<{ x: number; y: number }> = [];
     for (let i = shown.length - 1; i >= 0; i -= 1) {
       const m = shown[i];
       const mx = Phaser.Math.Clamp(cx + m.ox * w * (1.55 + this.pack * 0.01), w * 0.17, w * 0.83);
       const my = cy + m.oy * (0.7 + this.pack * 0.005);
       const col = crowdPalette[Math.abs(Math.round(m.phase * 7)) % crowdPalette.length];
       this.drawSquadUnit(g, mx, my, col, this.time.now / 140 + m.phase, person, i === 0);
+      if (i < 8) frontUnits.push({ x: mx, y: my });
+    }
+
+    // Mob Control / Count Masters Energy Barrage & Explosive VS Badge on Clashes / Boss
+    const activeBossFight = Boolean(this.boss && this.boss.dead <= 0);
+    const activeClash = Boolean(this.clash && this.clash.t > 0);
+    if ((activeClash || activeBossFight) && frontUnits.length > 0) {
+      const targetX = activeBossFight
+        ? w * 0.5
+        : this.clash!.lane === 0
+          ? w * 0.28 + 22
+          : w * 0.62 + 22;
+      const targetY = activeBossFight ? cy - 82 : cy - 42;
+      const tSec = this.time.now / 1000;
+
+      for (let i = 0; i < frontUnits.length; i += 1) {
+        const u = frontUnits[i];
+        const boltCol = i % 2 === 0 ? 0x38bdf8 : 0xfacc15;
+        const spreadX = Math.sin(tSec * 24 + i * 1.7) * 18;
+        const spreadY = Math.cos(tSec * 20 + i * 2.1) * 10;
+        const tx = targetX + spreadX;
+        const ty = targetY + spreadY;
+        const prog = (tSec * 9 + i * 0.23) % 1;
+        const bx1 = u.x + (tx - u.x) * Math.max(0, prog - 0.28);
+        const by1 = u.y - 6 + (ty - (u.y - 6)) * Math.max(0, prog - 0.28);
+        const bx2 = u.x + (tx - u.x) * prog;
+        const by2 = u.y - 6 + (ty - (u.y - 6)) * prog;
+
+        g.lineStyle(4, boltCol, 0.88);
+        g.lineBetween(bx1, by1, bx2, by2);
+        g.lineStyle(1.8, 0xffffff, 0.95);
+        g.lineBetween(bx1, by1, bx2, by2);
+
+        // Impact spark ring at target
+        g.fillStyle(boltCol, 0.85);
+        g.fillCircle(tx, ty, 3.5 + (i % 3));
+        g.fillStyle(0xffffff, 0.95);
+        g.fillCircle(tx, ty, 1.8);
+      }
+
+      // Central Explosive VS Clash Badge
+      const vsPulse = 1 + Math.sin(tSec * 22) * 0.08;
+      const vx = w * 0.5;
+      const vy = cy - 92;
+      const badgeW = 148 * vsPulse;
+      const badgeH = 32 * vsPulse;
+      g.fillStyle(0xff2a5a, 0.32);
+      g.fillEllipse(vx, vy, badgeW + 26, badgeH + 16);
+      g.fillStyle(0x0f172a, 0.92);
+      g.fillRoundedRect(vx - badgeW * 0.5, vy - badgeH * 0.5, badgeW, badgeH, 16);
+      g.lineStyle(2.5, 0xfacc15, 0.98);
+      g.strokeRoundedRect(vx - badgeW * 0.5, vy - badgeH * 0.5, badgeW, badgeH, 16);
+
+      const enemyCount = activeBossFight
+        ? Math.max(1, Math.ceil(this.boss!.hp))
+        : Math.max(1, Math.round(this.clash!.right * (this.clash!.t / 0.85)));
+      this.labelAt(labelN, vx, vy, `${Math.max(1, Math.round(this.pack))}  VS  ${enemyCount}`, "#fde047", 18);
+      labelN += 1;
     }
 
     // Floating Squad Count Pill above Commander
@@ -794,6 +908,8 @@ export class CrowdScene extends Phaser.Scene {
 
     this.overlay.clear();
     if (this.hud.visible) {
+      this.drawRouteProgressBar(w);
+
       // Top-left HUD Plate
       this.overlay.fillStyle(0x0f172a, 0.78);
       this.overlay.fillRoundedRect(10, 54, 260, 52, 12);

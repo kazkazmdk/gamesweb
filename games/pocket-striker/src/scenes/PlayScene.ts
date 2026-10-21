@@ -17,6 +17,8 @@ import { pocketStrikerManifest, readRunContext, type PlatformSDK } from "@gamesw
 import { LAYOUTS, type Layout } from "../systems/layouts";
 import { stepBall, type BallState } from "../systems/physics";
 
+const BALL_R = 11;
+
 export class PocketScene extends Phaser.Scene {
   private platform!: PlatformSDK;
   private layout!: Layout;
@@ -29,6 +31,7 @@ export class PocketScene extends Phaser.Scene {
   private overlay!: Phaser.GameObjects.Graphics;
   private hud!: Phaser.GameObjects.Text;
   private bannerLabel!: Phaser.GameObjects.Text;
+  private powerLabel!: Phaser.GameObjects.Text;
   private native: GameKeyboard | null = null;
   private bx = 0;
   private by = 0;
@@ -40,6 +43,8 @@ export class PocketScene extends Phaser.Scene {
   private aiming = false;
   private ax = 0;
   private ay = 0;
+  private lastPower = 0;
+  private bumperShockwaves: Array<{ x: number; y: number; r: number; t: number }> = [];
   private ended = false;
   private banked = false;
   private wallThisShot = false;
@@ -81,6 +86,8 @@ export class PocketScene extends Phaser.Scene {
     this.wallThisShot = false;
     this.ended = false;
     this.bannerTimer = 0;
+    this.lastPower = 0;
+    this.bumperShockwaves = [];
     this.parts = new ParticlePool(120);
     this.synth = (this.game.registry.get("synth") as Synth | undefined) ?? new Synth();
     this.game.registry.set("synth", this.synth);
@@ -111,6 +118,18 @@ export class PocketScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(25)
       .setVisible(false);
+    this.powerLabel = this.add
+      .text(this.scale.width - 14, 108, "POWER 0%", {
+        fontFamily: "ui-sans-serif, system-ui",
+        fontSize: "11px",
+        fontStyle: "900",
+        color: "#ffe066",
+        stroke: "#140e0a",
+        strokeThickness: 3,
+      })
+      .setOrigin(1, 1)
+      .setScrollFactor(0)
+      .setDepth(22);
     this.trail = [];
     this.native?.destroy();
     this.native = createGameKeyboard();
@@ -151,10 +170,12 @@ export class PocketScene extends Phaser.Scene {
     const len = Math.hypot(dx, dy);
     if (len < 8) return;
     const power = Math.min(1, len / 160);
+    this.lastPower = power;
     this.vx = (dx / len) * power * 620;
     this.vy = (dy / len) * power * 620;
     this.strokes += 1;
     this.wallThisShot = false;
+    this.juice.cameraPunch(0.2 + power * 0.25);
     this.synth.tone(180 + power * 80, 0.06, "triangle", 0.05, 0.16);
     this.parts.burst(this.bx, this.by, 7, 0xffe08a, 40, 150);
     pulseHaptic(6);
@@ -180,6 +201,10 @@ export class PocketScene extends Phaser.Scene {
     if (this.bannerTimer > 0) {
       this.bannerTimer = Math.max(0, this.bannerTimer - dt);
     }
+    for (let i = this.bumperShockwaves.length - 1; i >= 0; i -= 1) {
+      this.bumperShockwaves[i].t += dt * 3.2;
+      if (this.bumperShockwaves[i].t >= 1) this.bumperShockwaves.splice(i, 1);
+    }
     if (!this.ended) {
       const res = stepBall({ x: this.bx, y: this.by, vx: this.vx, vy: this.vy, portalCd: this.portalCd }, this.layout, dt);
       if (res.wallHit) {
@@ -188,8 +213,23 @@ export class PocketScene extends Phaser.Scene {
         this.parts.burst(res.x, res.y, 7, 0x7dffc3, 55, 190);
       }
       if (res.bumperHit) {
+        this.juice.cameraPunch(0.45);
         this.synth.tone(680, 0.04, "triangle", 0.03, 0.1);
         this.parts.burst(res.x, res.y, 9, 0xffd166, 70, 210);
+        let hitBumper = (this.layout.bumpers ?? [])[0];
+        let bestDist = Infinity;
+        for (const b of this.layout.bumpers ?? []) {
+          const d = Math.hypot(res.x - b.x, res.y - b.y);
+          if (d < bestDist) {
+            bestDist = d;
+            hitBumper = b;
+          }
+        }
+        if (hitBumper) {
+          this.bumperShockwaves.push({ x: hitBumper.x, y: hitBumper.y, r: hitBumper.r, t: 0 });
+        } else {
+          this.bumperShockwaves.push({ x: res.x, y: res.y, r: 18, t: 0 });
+        }
       }
       if (res.portalCd > this.portalCd) {
         this.synth.tone(720, 0.05, "sine", 0.04, 0.08);
@@ -383,6 +423,8 @@ export class PocketScene extends Phaser.Scene {
     const strokesUsed = Math.max(1, this.strokes);
     if (ok) {
       this.synth.finishSting();
+      this.juice.flash(0.28);
+      this.juice.cameraPunch(0.6);
       void this.platform.achievement.unlock("first-pocket");
       if (this.strokes === 1) void this.platform.achievement.unlock("perfect");
       if (this.wallThisShot) {
@@ -444,6 +486,62 @@ export class PocketScene extends Phaser.Scene {
     g.fillPath();
   }
 
+  private getSegmentColor(segIdx: number): number {
+    if (segIdx <= 3) return 0x34d399;
+    if (segIdx <= 6) return 0xffe066;
+    if (segIdx === 7) return 0xf97316;
+    return 0xef4444;
+  }
+
+  private drawPowerMeter(power: number, brass: number) {
+    const o = this.overlay;
+    const meterW = 22;
+    const meterH = Math.min(176, Math.max(110, this.scale.height * 0.42));
+    const meterX = this.scale.width - meterW - 16;
+    const meterY = Math.max(68, (this.scale.height - meterH) * 0.52);
+
+    // Outer gauge housing
+    o.fillStyle(0x140e0a, 0.86);
+    o.fillRoundedRect(meterX, meterY, meterW, meterH, 8);
+    o.lineStyle(1.8, this.aiming ? 0xffe066 : brass, 0.9);
+    o.strokeRoundedRect(meterX, meterY, meterW, meterH, 8);
+
+    const padX = 4;
+    const padY = 6;
+    const innerW = meterW - padX * 2;
+    const innerH = meterH - padY * 2;
+    const gap = 2.5;
+    const segH = (innerH - gap * 9) / 10;
+
+    // 10 graduated segments from bottom (0) to top (9)
+    for (let s = 0; s < 10; s += 1) {
+      const sy = meterY + meterH - padY - (s + 1) * segH - s * gap;
+      const segThreshold = s / 10;
+      const col = this.getSegmentColor(s);
+      const active = power > segThreshold + 0.01;
+      const partial = Math.max(0, Math.min(1, (power - segThreshold) * 10));
+      o.fillStyle(col, active ? 0.25 + partial * 0.72 : 0.14);
+      o.fillRoundedRect(meterX + padX, sy, innerW, segH, 2);
+      // Graduation tick on left edge
+      o.fillStyle(0xffffff, s % 5 === 4 ? 0.65 : 0.28);
+      o.fillRect(meterX - 3, sy + segH * 0.5 - 0.5, 3, 1.2);
+    }
+
+    // Power marker chevron on the left edge of the gauge
+    const markerY = meterY + meterH - padY - power * innerH;
+    const activeCol = this.getSegmentColor(Math.min(9, Math.floor(power * 9.99)));
+    o.fillStyle(activeCol, 0.98);
+    o.fillTriangle(meterX - 7, markerY - 4.5, meterX - 7, markerY + 4.5, meterX - 1, markerY);
+
+    const pct = Math.round(power * 100);
+    const hexCol = pct >= 80 ? "#ef4444" : pct >= 45 ? "#ffe066" : "#34d399";
+    this.powerLabel
+      .setText(`POWER ${pct}%`)
+      .setColor(this.aiming || pct > 0 ? hexCol : "#e2e8f0")
+      .setPosition(meterX + meterW, meterY - 6)
+      .setVisible(this.hud.visible);
+  }
+
   private draw() {
     const g = this.gfx;
     g.clear();
@@ -462,8 +560,10 @@ export class PocketScene extends Phaser.Scene {
       grain: 0.03,
       blobs: [{ color: 0xffe08a, x: 0.18, y: 0.12, r: 90, alpha: 0.14 }],
     });
+    const camOff = this.juice.applyCamera({ x: 0, y: 0 }, this.time.now);
     g.save();
     g.scaleCanvas(this.scaleX, this.scaleY);
+    g.translateCanvas(camOff.x, camOff.y);
 
     // Outer table cabinet & mahogany/anodized-neon frame
     g.fillStyle(0x0d0806, 0.65);
@@ -585,26 +685,80 @@ export class PocketScene extends Phaser.Scene {
       g.fillCircle(p.x, p.y, 3.5 + u * 4.5);
     }
 
-    // Reflective Bank-Shot Aim Preview
+    // Reflective Bank-Shot Aim Preview, Pool Cue & Ghost Ball
+    let aimPower = 0;
     if (this.aiming) {
       const dx = this.bx - this.ax;
       const dy = this.by - this.ay;
       const len = Math.hypot(dx, dy);
       const power = Math.min(1, len / 160);
-      // Pull-back power handle
-      g.lineStyle(2.5, 0xffe066, 0.55);
+      aimPower = power;
+      const powerCol = power >= 0.8 ? 0xef4444 : power >= 0.45 ? 0xffe066 : 0x34d399;
+
+      // Pull-back power handle & graduated impulse ticks
+      g.lineStyle(2, 0xffe066, 0.45);
       g.lineBetween(this.bx, this.by, this.ax, this.ay);
-      g.fillStyle(0xffe066, 0.9);
+      g.fillStyle(powerCol, 0.92);
       g.fillCircle(this.ax, this.ay, 4 + power * 4);
+
+      if (len >= 6) {
+        const ux = dx / len;
+        const uy = dy / len;
+        const pullGap = BALL_R + 6 + power * 28;
+        // Dynamic pool cue stick behind the ball along the shot axis
+        g.save();
+        g.translateCanvas(this.bx, this.by);
+        g.rotateCanvas(Math.atan2(-uy, -ux));
+        // Graduated impulse ticks between ball and cue tip
+        for (let ti = 1; ti <= 4; ti += 1) {
+          const tx = BALL_R + 3 + (ti / 5) * (pullGap - BALL_R - 3);
+          g.fillStyle(powerCol, 0.75);
+          g.fillRect(tx, -2.5, 2, 5);
+        }
+        // Chalk tip + white ferrule + maple shaft + ornate grip butt
+        g.fillStyle(0x38bdf8, 0.98);
+        g.fillRoundedRect(pullGap, -2.4, 4, 4.8, 1.5);
+        g.fillStyle(0xf8fafc, 0.98);
+        g.fillRect(pullGap + 4, -2.5, 5, 5);
+        g.fillStyle(0xfde68a, 0.96);
+        g.fillRoundedRect(pullGap + 9, -2.8, 56, 5.6, 2);
+        g.fillStyle(0x1e293b, 0.96);
+        g.fillRoundedRect(pullGap + 65, -3.5, 42, 7, 3);
+        g.fillStyle(0xffe066, 0.95);
+        g.fillRect(pullGap + 67, -3.5, 3, 7);
+        g.fillRect(pullGap + 104, -3.5, 3, 7);
+        g.restore();
+
+        // Forward impulse arrow chevron ahead of cue ball
+        const tipX = this.bx + ux * (BALL_R + 14 + power * 10);
+        const tipY = this.by + uy * (BALL_R + 14 + power * 10);
+        const px = -uy;
+        const py = ux;
+        g.fillStyle(powerCol, 0.9);
+        g.fillTriangle(
+          tipX,
+          tipY,
+          tipX - ux * 8 + px * 5,
+          tipY - uy * 8 + py * 5,
+          tipX - ux * 8 - px * 5,
+          tipY - uy * 8 - py * 5,
+        );
+      }
 
       const bank = this.computeBankPreview();
       if (bank) {
         // Primary raycast aim line up to first wall/obstacle
-        g.lineStyle(3, 0xffffff, 0.55 + power * 0.35);
+        g.lineStyle(2.8, 0xffffff, 0.55 + power * 0.35);
         g.lineBetween(this.bx, this.by, bank.hitX, bank.hitY);
-        // Ghost impact ring at first bounce point
-        g.lineStyle(2, bank.bounced ? 0x38bdf8 : 0xffe066, 0.9);
-        g.strokeCircle(bank.hitX, bank.hitY, 8);
+        // Translucent Ghost Ball (radius BALL_R = 11px) with cyan #38bdf8 ring at exact impact point
+        g.fillStyle(0xffffff, 0.24);
+        g.fillCircle(bank.hitX, bank.hitY, BALL_R);
+        g.fillStyle(0xffffff, 0.48);
+        g.fillCircle(bank.hitX - 3, bank.hitY - 3, 3);
+        g.lineStyle(2.2, 0x38bdf8, 0.95);
+        g.strokeCircle(bank.hitX, bank.hitY, BALL_R);
+        g.fillStyle(0x38bdf8, 0.92);
+        g.fillCircle(bank.hitX, bank.hitY, 2.4);
         // Reflected post-bounce dotted neon trajectory segment
         for (let i = 0; i < bank.postPts.length; i += 1) {
           const pt = bank.postPts[i];
@@ -613,6 +767,16 @@ export class PocketScene extends Phaser.Scene {
           g.fillCircle(pt.x, pt.y, 2.8);
         }
       }
+    }
+
+    // Golden shockwave rings on bumper hits
+    for (const sw of this.bumperShockwaves) {
+      const alpha = Math.max(0, 1 - sw.t);
+      const radius = sw.r + sw.t * 26;
+      g.lineStyle(3 * (1 - sw.t * 0.5), 0xffe066, alpha * 0.9);
+      g.strokeCircle(sw.x, sw.y, radius);
+      g.lineStyle(1.5, 0xffffff, alpha * 0.55);
+      g.strokeCircle(sw.x, sw.y, Math.max(2, radius - 4));
     }
 
     for (const b of this.layout.bumpers ?? []) {
@@ -705,6 +869,15 @@ export class PocketScene extends Phaser.Scene {
       this.overlay.fillRoundedRect(10, 54, 300, 50, 10);
       this.overlay.lineStyle(1.5, brass, 0.8);
       this.overlay.strokeRoundedRect(10, 54, 300, 50, 10);
+      const displayPower = this.aiming ? aimPower : Math.hypot(this.vx, this.vy) > 8 ? this.lastPower : 0;
+      this.drawPowerMeter(displayPower, brass);
+    } else {
+      this.powerLabel.setVisible(false);
+    }
+    const fa = this.juice.flashAlpha(0.016);
+    if (fa > 0) {
+      this.overlay.fillStyle(0xffffff, fa);
+      this.overlay.fillRect(0, 0, this.scale.width, this.scale.height);
     }
     this.bannerLabel.setVisible(this.hud.visible && this.bannerTimer > 0);
   }
@@ -730,6 +903,7 @@ export class PocketScene extends Phaser.Scene {
         hideHud: () => {
           this.hud.setVisible(false);
           this.bannerLabel.setVisible(false);
+          this.powerLabel.setVisible(false);
         },
       },
     );
@@ -738,6 +912,7 @@ export class PocketScene extends Phaser.Scene {
   shutdown() {
     this.native?.destroy();
     this.bannerLabel?.destroy();
+    this.powerLabel?.destroy();
     clearGwDebug();
   }
 }

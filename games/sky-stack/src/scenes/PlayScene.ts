@@ -64,6 +64,7 @@ export class SkyStackScene extends Phaser.Scene {
   private scraps: Array<{ x: number; y: number; w: number; vx: number; vy: number; rot: number; vr: number; color: number }> = [];
   private clouds: Array<{ x: number; y: number; r: number; a: number; s: number }> = [];
   private ripples: Array<{ x: number; y: number; w: number; t: number; maxT: number; fever: boolean }> = [];
+  private feverTrail: number[] = [];
   private markLabels: Phaser.GameObjects.Text[] = [];
   private halo = 0;
   private event: "none" | "wind" | "narrow" | "fast" | "mirror" = "none";
@@ -161,6 +162,7 @@ export class SkyStackScene extends Phaser.Scene {
     this.halo = 0;
     this.scraps = [];
     this.ripples = [];
+    this.feverTrail = [];
     this.clouds = Array.from({ length: 8 }, () => ({
       x: this.rng() * (this.scale.width || 390),
       y: this.rng() * (this.scale.height || 844) * 0.7,
@@ -192,19 +194,21 @@ export class SkyStackScene extends Phaser.Scene {
     this.stack.push(result.next);
     this.floors += 1;
     if (this.floors === 1) void this.platform.achievement.unlock("first-place");
-    if (result.leftover > 6) {
+    if (result.leftover > 1.5) {
       const overlapR = Math.min(this.moving.x + this.moving.w, top.x + top.w);
       const leftScrap = this.moving.x < top.x;
+      const impulse = 105 + Math.min(65, result.leftover * 0.85);
       this.scraps.push({
         x: leftScrap ? this.moving.x : overlapR,
         y: this.moving.y,
-        w: result.leftover,
-        vx: leftScrap ? -90 : 90,
-        vy: 40,
+        w: Math.max(3, result.leftover),
+        vx: leftScrap ? -impulse : impulse,
+        vy: -32,
         rot: 0,
-        vr: leftScrap ? -2.4 : 2.4,
+        vr: leftScrap ? -3.2 : 3.2,
         color: this.colorFor(this.stack.length),
       });
+      this.juice.hitStop(Math.min(35, 10 + result.leftover * 0.35));
     }
     if (result.kind === "perfect") {
       this.streak += 1;
@@ -261,6 +265,7 @@ export class SkyStackScene extends Phaser.Scene {
       y: result.next.y - SLAB_H - 6,
       w,
     };
+    this.feverTrail = [];
     this.placing = false;
   }
 
@@ -337,6 +342,12 @@ export class SkyStackScene extends Phaser.Scene {
       return;
     }
     if (!this.ended) {
+      if (this.fever) {
+        this.feverTrail.push(this.moving.x);
+        if (this.feverTrail.length > 4) this.feverTrail.shift();
+      } else if (this.feverTrail.length > 0) {
+        this.feverTrail.length = 0;
+      }
       const wind = this.event === "wind" ? Math.sin(this.time.now / 180) * 40 : 0;
       this.moving.x += (this.dir * this.speed + wind) * dt * (this.fever ? 1.18 : 1);
       if (this.moving.x <= 6) {
@@ -574,6 +585,47 @@ export class SkyStackScene extends Phaser.Scene {
       g.fillStyle(0xffffff, this.halo * 0.08);
       g.fillRoundedRect(top.x - 4, top.y + this.camY + ox - 4, top.w + 8, SLAB_H, 8);
     }
+
+    // FEVER luminous crown at the summit of the tower
+    if (this.fever && top) {
+      const crownY = top.y + this.camY + ox;
+      const crownPulse = 0.55 + 0.25 * Math.sin(this.time.now / 110);
+      g.lineStyle(2.4, 0xffdf6b, crownPulse);
+      g.strokeRoundedRect(top.x - 5, crownY - 5, top.w + 10, SLAB_H + 2, 9);
+      g.lineStyle(1.4, 0x48f2ff, crownPulse * 0.85);
+      g.strokeRoundedRect(top.x - 2, crownY - 3, top.w + 4, SLAB_H - 2, 7);
+      for (let c = 0; c < 3; c += 1) {
+        const cx = top.x + top.w * (0.22 + c * 0.28);
+        const crestH = c === 1 ? 9 : 6;
+        g.fillStyle(c === 1 ? 0xffdf6b : 0x48f2ff, crownPulse * 0.78);
+        g.fillTriangle(cx - 5, crownY - 3, cx, crownY - 3 - crestH, cx + 5, crownY - 3);
+      }
+    }
+
+    // Monument Valley-style Architectural Ghost Blueprint between top slab and moving slab
+    if (!this.ended && top) {
+      const topY = top.y + this.camY + ox;
+      const movY = this.moving.y + this.camY;
+      const leftX = top.x;
+      const rightX = top.x + top.w;
+      g.lineStyle(1.2, 0x48f2ff, 0.24);
+      for (let dy = movY; dy < topY; dy += 6) {
+        const yEnd = Math.min(topY, dy + 3.5);
+        g.lineBetween(leftX, dy, leftX, yEnd);
+        g.lineBetween(rightX, dy, rightX, yEnd);
+      }
+      g.fillStyle(0x48f2ff, 0.06);
+      g.fillRoundedRect(leftX, movY, top.w, SLAB_H - 4, 6);
+      g.lineStyle(1, 0x48f2ff, 0.24);
+      g.strokeRoundedRect(leftX, movY, top.w, SLAB_H - 4, 6);
+      const ovL = Math.max(leftX, this.moving.x);
+      const ovR = Math.min(rightX, this.moving.x + this.moving.w);
+      if (ovR > ovL) {
+        g.fillStyle(0x48f2ff, 0.11);
+        g.fillRoundedRect(ovL, movY + 2, ovR - ovL, SLAB_H - 8, 4);
+      }
+    }
+
     for (const s of this.scraps) {
       g.save();
       g.translateCanvas(s.x + s.w / 2, s.y + this.camY + SLAB_H / 2);
@@ -582,6 +634,18 @@ export class SkyStackScene extends Phaser.Scene {
       g.restore();
     }
     if (!this.ended) {
+      if (this.fever && this.feverTrail.length > 0) {
+        const movY = this.moving.y + this.camY;
+        for (let i = 0; i < this.feverTrail.length; i += 1) {
+          const tx = this.feverTrail[i] - this.dir * (this.feverTrail.length - i) * 3.5;
+          const tRatio = (i + 1) / (this.feverTrail.length + 1);
+          const ghostCol = i % 2 === 0 ? 0xffdf6b : 0x48f2ff;
+          g.fillStyle(ghostCol, 0.1 + tRatio * 0.16);
+          g.fillRoundedRect(tx, movY, this.moving.w, SLAB_H - 4, 6);
+          g.lineStyle(1.2, ghostCol, 0.18 + tRatio * 0.22);
+          g.strokeRoundedRect(tx, movY, this.moving.w, SLAB_H - 4, 6);
+        }
+      }
       this.drawIsometricSlab(
         g,
         this.moving.x,

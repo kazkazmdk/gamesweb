@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, seededRng, fillBackdrop, fillVignette, drawFungusPatch, drawContainer, qualityFromFps, type GameKeyboard, type QualityTier } from "@gamesweb/game-core";
+import { clamp, FloatingTextPool, Juice, ParticlePool, pulseHaptic, Synth, publishGwDebug, countLongFrame, clearGwDebug, createGameKeyboard, seededRng, fillBackdrop, fillVignette, drawFungusPatch, drawContainer, mixColor, qualityFromFps, type GameKeyboard, type QualityTier } from "@gamesweb/game-core";
 import type { PlatformSDK } from "@gamesweb/game-sdk";
 import { readRunContext, swarmProtocolManifest, utcDayKey } from "@gamesweb/game-sdk";
 import {
@@ -90,6 +90,8 @@ export class SwarmPlayScene extends Phaser.Scene {
   private xp = 0;
   private level = 1;
   private kills = 0;
+  private killStreak = 0;
+  private killStreakTimer = 0;
   private damageDone = 0;
   private runStartedAt = 0;
   private started = false;
@@ -100,6 +102,9 @@ export class SwarmPlayScene extends Phaser.Scene {
   private gridPulses: Array<{ x: number; y: number; r: number; strength: number; t: number; maxT: number; color: number }> = [];
   private shatters: Array<{ x: number; y: number; vx: number; vy: number; rot: number; vr: number; size: number; color: number; t: number; maxT: number }> = [];
   private bossHudTxt!: Phaser.GameObjects.Text;
+  private lvlBadgeTxt!: Phaser.GameObjects.Text;
+  private chainBadgeTxt!: Phaser.GameObjects.Text;
+  private floaterGfx: Phaser.GameObjects.Text[] = [];
   private paused = false;
   private choosing: UpgradeDef[] | null = null;
   private dead = false;
@@ -175,6 +180,27 @@ export class SwarmPlayScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(21)
       .setAlpha(0);
+    this.lvlBadgeTxt = this.add
+      .text(52, 29, "LVL 1", { fontFamily: "ui-monospace, SFMono-Regular, monospace", fontSize: "11px", color: "#62e8ff" })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(21);
+    this.chainBadgeTxt = this.add
+      .text(0, 0, "", { fontFamily: "ui-monospace, SFMono-Regular, monospace", fontSize: "12px", color: "#62e8ff" })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(21)
+      .setAlpha(0);
+    this.floaterGfx = [];
+    for (let i = 0; i < 12; i += 1) {
+      this.floaterGfx.push(
+        this.add
+          .text(0, 0, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "13px", color: "#62e8ff", fontStyle: "bold" })
+          .setOrigin(0.5)
+          .setDepth(18)
+          .setAlpha(0),
+      );
+    }
     this.cards = [0, 1, 2].map((i) =>
       this.add
         .text(0, 0, "", { fontFamily: "ui-sans-serif, system-ui", fontSize: "15px", color: "#f7ebe3", wordWrap: { width: 190 } })
@@ -320,6 +346,8 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.xp = 0;
     this.level = 1;
     this.kills = 0;
+    this.killStreak = 0;
+    this.killStreakTimer = 0;
     this.damageDone = 0;
     this.splitters = 0;
     this.dashKills = 0;
@@ -448,6 +476,10 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.droneClock += dt;
     this.missileCd = Math.max(0, this.missileCd - dt);
     this.deathFx = Math.max(0, this.deathFx - dt);
+    if (this.killStreakTimer > 0) {
+      this.killStreakTimer = Math.max(0, this.killStreakTimer - dt);
+      if (this.killStreakTimer <= 0) this.killStreak = 0;
+    }
     for (const b of this.banners) b.t -= dt;
     this.banners = this.banners.filter((b) => b.t > 0);
 
@@ -1002,6 +1034,17 @@ export class SwarmPlayScene extends Phaser.Scene {
   private kill(e: Enemy, fromDash = false) {
     e.active = false;
     this.kills += 1;
+    this.killStreak += 1;
+    this.killStreakTimer = 1.35;
+    if (this.killStreak === 50 || (this.killStreak > 50 && this.killStreak % 10 === 0)) {
+      this.floaters.spawn(this.px, this.py - 34, `${this.killStreak}× PROTOCOL FURY!`, "#ffd862");
+    } else if (this.killStreak === 25) {
+      this.floaters.spawn(this.px, this.py - 34, "25× OVERKILL!", "#ff4ad4");
+    } else if (this.killStreak % 10 === 0) {
+      const col = this.killStreak >= 30 ? "#ffd862" : this.killStreak >= 20 ? "#ff4ad4" : "#62e8ff";
+      const label = this.killStreak >= 30 ? `${this.killStreak}× OVERKILL!` : `${this.killStreak}× STREAK!`;
+      this.floaters.spawn(this.px, this.py - 34, label, col);
+    }
     const isBossOrElite = e.kind === "boss" || e.kind === "warden" || e.kind === "elite";
     this.parts.burst(e.x, e.y, isBossOrElite ? 18 : 10, KIND[e.kind].color, 170, 280);
     const shardCount = isBossOrElite ? 10 : this.quality === "low" ? 3 : 6;
@@ -1390,8 +1433,34 @@ export class SwarmPlayScene extends Phaser.Scene {
       g.fillStyle(0xf07a3a, t.life * 0.45);
       g.fillCircle(t.x, t.y, t.r);
     }
+    const pullR = magnetRange(this.build);
+    const magPulse = 0.14 + 0.06 * Math.sin(this.time.now / 210);
+    const magSegs = 28;
+    const magRot = this.time.now / 1800;
+    g.lineStyle(1.4, 0x62e8ff, magPulse);
+    for (let i = 0; i < magSegs; i += 1) {
+      const a0 = magRot + (i * Math.PI * 2) / magSegs;
+      const a1 = a0 + (Math.PI / magSegs) * 0.95;
+      g.lineBetween(
+        this.px + Math.cos(a0) * pullR,
+        this.py + Math.sin(a0) * pullR,
+        this.px + Math.cos(a1) * pullR,
+        this.py + Math.sin(a1) * pullR,
+      );
+    }
     for (const o of this.orbs) {
       if (!o.active) continue;
+      const d = Math.hypot(this.px - o.x, this.py - o.y);
+      if (d < pullR && d > 4) {
+        const pullT = 1 - d / pullR;
+        g.lineStyle(1.4 + pullT * 1.2, 0xffe08a, 0.24 + pullT * 0.56);
+        g.lineBetween(o.x, o.y, this.px, this.py);
+        g.lineStyle(0.8, 0xfff4d8, 0.35 + pullT * 0.45);
+        g.lineBetween(o.x, o.y, this.px, this.py);
+        const sparkT = (this.time.now / 180 + o.x * 0.03) % 1;
+        g.fillStyle(0xffe08a, 0.55 + pullT * 0.4);
+        g.fillCircle(o.x + (this.px - o.x) * sparkT, o.y + (this.py - o.y) * sparkT, 2);
+      }
       g.fillStyle(0xffe08a, 0.28);
       g.fillCircle(o.x, o.y, 10);
       g.fillStyle(0xffc58a, 1);
@@ -1646,7 +1715,15 @@ export class SwarmPlayScene extends Phaser.Scene {
     this.hud.setText(
       `HULL ${Math.max(0, Math.ceil(this.hp))}   ${survive.toFixed(0)}s\nLV ${this.level}  ${this.kills} SALVAGED  ${phase.toUpperCase()}  ${this.arenaName === "fracture-zone" ? "INFESTED" : "DECK"}${this.bossSpawned ? (this.bossDown ? "  DOWN" : this.endless ? "  WARDEN" : "  CORE") : ""}`,
     );
-    void need;
+
+    this.floaterGfx.forEach((label, i) => {
+      const t = this.floaters.items[i];
+      if (!t?.active) {
+        label.setAlpha(0);
+        return;
+      }
+      label.setText(t.text).setPosition(t.x, t.y).setColor(t.color).setAlpha(Math.min(1, t.life / 350));
+    });
 
     fillVignette(g, ARENA, ARENA, 0.32);
     this.overlay.clear();
@@ -1658,6 +1735,71 @@ export class SwarmPlayScene extends Phaser.Scene {
     if (this.deathFx > 0) {
       this.overlay.fillStyle(0xffc18a, this.deathFx * 0.28);
       this.overlay.fillRect(0, 0, this.scale.width, this.scale.height);
+    }
+
+    // Vampire Survivors-style luminous top-of-screen XP progress bar with green/cyan gradient, segment notches & LVL badge
+    const xpBarX = 16;
+    const xpBarY = 8;
+    const xpBarW = Math.max(120, this.scale.width - 32);
+    const xpBarH = 7;
+    const xpRatio = clamp(this.xp / Math.max(1, need), 0, 1);
+    this.overlay.fillStyle(0x07110e, 0.88);
+    this.overlay.fillRoundedRect(xpBarX - 2, xpBarY - 2, xpBarW + 4, xpBarH + 4, 4);
+    this.overlay.lineStyle(1, 0x3ad49a, 0.38);
+    this.overlay.strokeRoundedRect(xpBarX - 2, xpBarY - 2, xpBarW + 4, xpBarH + 4, 4);
+    if (xpRatio > 0.005) {
+      const fillW = xpBarW * xpRatio;
+      const slices = 16;
+      const sliceW = fillW / slices;
+      for (let s = 0; s < slices; s += 1) {
+        const col = mixColor(0x3ad49a, 0x62e8ff, s / Math.max(1, slices - 1));
+        this.overlay.fillStyle(col, 0.94);
+        this.overlay.fillRect(xpBarX + s * sliceW, xpBarY, Math.ceil(sliceW + 0.5), xpBarH);
+      }
+      this.overlay.fillStyle(0xd8fff8, 0.65);
+      this.overlay.fillRect(xpBarX, xpBarY, fillW, 1.8);
+      this.overlay.fillStyle(0x62e8ff, 0.75 + 0.25 * Math.sin(this.time.now / 110));
+      this.overlay.fillCircle(xpBarX + fillW, xpBarY + xpBarH / 2, 4.5);
+    }
+    for (let seg = 1; seg < 10; seg += 1) {
+      const nx = xpBarX + (xpBarW * seg) / 10;
+      this.overlay.lineStyle(1.2, 0x07110e, 0.78);
+      this.overlay.lineBetween(nx, xpBarY, nx, xpBarY + xpBarH);
+      this.overlay.lineStyle(0.8, 0x9affda, 0.22);
+      this.overlay.lineBetween(nx + 1, xpBarY, nx + 1, xpBarY + xpBarH);
+    }
+    this.overlay.fillStyle(0x071310, 0.92);
+    this.overlay.fillRoundedRect(xpBarX, xpBarY + 11, 72, 18, 5);
+    this.overlay.lineStyle(1.2, 0x62e8ff, 0.65);
+    this.overlay.strokeRoundedRect(xpBarX, xpBarY + 11, 72, 18, 5);
+    this.lvlBadgeTxt.setText(`LVL ${this.level}`).setPosition(xpBarX + 36, xpBarY + 20);
+
+    // Geometry Wars-style dynamic Kill-Chain / Multi-Kill badge (Cyan -> Magenta -> Gold)
+    if (this.killStreak >= 5 && this.killStreakTimer > 0) {
+      const heat = clamp((this.killStreak - 5) / 35, 0, 1);
+      const chainCol =
+        heat < 0.5
+          ? mixColor(0x62e8ff, 0xff4ad4, heat * 2)
+          : mixColor(0xff4ad4, 0xffd862, (heat - 0.5) * 2);
+      const chainHex = this.killStreak >= 25 ? "#ffd862" : this.killStreak >= 15 ? "#ff4ad4" : "#62e8ff";
+      const badgeW = 108;
+      const badgeH = 22;
+      const badgeX = xpBarX + 80;
+      const badgeY = xpBarY + 9;
+      const timerRatio = clamp(this.killStreakTimer / 1.35, 0, 1);
+      this.overlay.fillStyle(0x0b1014, 0.92);
+      this.overlay.fillRoundedRect(badgeX, badgeY, badgeW, badgeH, 5);
+      this.overlay.lineStyle(1.5, chainCol, 0.85);
+      this.overlay.strokeRoundedRect(badgeX, badgeY, badgeW, badgeH, 5);
+      this.overlay.fillStyle(chainCol, 0.88);
+      this.overlay.fillRect(badgeX + 4, badgeY + badgeH - 3.5, (badgeW - 8) * timerRatio, 2);
+      this.chainBadgeTxt
+        .setText(`CHAIN ×${this.killStreak}`)
+        .setColor(chainHex)
+        .setPosition(badgeX + badgeW / 2, badgeY + badgeH / 2 - 1)
+        .setAlpha(1);
+    } else {
+      this.chainBadgeTxt.setAlpha(0);
     }
     if (activeBoss) {
       const bw = Math.min(340, this.scale.width * 0.46);
@@ -1774,6 +1916,8 @@ export class SwarmPlayScene extends Phaser.Scene {
         hideHud: () => {
           this.hud.setVisible(false);
           this.bossHudTxt.setVisible(false);
+          this.lvlBadgeTxt.setVisible(false);
+          this.chainBadgeTxt.setVisible(false);
           this.overlay.setVisible(false);
         },
         seedPeak: () => this.seedPeakField(),

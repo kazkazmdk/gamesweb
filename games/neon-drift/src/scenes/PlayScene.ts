@@ -46,7 +46,9 @@ export class DriftPlayScene extends Phaser.Scene {
   private hint!: Phaser.GameObjects.Text;
   private countTxt!: Phaser.GameObjects.Text;
   private deltaTxt!: Phaser.GameObjects.Text;
+  private apexTxt!: Phaser.GameObjects.Text;
   private floaterGfx: Phaser.GameObjects.Text[] = [];
+  private bankRings: Array<{ x: number; y: number; r: number; maxR: number; alpha: number; color: number }> = [];
   private paused = false;
   private ended = false;
   private lap = 0;
@@ -118,6 +120,7 @@ export class DriftPlayScene extends Phaser.Scene {
     this.runStart = this.time.now;
     this.cam = createCam(pose.x, pose.y, CAMERA_BY_TRACK[this.def.id]);
     this.marks = [];
+    this.bankRings = [];
     this.lastWheelMarks = null;
     this.unbanked = 0;
     this.combo = 1;
@@ -155,6 +158,17 @@ export class DriftPlayScene extends Phaser.Scene {
         color: "#f3f1ec",
       })
       .setOrigin(0.5, 0)
+      .setScrollFactor(0)
+      .setDepth(21)
+      .setAlpha(0);
+    this.apexTxt = this.add
+      .text(this.scale.width / 2, 36, "", {
+        fontFamily: "ui-sans-serif, system-ui, sans-serif",
+        fontSize: "14px",
+        fontStyle: "bold",
+        color: "#f3f1ec",
+      })
+      .setOrigin(0.5, 0.5)
       .setScrollFactor(0)
       .setDepth(21)
       .setAlpha(0);
@@ -235,6 +249,7 @@ export class DriftPlayScene extends Phaser.Scene {
       this.fitCam(gs.width, gs.height);
       this.hint.setPosition(this.scale.width / 2, this.scale.height * 0.7);
       this.deltaTxt.setPosition(this.scale.width / 2, 86);
+      this.apexTxt.setPosition(this.scale.width / 2, 36);
       this.countTxt.setPosition(this.scale.width / 2, this.scale.height / 2);
     });
     this.game.events.on("platform-pause", this.onPause, this);
@@ -459,6 +474,34 @@ export class DriftPlayScene extends Phaser.Scene {
       this.floaters.spawn(this.car.x, this.car.y - 42, "BANKED", "#8dffc1");
       this.completeTutorial();
     }
+    if (this.wasDrifting && !this.car.drifting && this.unbanked >= 350) {
+      this.juice.hitStop(14);
+      this.juice.cameraPunch(0.45);
+      this.bankFlash = 1;
+      const bigBank = this.unbanked >= 900;
+      this.bankRings.push({
+        x: this.car.x,
+        y: this.car.y,
+        r: 18,
+        maxR: bigBank ? 96 : 74,
+        alpha: 0.92,
+        color: bigBank ? 0x8dffc1 : this.def.theme.accent,
+      });
+      this.floaters.spawn(
+        this.car.x,
+        this.car.y - 44,
+        `BANK +${Math.round(this.unbanked).toLocaleString()}`,
+        "#8dffc1",
+      );
+      this.parts.burst(
+        this.car.x,
+        this.car.y,
+        this.quality === "high" ? 14 : 8,
+        this.def.theme.accent,
+        140,
+        240,
+      );
+    }
     this.unbanked = this.score.currentDrift;
     this.combo = this.score.combo;
     this.wasDrifting = this.car.drifting;
@@ -602,6 +645,19 @@ export class DriftPlayScene extends Phaser.Scene {
       this.gfx.fillCircle(p.x, p.y, p.size);
     }
     this.smash *= Math.exp(-dt * 8);
+    for (let i = this.bankRings.length - 1; i >= 0; i -= 1) {
+      const ring = this.bankRings[i];
+      ring.r += (ring.maxR - ring.r) * Math.min(1, dt * 11) + dt * 65;
+      ring.alpha -= dt * 2.4;
+      if (ring.alpha <= 0) {
+        this.bankRings.splice(i, 1);
+        continue;
+      }
+      this.gfx.lineStyle(3.2, ring.color, ring.alpha * 0.85);
+      this.gfx.strokeCircle(this.car.x, this.car.y, ring.r);
+      this.gfx.lineStyle(1.6, 0xffffff, ring.alpha * 0.65);
+      this.gfx.strokeCircle(this.car.x, this.car.y, ring.r * 0.78);
+    }
     drawCar(this.gfx, this.car, this.def.theme.accent, this.smash);
 
     this.floaterGfx.forEach((label, i) => {
@@ -646,10 +702,66 @@ export class DriftPlayScene extends Phaser.Scene {
       const step = this.countdown > 3 ? 3 : this.countdown > 2 ? 2 : this.countdown > 1 ? 1 : 0;
       this.countTxt.setText(step === 0 ? "GO" : String(step)).setAlpha(1);
       this.countTxt.setColor(step === 0 ? "#8dffc1" : "#f3f1ec");
+      this.apexTxt.setAlpha(0);
     } else {
       this.countTxt.setAlpha(0);
+      this.drawApexTelegraph();
     }
     this.drawMobileChrome();
+  }
+
+  private drawApexTelegraph() {
+    if (this.ended || this.paused || this.car.speed <= 190 || this.samples.length === 0) {
+      this.apexTxt.setAlpha(0);
+      return;
+    }
+    const q = queryTrack(this.samples, this.car.x, this.car.y);
+    const len = this.samples.length;
+    const aheadSample = this.samples[(q.index + 16) % len];
+    const absTurn = Math.abs(aheadSample.turn);
+    if (absTurn <= 0.048) {
+      this.apexTxt.setAlpha(0);
+      return;
+    }
+    const isLeft = aheadSample.turn < 0;
+    const isHairpin = absTurn > 0.075;
+    const label = isHairpin
+      ? isLeft
+        ? "HAIRPIN ◄◄"
+        : "►► HAIRPIN"
+      : isLeft
+        ? "APEX ◄"
+        : "► APEX";
+    const pulse = 0.62 + Math.sin(this.time.now / (isHairpin ? 95 : 140)) * 0.32;
+    const cx = this.scale.width * 0.5;
+    const cy = 36;
+    const pillW = isHairpin ? 168 : 132;
+    const pillH = 26;
+    const accent = this.def.theme.accent;
+    this.overlay.fillStyle(0x0b0d14, 0.72);
+    this.overlay.fillRoundedRect(cx - pillW * 0.5, cy - pillH * 0.5, pillW, pillH, 13);
+    this.overlay.lineStyle(1.6, accent, pulse * 0.85);
+    this.overlay.strokeRoundedRect(cx - pillW * 0.5, cy - pillH * 0.5, pillW, pillH, 13);
+    const dir = isLeft ? -1 : 1;
+    const chevronCount = isHairpin ? 3 : 2;
+    for (let i = 0; i < chevronCount; i += 1) {
+      const wave = ((this.time.now / 160 + i * 0.35) % 1);
+      const alpha = (1 - Math.abs(wave - 0.5) * 1.6) * 0.9;
+      const bx = cx + dir * (pillW * 0.5 + 10 + i * 11);
+      this.overlay.fillStyle(accent, Math.max(0.22, alpha));
+      this.overlay.fillTriangle(
+        bx + dir * 7,
+        cy,
+        bx - dir * 3,
+        cy - 6,
+        bx - dir * 3,
+        cy + 6,
+      );
+    }
+    this.apexTxt
+      .setText(label)
+      .setColor(isHairpin ? "#ffd84a" : "#f3f1ec")
+      .setAlpha(Math.min(1, 0.78 + pulse * 0.22));
   }
 
   private drawMobileChrome() {
@@ -740,6 +852,7 @@ export class DriftPlayScene extends Phaser.Scene {
           this.overlay.setVisible(false);
           this.hint.setVisible(false);
           this.deltaTxt.setVisible(false);
+          this.apexTxt.setVisible(false);
           this.countTxt.setVisible(false);
           this.floaterGfx.forEach((t) => t.setVisible(false));
         },
