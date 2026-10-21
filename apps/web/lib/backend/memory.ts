@@ -940,6 +940,21 @@ export class MemoryBackend implements BackendStore {
     });
   }
 
+  async reactParty(identity: Identity, code: string, name: string, reaction: string) {
+    return this.withLock(`party:${code.toUpperCase()}`, async () => {
+      const party = this.parties.get(code.toUpperCase());
+      if (!party) return null;
+      const id = actorId(identity);
+      const memberName = party.members.find((row) => row.id === id)?.name ?? name ?? "Player";
+      party.reactions = [
+        { actorId: id, name: memberName, reaction, at: Date.now() },
+        ...(party.reactions ?? []),
+      ].slice(0, 12);
+      this.persist();
+      return structuredClone(party);
+    });
+  }
+
   async startParty(identity: Identity, code: string) {
     return this.withLock(`party:${code.toUpperCase()}`, async () => {
       const party = this.parties.get(code.toUpperCase());
@@ -1043,12 +1058,16 @@ export class MemoryBackend implements BackendStore {
     if (!resolved.ok) return { error: resolved.error };
     const profile = await this.getOrCreateProfile(identity);
     const publicCode = makePublicCode();
+    const seed =
+      typeof run.metadata?.seed === "string" && run.metadata.seed.trim() !== ""
+        ? String(run.metadata.seed)
+        : `${run.gameId}:${run.runId}`;
     const challenge: ChallengeRecord = {
       id: crypto.randomUUID(),
       publicCode,
       gameId: run.gameId,
       mode: run.mode,
-      seed: `${run.gameId}:${run.runId}`,
+      seed,
       type: resolved.type,
       challengerId: actorId(identity),
       challengerName: profile.displayName || "Player",

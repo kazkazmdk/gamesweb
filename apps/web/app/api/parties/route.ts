@@ -3,7 +3,7 @@ import { getIdentity, identityKey } from "@/lib/api/identity";
 import { assertSameOrigin, clientIp } from "@/lib/api/origin";
 import { policies, rateLimit } from "@/lib/api/rate-limit";
 import { getBackend } from "@/lib/backend";
-import { actorId, advanceParty, createParty, getParty, joinParty, setPartyReady, startParty, submitPartyRound } from "@/lib/backend/social-arcade";
+import { actorId, advanceParty, createParty, getParty, joinParty, reactParty, setPartyReady, startParty, submitPartyRound } from "@/lib/backend/social-arcade";
 
 export async function GET(req: Request) {
   const identity = await getIdentity();
@@ -25,12 +25,13 @@ export async function POST(req: Request) {
   const parsed = await readJson(req);
   if (!parsed.ok) return parsed.response;
   const body = parsed.data as {
-    action?: "create" | "join" | "ready" | "start" | "advance" | "submit-round" | "score";
+    action?: "create" | "join" | "ready" | "start" | "advance" | "submit-round" | "react" | "score";
     hostName?: string;
     name?: string;
     code?: string;
     ready?: boolean;
     runId?: string;
+    reaction?: string;
   };
   const identity = await getIdentity();
   const backend = getBackend();
@@ -59,6 +60,11 @@ export async function POST(req: Request) {
   }
   if (action === "ready") {
     const party = await setPartyReady(identity, code, Boolean(body.ready));
+    if (!party) return jsonError("NOT_FOUND", "Party not found.", 404);
+    return jsonOk({ party, persistence: "server", you: actorId(identity) });
+  }
+  if (action === "react") {
+    const party = await reactParty(identity, code, body.name ?? "Player", String(body.reaction ?? "GG").slice(0, 24));
     if (!party) return jsonError("NOT_FOUND", "Party not found.", 404);
     return jsonOk({ party, persistence: "server", you: actorId(identity) });
   }

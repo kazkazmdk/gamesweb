@@ -35,6 +35,7 @@ export async function loadCompetitiveRun(
     gameVersion,
     verificationStatus: score.verified,
     createdAt: score.createdAt,
+    metadata: score.metadata,
   };
 }
 

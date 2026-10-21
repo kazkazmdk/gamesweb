@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { activityFromHistory, challengeViewModel, friendsBoard, latestUnlocks, playerStatsFromSnapshot } from "../apps/web/lib/platform/adapters";
+import { activityFromHistory, challengeViewModel, friendsBoard, gameRecordFor, latestUnlocks, playerStatsFromSnapshot } from "../apps/web/lib/platform/adapters";
 import { formatCountdown, formatPlayScore, formatRank, greeting, hasRecord, zeroResultCopy } from "../apps/web/lib/platform/format";
-import { boardModeOptions, boardModeFromPlayIndex, defaultBoardMode, isCompactCatalog, neonBoardMode, playModeOptions, resolvePlayIndex } from "../apps/web/lib/platform/modes";
-import type { PlayerSnapshot } from "../apps/web/lib/player-store";
+import { boardModeOptions, boardModeFromPlayIndex, defaultBoardMode, isCompactCatalog, lowerIsBetter, neonBoardMode, playModeOptions, resolvePlayIndex } from "../apps/web/lib/platform/modes";
+import { store, type PlayerSnapshot } from "../apps/web/lib/player-store";
 
 const player = {
   history: [
@@ -114,5 +114,80 @@ describe("adapters", () => {
   it("sorts recent unlocks by timestamp not catalog order", () => {
     const recent = latestUnlocks(player, 1);
     expect(recent[0]?.key).toBe("score-25k");
+  });
+  it("sorts lowerIsBetter leaderboards with lower strokes first for pocket-striker and lower times first for knockout-circuit", () => {
+    expect(lowerIsBetter("pocket-striker")).toBe(true);
+    expect(lowerIsBetter("knockout-circuit")).toBe(true);
+
+    store.snapshot = {
+      ...store.snapshot,
+      displayName: "You",
+      username: "you",
+      scores: [
+        { id: "ps-1", gameId: "pocket-striker", mode: "layout", score: 5, at: 1000, verified: "verified", metadata: {} },
+        { id: "ps-2", gameId: "pocket-striker", mode: "layout", score: 2, at: 2000, verified: "verified", metadata: {} },
+        { id: "kc-1", gameId: "knockout-circuit", mode: "map-a", score: 58000, at: 1000, verified: "verified", metadata: {} },
+        { id: "kc-2", gameId: "knockout-circuit", mode: "map-a", score: 41200, at: 2000, verified: "verified", metadata: {} },
+      ],
+    };
+    store.remoteBoards["pocket-striker:layout"] = [
+      { name: "Rival A", username: "rival_a", score: 4, isYou: false, verified: true },
+      { name: "Rival B", username: "rival_b", score: 1, isYou: false, verified: true },
+    ];
+    store.remoteBoards["knockout-circuit:map-a"] = [
+      { name: "Runner A", username: "runner_a", score: 49500, isYou: false, verified: true },
+      { name: "Runner B", username: "runner_b", score: 39100, isYou: false, verified: true },
+    ];
+
+    const pocketBoard = store.leaderboard("pocket-striker", "layout");
+    expect(pocketBoard.map((r) => r.score)).toEqual([1, 2, 4]);
+
+    const koBoard = store.leaderboard("knockout-circuit", "map-a");
+    expect(koBoard.map((r) => r.score)).toEqual([39100, 41200, 49500]);
+
+    expect(gameRecordFor(store.snapshot, "pocket-striker", "layout").score).toBe(2);
+    expect(gameRecordFor(store.snapshot, "knockout-circuit", "map-a").score).toBe(41200);
+  });
+  it("preserves run metadata seed in createChallengeFromRun and falls back when absent", async () => {
+    const { MemoryBackend } = await import("../apps/web/lib/backend/memory");
+    const backend = new MemoryBackend();
+    const identity = { userId: "u-seed-1", anonymousId: "anon-seed-1", email: null };
+    const session1 = await backend.startSession({
+      identity,
+      gameId: "sky-stack",
+      gameVersion: "1.0.0",
+      device: "desktop",
+    });
+    const runWithSeed = await backend.submitScore({
+      identity,
+      session: session1,
+      gameId: "sky-stack",
+      mode: "climb",
+      score: 3400,
+      durationMs: 12000,
+      metadata: { seed: "custom-seed-42", floors: 34 },
+      verified: "verified",
+    });
+    const created1 = await backend.createChallengeFromRun(identity, runWithSeed.score.id);
+    expect("challenge" in created1 && created1.challenge.seed).toBe("custom-seed-42");
+
+    const session2 = await backend.startSession({
+      identity,
+      gameId: "neon-drift",
+      gameVersion: "1.2.0",
+      device: "desktop",
+    });
+    const runWithoutSeed = await backend.submitScore({
+      identity,
+      session: session2,
+      gameId: "neon-drift",
+      mode: "foundation",
+      score: 28000,
+      durationMs: 45000,
+      metadata: {},
+      verified: "verified",
+    });
+    const created2 = await backend.createChallengeFromRun(identity, runWithoutSeed.score.id);
+    expect("challenge" in created2 && created2.challenge.seed).toBe(`neon-drift:${runWithoutSeed.score.id}`);
   });
 });

@@ -47,6 +47,12 @@ export async function submitPartyRound(identity: Identity, code: string, runId: 
   return requireBackend().submitPartyRound(identity, code, runId);
 }
 
+export async function reactParty(identity: Identity, code: string, name: string, reaction: string) {
+  const backend = requireBackend();
+  if (backend.reactParty) return backend.reactParty(identity, code, name, reaction);
+  return backend.getParty(code);
+}
+
 export async function createChallengeFromRun(identity: Identity, runId: string, type?: string) {
   return requireBackend().createChallengeFromRun(identity, runId, type);
 }

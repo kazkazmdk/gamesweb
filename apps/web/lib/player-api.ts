@@ -189,6 +189,11 @@ export const playerApi = {
       await fetch("/api/parties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "ready", code, ready }) }),
     );
   },
+  async reactParty(code: string, name: string, reaction: string) {
+    return parse<{ party: import("@/lib/social/arcade-store").PartyState; persistence: string }>(
+      await fetch("/api/parties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "react", code, name, reaction }) }),
+    );
+  },
   async rivals() {
     return parse<{ rows: import("@/lib/social/arcade-store").RivalRow[] }>(await fetch("/api/rivals"));
   },

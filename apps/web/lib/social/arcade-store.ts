@@ -48,6 +48,7 @@ export type PartyState = {
   persistence?: "server" | "local";
   roundRoster?: string[];
   submitted?: string[];
+  reactions?: Array<{ actorId: string; name: string; reaction: string; at: number }>;
 };
 
 export type RivalRow = {
@@ -156,6 +157,10 @@ class ArcadeStore {
     }
   }
   view() {
+    return this.snap;
+  }
+
+  getSnapshot() {
     return this.snap;
   }
 
@@ -498,6 +503,30 @@ class ArcadeStore {
     }
     const party = this.snap.parties.find((p) => p.code === code);
     return party ?? null;
+  }
+
+  async reactParty(code: string, name: string, reaction: string) {
+    try {
+      const remote = await playerApi.reactParty(code, name, reaction);
+      if (remote.ok) {
+        const party = cacheParty(remote.data.party);
+        this.rememberParty(party);
+        this.emit();
+        return party;
+      }
+    } catch {
+      /* fallback local */
+    }
+    const party = this.snap.parties.find((p) => p.code === code);
+    if (party) {
+      party.reactions = [
+        { actorId: name, name, reaction, at: Date.now() },
+        ...(party.reactions ?? []),
+      ].slice(0, 12);
+      this.emit();
+      return party;
+    }
+    return null;
   }
 
   async startParty(code: string) {

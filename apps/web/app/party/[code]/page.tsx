@@ -216,12 +216,26 @@ export default function PartyPage() {
 
         <div className="mt-8 flex flex-wrap gap-2">
           {PARTY_REACTIONS.map((r) => (
-            <button key={r} type="button" className="gw-cta-ghost min-h-10 px-3" onClick={() => setReaction(r)}>
+            <button
+              key={r}
+              type="button"
+              className="gw-cta-ghost min-h-10 px-3"
+              onClick={() => {
+                setReaction(r);
+                void arcadeStore.reactParty(party.code, player.displayName || "Player", r).then((next) => {
+                  if (next) setParty(next);
+                });
+              }}
+            >
               {r}
             </button>
           ))}
         </div>
-        {reaction ? (
+        {party.reactions?.[0] ? (
+          <p className="mt-2 text-white/50">
+            {party.reactions[0].name}: {party.reactions[0].reaction}
+          </p>
+        ) : reaction ? (
           <p className="mt-2 text-white/50">
             {player.displayName}: {reaction}
           </p>

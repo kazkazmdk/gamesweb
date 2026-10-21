@@ -1015,6 +1015,18 @@ export class SupabaseBackend implements BackendStore {
     return this.getParty(code);
   }
 
+  async reactParty(identity: Identity, code: string, name: string, reaction: string) {
+    const party = await this.getParty(code);
+    if (!party) return null;
+    const id = actorId(identity);
+    const memberName = party.members.find((m) => m.id === id)?.name ?? name ?? "Player";
+    party.reactions = [
+      { actorId: id, name: memberName, reaction, at: Date.now() },
+      ...(party.reactions ?? []),
+    ].slice(0, 12);
+    return party;
+  }
+
   async startParty(identity: Identity, code: string) {
     const sb = admin();
     const { data, error } = await sb.rpc("start_party", { p_code: code, p_actor: actorId(identity) });
@@ -1115,6 +1127,10 @@ export class SupabaseBackend implements BackendStore {
     if (!resolved.ok) return { error: resolved.error };
     const profile = await this.getOrCreateProfile(identity);
     const publicCode = makePublicCode();
+    const seed =
+      typeof run.metadata?.seed === "string" && run.metadata.seed.trim() !== ""
+        ? String(run.metadata.seed)
+        : `${run.gameId}:${run.runId}`;
     const sb = admin();
     const { data, error } = await sb
       .from("challenges")
@@ -1122,7 +1138,7 @@ export class SupabaseBackend implements BackendStore {
         public_code: publicCode,
         game_id: run.gameId,
         mode: run.mode,
-        seed: `${run.gameId}:${run.runId}`,
+        seed,
         type: resolved.type,
         challenger_id: identity.userId,
         challenger_actor: actorId(identity),

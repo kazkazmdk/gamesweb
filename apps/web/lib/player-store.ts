@@ -1,6 +1,6 @@
 import { analytics, setAnalyticsContext } from "@gamesweb/analytics";
 import { brand, levelFromXp, storageKeys, xpRewards } from "@gamesweb/config";
-import { GAME_MODES, validateScore, type VerifiedStatus } from "@gamesweb/database";
+import { GAME_MODES, lowerIsBetter, validateScore, type VerifiedStatus } from "@gamesweb/database";
 import { applyServerProgression } from "./player/progression-client";
 import { isValidInviteRef } from "./player/invite";
 import {
@@ -364,7 +364,7 @@ class PlayerStore {
       endedAt: Date.now(),
       metadata: payload.metadata,
     });
-    const lower = Boolean(payload.metadata.lowerIsBetter);
+    const lower = Boolean(payload.metadata.lowerIsBetter) || lowerIsBetter(gameId);
     const prev = this.personalBest(gameId, payload.mode, lower);
     const improved = lower ? payload.score < prev : payload.score > prev;
     const row: StoredScore = {
@@ -791,7 +791,7 @@ class PlayerStore {
   }
 
   leaderboard(gameId: string, mode?: string) {
-    const lower = gameId === "velocity-run";
+    const lower = lowerIsBetter(gameId);
     const rows = this.snapshot.scores.filter((s) => s.gameId === gameId && (!mode || s.mode === mode) && s.verified !== "flagged");
     const best = new Map<string, StoredScore>();
     for (const r of rows) {
@@ -1006,7 +1006,7 @@ class PlayerStore {
           this.snapshot.displayName = me.data.displayName;
           this.snapshot.avatar = me.data.avatar;
           this.snapshot.xp = me.data.xp;
-          this.snapshot.achievements = me.data.achievements;
+          this.snapshot.achievements = Array.from(new Set([...me.data.achievements, ...this.snapshot.achievements]));
           if (me.data.achievementUnlocks) {
             this.snapshot.achievementUnlocks = { ...this.snapshot.achievementUnlocks, ...me.data.achievementUnlocks };
           }
@@ -1036,7 +1036,7 @@ class PlayerStore {
           }
         } else if (serverHasProgress) {
           this.snapshot.xp = me.data.xp;
-          this.snapshot.achievements = me.data.achievements;
+          this.snapshot.achievements = Array.from(new Set([...me.data.achievements, ...this.snapshot.achievements]));
           this.snapshot.questCompleted = me.data.questCompleted ?? this.snapshot.questCompleted;
           this.snapshot.questProgress = me.data.questProgress ?? this.snapshot.questProgress;
           this.snapshot.streak = me.data.streak ?? this.snapshot.streak;

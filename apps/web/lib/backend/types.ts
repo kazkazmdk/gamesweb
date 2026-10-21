@@ -134,6 +134,7 @@ export type CompetitiveRun = {
   gameVersion: string;
   verificationStatus: VerifiedStatus;
   createdAt: number;
+  metadata?: Record<string, number | string | boolean>;
 };
 
 export type StoredPartyMember = {
@@ -158,6 +159,7 @@ export type StoredParty = {
   persistence: "server";
   roundRoster: string[];
   submitted: string[];
+  reactions?: Array<{ actorId: string; name: string; reaction: string; at: number }>;
 };
 
 export type StoredInbox = {
@@ -237,6 +239,7 @@ export type BackendStore = {
   startParty(identity: Identity, code: string): Promise<StoredParty | { error: string }>;
   advanceParty(identity: Identity, code: string): Promise<StoredParty | { error: string }>;
   submitPartyRound(identity: Identity, code: string, runId: string): Promise<StoredParty | { error: string }>;
+  reactParty?(identity: Identity, code: string, name: string, reaction: string): Promise<StoredParty | null>;
   createChallengeFromRun(identity: Identity, runId: string, type?: string): Promise<{ challenge: import("@gamesweb/game-sdk").ChallengeRecord; url: string } | { error: string }>;
   getChallenge(code: string): Promise<import("@gamesweb/game-sdk").ChallengeRecord | null>;
   putChallenge(challenge: import("@gamesweb/game-sdk").ChallengeRecord): Promise<void>;
