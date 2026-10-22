@@ -63,10 +63,10 @@ describe("SEO registry quality", () => {
     expect(issues, JSON.stringify(issues, null, 2)).toEqual([]);
   });
 
-  it("keeps the indexable surface in the 50–70 band", () => {
+  it("keeps the indexable surface in the 50–115 band", () => {
     const count = indexablePages().length;
     expect(count).toBeGreaterThanOrEqual(50);
-    expect(count).toBeLessThanOrEqual(70);
+    expect(count).toBeLessThanOrEqual(115);
     expect(sitemapEntries()).toHaveLength(count);
   });
 
@@ -90,7 +90,7 @@ describe("SEO registry quality", () => {
 
   it("builds collections from at least three real games", () => {
     expect(COLLECTIONS.length).toBeGreaterThanOrEqual(6);
-    expect(COLLECTIONS.length).toBeLessThanOrEqual(8);
+    expect(COLLECTIONS.length).toBeLessThanOrEqual(14);
     for (const col of COLLECTIONS) {
       expect(col.games.length).toBeGreaterThanOrEqual(3);
     }

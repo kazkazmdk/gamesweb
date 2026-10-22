@@ -37,6 +37,16 @@ test("territory rush boots", async ({ page }) => {
   await expect(page.locator("canvas")).toBeVisible({ timeout: 20_000 });
 });
 
+test("prism drop boots", async ({ page }) => {
+  await page.goto("/play/prism-drop");
+  await expect(page.locator("canvas")).toBeVisible({ timeout: 20_000 });
+});
+
+test("swing vector boots", async ({ page }) => {
+  await page.goto("/play/swing-vector");
+  await expect(page.locator("canvas")).toBeVisible({ timeout: 20_000 });
+});
+
 test("guest magic challenge page renders without signup", async ({ page }) => {
   await page.goto("/c/7FQ2K?p=e30");
   await expect(page.getByRole("heading", { name: /challenge not found|challenged you/i })).toBeVisible();

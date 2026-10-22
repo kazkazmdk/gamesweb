@@ -50,12 +50,18 @@ importers:
       '@gamesweb/pocket-striker':
         specifier: workspace:*
         version: link:../../games/pocket-striker
+      '@gamesweb/prism-drop':
+        specifier: workspace:*
+        version: link:../../games/prism-drop
       '@gamesweb/sky-stack':
         specifier: workspace:*
         version: link:../../games/sky-stack
       '@gamesweb/swarm-protocol':
         specifier: workspace:*
         version: link:../../games/swarm-protocol
+      '@gamesweb/swing-vector':
+        specifier: workspace:*
+        version: link:../../games/swing-vector
       '@gamesweb/territory-rush':
         specifier: workspace:*
         version: link:../../games/territory-rush
@@ -163,6 +169,18 @@ importers:
         specifier: ^3.90.0
         version: 3.90.0
 
+  games/prism-drop:
+    dependencies:
+      '@gamesweb/game-core':
+        specifier: workspace:*
+        version: link:../../packages/game-core
+      '@gamesweb/game-sdk':
+        specifier: workspace:*
+        version: link:../../packages/game-sdk
+      phaser:
+        specifier: ^3.90.0
+        version: 3.90.0
+
   games/sky-stack:
     dependencies:
       '@gamesweb/game-core':
@@ -176,6 +194,18 @@ importers:
         version: 3.90.0
 
   games/swarm-protocol:
+    dependencies:
+      '@gamesweb/game-core':
+        specifier: workspace:*
+        version: link:../../packages/game-core
+      '@gamesweb/game-sdk':
+        specifier: workspace:*
+        version: link:../../packages/game-sdk
+      phaser:
+        specifier: ^3.90.0
+        version: 3.90.0
+
+  games/swing-vector:
     dependencies:
       '@gamesweb/game-core':
         specifier: workspace:*

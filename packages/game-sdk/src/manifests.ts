@@ -618,7 +618,7 @@ export const swingVectorManifest: GameManifest = {
   skills: ["momentum", "timing", "routing"],
   accent: "#facc15",
   accentSoft: "#221a08",
-  orientation: "landscape",
+  orientation: "either",
   inputMethods: ["keyboard", "mouse", "touch"],
   thumbnail: "/art/swing-vector-card.svg",
   hero: "/art/swing-vector-hero.svg",
