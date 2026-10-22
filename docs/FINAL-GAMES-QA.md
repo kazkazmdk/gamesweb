@@ -1,37 +1,35 @@
 # Final games QA
 
-Base: `cursor/final-platform-games-seo-c08e` @ `f24d352`  
-Head: work branch `cursor/final-product-seo-qa-032a`
+Base: `cursor/final-product-seo-qa-032a` @ `d7a22e3`  
+Head: `cursor/production-social-closure-032a`
 
-## Eight games
+## Eight games — proven this pass
 
-| Game | Boot | Pause stops sim | Retry | First-read note |
-| --- | --- | --- | --- | --- |
-| Neon Drift | existing mount | already wired | existing | Harbour / Hairpin / Ridge cameras + worlds split |
-| Velocity Run | existing | already wired | existing | Not redesigned. Rooftop parkour still the read. |
-| Swarm Protocol | existing | already wired | existing | Peak not redesigned this pass. |
-| Sky Stack | existing | **wired** | existing | Polish only. |
-| Knockout Circuit | existing | **wired** | existing | Not redesigned. Oversized props remain. |
-| Pocket Striker | existing | **wired** | existing | Polish only. |
-| Territory Rush | existing | **wired** | existing | Territory/hold first; houses demoted |
-| Crowd Control | existing | **wired** | existing | Boulevard facades + gates unchanged mechanically |
+| Game | Boot | Pause freezes score/pos/time | Retry (no second Phaser) |
+| --- | --- | --- | --- |
+| Neon Drift | e2e | **e2e pause-retry** | **e2e** |
+| Velocity Run | e2e | **e2e** | **e2e** |
+| Swarm Protocol | e2e | **e2e** | **e2e** |
+| Sky Stack | e2e | **e2e** | **e2e** |
+| Knockout Circuit | e2e | **e2e** | **e2e** |
+| Pocket Striker | e2e | **e2e** | **e2e** |
+| Territory Rush | e2e | **e2e** | **e2e** |
+| Crowd Control | e2e | **e2e** | **e2e** |
+
+Proof: `e2e/pause-retry.spec.ts` (16 passed). Debug `tick` still counts overlay frames; freeze is asserted on simulation fields.
 
 ## Neon Drift first-read
 
-| Track | Camera | Road | World |
-| --- | --- | --- | --- |
-| Harbour Loop | pulled back, sodium horizon | widest waterfront | water, cranes, containers, sodium lamps |
-| Hairpin District | tight zoom, more yaw | 108–158 | vertical vegetation, no harbour water |
-| Ridge Sweep | very pulled back, long look | 208–276 | ridge drop, underpass only here |
+Screenshot proof (1440): `docs/qa-production-closure/neon/`
 
-Roadside families are per track: harbour = service, hairpin = touge, ridge = tunnel + guardrail. Shared `roadsideFamily(u)` is gone.
+| Track | Opening read |
+| --- | --- |
+| Harbour | Wide waterfront, sodium lamps, water, containers |
+| Hairpin | Tight road, dark vegetation, orange chevrons |
+| Ridge | Pulled-back height, guardrails, underpass bar |
 
-## Game feel (audit, not a new juice pass)
+Unlabeled contact sheet: `docs/qa-production-closure/neon/contact-sheet-unlabeled.png`.
 
-Existing retry, result grace, Escape pause, blur-to-pause remain. Five games no longer keep simulating under the overlay. Results Retry is the dominant CTA.
+## Results
 
-## Known limits
-
-No new gameplay features. No global art redesign. Visual stills for the three Neon environments were not recaptured in this pass; first-read claims are from code + prior QA folders.
-
-Gameplay e2e: neon steer/pause/retry, velocity, swarm, sky, knockout, Territory result+score — passed on this branch.
+Unchanged hierarchy: score / PB / Retry primary / challenge secondary / next game tertiary. Space/R grace still covered by `e2e/gameplay.spec.ts`.

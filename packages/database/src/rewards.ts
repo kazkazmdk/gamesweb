@@ -99,14 +99,39 @@ export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
     xp += achievementXp(id);
   }
 
+  const stats = ctx.metadata ?? {};
+  const allGames = new Set([...(ctx.playedGameIds ?? []), ctx.gameId]);
+  const todayGames = new Set([...(ctx.uniqueGamesToday ?? []), ctx.gameId]);
+
   unlock("platform:first-run");
   if (ctx.hourUtc < 5) unlock("platform:night-shift");
+  if (allGames.size >= 3) unlock("platform:three-worlds");
+  if (allGames.size >= 5) unlock("platform:arcade-tourist");
+  if (allGames.size >= 8) unlock("platform:world-tour");
+  if (todayGames.size >= 3) unlock("platform:on-fire");
+  if (
+    (allGames.size >= 3 && Number(ctx.gamesPlayedToday ?? 0) >= 6) ||
+    Number(stats.totalRuns ?? 0) >= 9
+  ) {
+    unlock("platform:explorer");
+  }
+  if (pbImproved) unlock("platform:untouchable");
+  if (Number(ctx.pbCount ?? 0) + (pbImproved ? 1 : 0) >= 4) unlock("platform:all-rounder");
 
   if (ctx.gameId === "neon-drift") {
-    if (ctx.score >= 25000) unlock("neon-drift:score-25k");
-    if (ctx.score >= 60000) unlock("neon-drift:score-60k");
-    if (Number(ctx.metadata.laps ?? 0) >= 2) unlock("neon-drift:two-laps");
-    if (Number(ctx.metadata.combo ?? 0) >= 5) unlock("neon-drift:combo-5");
+    if (Number(stats.maxCombo ?? stats.combo ?? 0) >= 2 || ctx.score >= 1200) {
+      unlock("neon-drift:first-slide");
+    }
+    if (ctx.score >= 25_000) unlock("neon-drift:score-25k");
+    if (ctx.score >= 60_000) unlock("neon-drift:score-60k");
+    if (Number(stats.laps ?? 0) >= 2) unlock("neon-drift:two-laps");
+    if (Number(stats.maxCombo ?? stats.combo ?? 0) >= 5) unlock("neon-drift:combo-5");
+    if (Number(stats.nearMisses ?? 0) >= 5) unlock("neon-drift:near-miss");
+    if (Number(stats.boostGates ?? 0) >= 8) unlock("neon-drift:boost-gate");
+    if (Number(stats.laps ?? 0) >= 1 && Number(stats.wallHits ?? 0) === 0) {
+      unlock("neon-drift:no-crash-lap");
+    }
+    if (ctx.mode === "daily" && ctx.result === "finish") unlock("neon-drift:daily-drift");
   }
 
   if (ctx.gameId === "velocity-run") {
@@ -115,20 +140,92 @@ export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
     if (medal) unlock("velocity-run:bronze");
     if (medal === "gold" || medal === "platinum") unlock("velocity-run:gold");
     if (medal === "platinum") unlock("velocity-run:platinum");
-    if (Number(ctx.metadata.deaths ?? 1) === 0) unlock("velocity-run:no-death");
+    if (Number(stats.deaths ?? 1) === 0) unlock("velocity-run:no-death");
     if (ctx.mode === "course-1" && ctx.score < 40000) unlock("velocity-run:sub-40");
+    if (Number(stats.fastFalls ?? 0) >= 12) unlock("velocity-run:fast-fall");
+    if (pbImproved && Number(ctx.pbBefore ?? Infinity) < Infinity && Number(ctx.pbBefore ?? 0) > 0) {
+      unlock("velocity-run:pb-twice");
+    }
   }
 
   if (ctx.gameId === "swarm-protocol") {
-    const kills = Number(ctx.metadata.kills ?? 0);
-    const survive = Number(ctx.metadata.surviveMs ?? ctx.durationMs);
-    const level = Number(ctx.metadata.level ?? 1);
+    const kills = Number(stats.kills ?? 0);
+    const survive = Number(stats.surviveMs ?? ctx.durationMs);
+    const level = Number(stats.level ?? 1);
     if (kills >= 10) unlock("swarm-protocol:first-blood");
     if (survive >= 120000) unlock("swarm-protocol:survive-2");
     if (survive >= 300000) unlock("swarm-protocol:survive-5");
     if (level >= 8) unlock("swarm-protocol:level-8");
     if (kills >= 200) unlock("swarm-protocol:kills-200");
-    if (Number(ctx.metadata.elites ?? 0) >= 1) unlock("swarm-protocol:elite");
+    if (Number(stats.elites ?? 0) >= 1) unlock("swarm-protocol:elite");
+    if (Number(stats.splitters ?? 0) >= 25) unlock("swarm-protocol:splitter");
+    if (Number(stats.dashKills ?? 0) >= 15) unlock("swarm-protocol:dash-kill");
+    if (Boolean(stats.shieldBroken)) unlock("swarm-protocol:shield");
+    if (Number(stats.chainLevel ?? 0) >= 3) unlock("swarm-protocol:chain");
+  }
+
+  if (ctx.gameId === "sky-stack") {
+    if (Number(stats.perfects ?? 0) >= 1) unlock("sky-stack:first-place");
+    if (Number(stats.maxStreak ?? stats.streak ?? 0) >= 8) unlock("sky-stack:streak-8");
+    if (Number(stats.floors ?? 0) >= 30 || ctx.score >= 3000) unlock("sky-stack:floor-30");
+    if (Number(stats.floors ?? 0) >= 67 || ctx.score >= 6700) unlock("sky-stack:floor-67");
+    if (Number(stats.fevers ?? 0) >= 2) unlock("sky-stack:fever-2");
+  }
+
+  if (ctx.gameId === "knockout-circuit") {
+    if (ctx.result === "finish" || Number(stats.gates ?? 0) >= 1) {
+      unlock("knockout-circuit:first-gate");
+    }
+    if (ctx.result === "finish") unlock("knockout-circuit:finish");
+    if (ctx.result === "finish" && Number(stats.falls ?? stats.deaths ?? 0) === 0) {
+      unlock("knockout-circuit:no-fall");
+    }
+    if (ctx.result === "finish" && ctx.score <= 36_000) unlock("knockout-circuit:fast");
+  }
+
+  if (ctx.gameId === "pocket-striker") {
+    if (ctx.result === "finish") unlock("pocket-striker:first-pocket");
+    if (ctx.result === "finish" && Boolean(stats.banked)) unlock("pocket-striker:bank");
+    if (ctx.result === "finish" && ctx.score <= Number(stats.par ?? 3) - 1) {
+      unlock("pocket-striker:under-par");
+    }
+    if (ctx.result === "finish" && ctx.score === 1) unlock("pocket-striker:perfect");
+  }
+
+  if (ctx.gameId === "territory-rush") {
+    if (ctx.score >= 15) unlock("territory-rush:first-claim");
+    if (ctx.score >= 50) unlock("territory-rush:half");
+    if (ctx.score >= 72) unlock("territory-rush:dominate");
+  }
+
+  if (ctx.gameId === "crowd-control") {
+    if (ctx.score >= 25) unlock("crowd-control:pack-gate");
+    if (ctx.score >= 60) unlock("crowd-control:pack-60");
+    if (ctx.score >= 120) unlock("crowd-control:pack-120");
+    if (ctx.result === "finish" && Boolean(stats.bossCleared ?? true)) {
+      unlock("crowd-control:win-boss");
+    }
+  }
+
+  if (ctx.gameId === "prism-drop") {
+    const maxTile = Number(stats.maxTile ?? 0);
+    const chain = Number(stats.maxChain ?? stats.chain ?? 0);
+    const merges = Number(stats.merges ?? 0);
+    if (merges >= 1 || maxTile >= 4 || chain >= 1) unlock("prism-drop:first-merge");
+    if (chain >= 4) unlock("prism-drop:chain-4");
+    if (maxTile >= 512) unlock("prism-drop:tile-512");
+    if (maxTile >= 2048) unlock("prism-drop:tile-2048");
+  }
+
+  if (ctx.gameId === "swing-vector") {
+    const finished = ctx.result === "finish";
+    const snaps = Number(stats.sonicSnaps ?? stats.snaps ?? 0);
+    if (finished) unlock("swing-vector:first-swing");
+    if (Boolean(stats.sonicSnap) || snaps >= 1) unlock("swing-vector:sonic-snap");
+    if (finished && Number(stats.falls ?? 0) === 0) unlock("swing-vector:clean-canyon");
+    if (finished && ctx.mode === "canyon-1" && ctx.score > 0 && ctx.score < 24_000) {
+      unlock("swing-vector:sub-24");
+    }
   }
 
   const questProgress = { ...ctx.questProgress };
@@ -142,23 +239,39 @@ export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
     if (ctx.questCompleted.includes(q.id)) continue;
     let value = questProgress[q.id] ?? 0;
     if (q.stat === "platform:uniqueGamesToday") value = uniqueToday;
-    if (q.stat === "platform:pbCountToday" && pbImproved) value = Math.max(value, 1);
-    if (q.stat === "neon-drift:score" && ctx.gameId === "neon-drift") value = Math.max(value, ctx.score);
-    if (q.stat === "neon-drift:maxCombo" && ctx.gameId === "neon-drift") {
-      value = Math.max(value, Number(ctx.metadata.combo ?? 0));
-    }
-    if (q.stat === "swarm-protocol:surviveMs" && ctx.gameId === "swarm-protocol") {
-      value = Math.max(value, Number(ctx.metadata.surviveMs ?? ctx.durationMs));
-    }
-    if (q.stat === "swarm-protocol:kills" && ctx.gameId === "swarm-protocol") {
-      value = Math.max(value, Number(ctx.metadata.kills ?? 0));
-    }
-    if (q.stat === "velocity-run:gold" && ctx.gameId === "velocity-run") {
+    else if (q.stat === "platform:pbCountToday" && pbImproved) value = Math.max(value, 1);
+    else if (q.stat === "neon-drift:score" && ctx.gameId === "neon-drift") value = Math.max(value, ctx.score);
+    else if (q.stat === "neon-drift:maxCombo" && ctx.gameId === "neon-drift") {
+      value = Math.max(value, Number(stats.maxCombo ?? stats.combo ?? 0));
+    } else if (q.stat === "swarm-protocol:surviveMs" && ctx.gameId === "swarm-protocol") {
+      value = Math.max(value, Number(stats.surviveMs ?? ctx.durationMs));
+    } else if (q.stat === "swarm-protocol:kills" && ctx.gameId === "swarm-protocol") {
+      value = Math.max(value, Number(stats.kills ?? 0));
+    } else if (q.stat === "velocity-run:gold" && ctx.gameId === "velocity-run") {
       const medal = medalForTime(ctx.mode, ctx.score);
       if (medal === "gold" || medal === "platinum") value = 1;
-    }
-    if (q.stat === "velocity-run:course-1-under" && ctx.mode === "course-1" && ctx.score < 65000) {
+    } else if (q.stat === "velocity-run:course-1-under" && ctx.mode === "course-1" && ctx.score < 65000) {
       value = 65000;
+    } else if (q.stat === "sky-stack:floors" && ctx.gameId === "sky-stack") {
+      const fl = Number(stats.floors ?? Math.floor(ctx.score / 100));
+      value = value + Math.max(0, fl - value);
+    } else if (q.stat === "knockout-circuit:finish" && ctx.gameId === "knockout-circuit" && ctx.result === "finish") {
+      value = value + 1;
+    } else if (
+      q.stat === "pocket-striker:strokes-under" &&
+      ctx.gameId === "pocket-striker" &&
+      ctx.result === "finish" &&
+      ctx.score <= Number(stats.par ?? 3)
+    ) {
+      value = Math.max(value + 1, q.target);
+    } else if (q.stat === "territory-rush:pct" && ctx.gameId === "territory-rush") {
+      value = value + Math.max(0, ctx.score - value);
+    } else if (q.stat === "crowd-control:pack" && ctx.gameId === "crowd-control") {
+      value = value + Math.max(0, ctx.score - value);
+    } else if (q.stat === "prism-drop:maxTile" && ctx.gameId === "prism-drop") {
+      value = Math.max(value, Number(stats.maxTile ?? 0));
+    } else if (q.stat === "swing-vector:finish" && ctx.gameId === "swing-vector" && ctx.result === "finish") {
+      value = value + 1;
     }
     questProgress[q.id] = value;
     if (value >= q.target) {

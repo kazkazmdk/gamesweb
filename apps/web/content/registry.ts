@@ -149,7 +149,7 @@ export function buildSeoPages(): SeoPage[] {
       path: GAMES,
       title: absTitle("Free Browser Games Catalog"),
       description:
-        "The public Gamesweb catalog: eight first-party browser games with hubs, guides, controls, and curated collections.",
+        "The public Gamesweb catalog: ten first-party browser games with hubs, guides, controls, scoring, courses, and curated collections.",
       h1: "Browser games",
       ogImage: GAME_MANIFESTS[0].hero,
       indexable: true,

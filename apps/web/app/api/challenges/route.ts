@@ -1,80 +1,74 @@
 import { jsonError, jsonOk, readJson } from "@/lib/api/errors";
-import { getIdentity } from "@/lib/api/identity";
-import { actorId, attemptChallenge, createChallenge, getChallenge } from "@/lib/backend/social-arcade";
-import { decodeChallengePayload, type ChallengeType } from "@gamesweb/game-sdk";
+import { getIdentity, identityKey } from "@/lib/api/identity";
+import { assertSameOrigin, clientIp } from "@/lib/api/origin";
+import { policies, rateLimit } from "@/lib/api/rate-limit";
+import { getBackend } from "@/lib/backend";
+import { attemptChallengeFromRun, createChallengeFromRun, getChallenge } from "@/lib/backend/social-arcade";
+
+function challengeFailure(error: string) {
+  if (error === "run_forbidden" || error === "game_mismatch" || error === "self_challenge") return jsonError("FORBIDDEN", error, 403);
+  if (error === "not_found" || error === "run_not_found") return jsonError("NOT_FOUND", error, 404);
+  if (
+    error === "expired" ||
+    error === "mode_mismatch" ||
+    error === "type_mismatch" ||
+    error === "invalid_score" ||
+    error === "run_reuse" ||
+    error === "seed_mismatch" ||
+    error === "challenge_closed"
+  ) {
+    return jsonError("CONFLICT", error, 409);
+  }
+  return jsonError("INVALID_PAYLOAD", error, 400);
+}
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const code = (url.searchParams.get("code") ?? "").toUpperCase();
   if (!code) return jsonError("INVALID_PAYLOAD", "Missing code.", 400);
-  const payload = url.searchParams.get("p");
-  let challenge = getChallenge(code);
-  if (!challenge && payload) {
-    const share = decodeChallengePayload(payload);
-    if (share) {
-      challenge = createChallenge({
-        gameId: share.gameId,
-        mode: share.mode,
-        seed: share.seed,
-        type: share.type,
-        challengerId: share.challengerId,
-        challengerName: share.challengerName,
-        score: share.challengerScore,
-        trust: share.trust,
-        gameVersion: share.gameVersion,
-        publicCode: share.publicCode,
-        expiresAt: share.expiresAt,
-      });
-    }
-  }
-  if (!challenge) return jsonError("NOT_FOUND", "Challenge not found on this instance.", 404);
+  const backend = getBackend();
+  if (!backend) return jsonError("NOT_CONFIGURED", "Backend is not configured.", 503);
+  const challenge = await getChallenge(code);
+  if (!challenge) return jsonError("NOT_FOUND", "Challenge not found.", 404);
   return jsonOk({ challenge, persistence: "server" });
 }
 
 export async function POST(req: Request) {
+  const denied = assertSameOrigin(req);
+  if (denied) return denied;
   const parsed = await readJson(req);
   if (!parsed.ok) return parsed.response;
   const body = parsed.data as {
     action?: "create" | "attempt";
-    gameId?: string;
-    mode?: string;
-    seed?: string;
-    type?: ChallengeType;
-    challengerName?: string;
-    score?: number;
+    runId?: string;
     code?: string;
-    playerName?: string;
-    trust?: "verified" | "unverified" | "practice";
-    durationMs?: number;
+    challengeType?: string;
+    type?: string;
+    score?: number;
+    trust?: string;
+    playerId?: string;
+    challengerId?: string;
+    gameId?: string;
   };
+  if (body.trust === "verified" || typeof body.score === "number" || body.playerId || body.challengerId) {
+    return jsonError("FORBIDDEN", "Score, trust, and identity are server-derived from runId.", 403);
+  }
   const identity = await getIdentity();
-  const id = actorId(identity);
+  const backend = getBackend();
+  if (!backend) return jsonError("NOT_CONFIGURED", "Backend is not configured.", 503);
   if ((body.action ?? "create") === "attempt") {
+    const limited = await rateLimit(`challenge-attempt:${identityKey(identity)}:${clientIp(req)}`, policies.challengeAttempt);
+    if (!limited.ok) return jsonError("RATE_LIMITED", "Too many attempts.", 429);
     const code = (body.code ?? "").toUpperCase();
-    if (!code || typeof body.score !== "number") return jsonError("INVALID_PAYLOAD", "Need code and score.", 400);
-    const result = attemptChallenge(code, {
-      id: crypto.randomUUID(),
-      playerId: id,
-      playerName: body.playerName ?? "Player",
-      score: body.score,
-      runId: null,
-      trust: body.trust ?? "unverified",
-      createdAt: Date.now(),
-      metadata: { durationMs: body.durationMs ?? 0 },
-    });
-    if (!result.ok) return jsonError("NOT_FOUND", "Challenge not found.", 404);
+    if (!code || !body.runId) return jsonError("INVALID_PAYLOAD", "Need code and runId.", 400);
+    const result = await attemptChallengeFromRun(identity, code, body.runId);
+    if (!result.ok) return challengeFailure(result.error);
     return jsonOk({ ...result, persistence: "server" });
   }
-  if (!body.gameId || typeof body.score !== "number") return jsonError("INVALID_PAYLOAD", "Need gameId and score.", 400);
-  const challenge = createChallenge({
-    gameId: body.gameId,
-    mode: body.mode ?? "default",
-    seed: body.seed ?? `${Date.now()}`,
-    type: body.type ?? "beat-score",
-    challengerId: id,
-    challengerName: body.challengerName ?? "Player",
-    score: body.score,
-    trust: body.trust,
-  });
-  return jsonOk({ challenge, url: `/c/${challenge.publicCode}`, persistence: "server" });
+  const limited = await rateLimit(`challenge-create:${identityKey(identity)}:${clientIp(req)}`, policies.challengeCreate);
+  if (!limited.ok) return jsonError("RATE_LIMITED", "Too many challenges.", 429);
+  if (!body.runId) return jsonError("INVALID_PAYLOAD", "Need runId.", 400);
+  const created = await createChallengeFromRun(identity, body.runId, body.challengeType ?? body.type);
+  if ("error" in created) return challengeFailure(created.error);
+  return jsonOk({ ...created, persistence: "server" });
 }

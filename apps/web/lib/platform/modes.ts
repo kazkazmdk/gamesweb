@@ -82,6 +82,17 @@ export const TERRITORY_ARENAS: ModeOption[] = [
   { id: "1", label: "Shatter Field", hint: "Broken channels" },
 ];
 
+export const PRISM_MODES: ModeOption[] = [
+  { id: "0", label: "Containment Well", hint: "Standard" },
+  { id: "1", label: "Overclock Well", hint: "Fast gravity" },
+];
+
+export const SWING_COURSES: ModeOption[] = [
+  { id: "0", label: "Ion Gorge", hint: "Learn the latch" },
+  { id: "1", label: "Pendulum Vault", hint: "Roofed orbit" },
+  { id: "2", label: "Hyperion Trench", hint: "Long gaps" },
+];
+
 const BOARD_LABELS: Record<string, string> = {
   foundation: "Harbour Loop",
   technical: "Hairpin District",
@@ -114,6 +125,10 @@ const BOARD_LABELS: Record<string, string> = {
   layout: "Table",
   arena: "Arena",
   rush: "Rush",
+  well: "Containment Well",
+  "canyon-1": "Ion Gorge",
+  "canyon-2": "Pendulum Vault",
+  "canyon-3": "Hyperion Trench",
 };
 
 export const NEON_BOARD_MODES = ["foundation", "technical", "velocity"] as const;
@@ -130,6 +145,11 @@ export function boardModeFromPlayIndex(gameId: string, index: number, daily = fa
   if (gameId === "pocket-striker") return "layout";
   if (gameId === "territory-rush") return "arena";
   if (gameId === "crowd-control") return "rush";
+  if (gameId === "prism-drop") return daily ? "daily" : "well";
+  if (gameId === "swing-vector") {
+    if (daily) return "daily";
+    return GAME_MODES["swing-vector"][index] ?? "canyon-1";
+  }
   return defaultMode(gameId);
 }
 
@@ -154,6 +174,11 @@ export function playIndexFromBoardMode(gameId: string, mode: string) {
   if (gameId === "crowd-control") {
     const n = Number(mode.replace("route-", "").replace("rush", ""));
     return Number.isFinite(n) ? Math.max(0, n) : 0;
+  }
+  if (gameId === "prism-drop") return mode === "1" || mode === "overclock" ? 1 : 0;
+  if (gameId === "swing-vector") {
+    const i = GAME_MODES["swing-vector"].indexOf(mode);
+    return i >= 0 ? i : 0;
   }
   return 0;
 }
@@ -184,6 +209,8 @@ export function playModeOptions(gameId: string): ModeOption[] {
   if (gameId === "sky-stack") return [{ id: "0", label: "Climb", hint: "Place the slab" }];
   if (gameId === "territory-rush") return TERRITORY_ARENAS;
   if (gameId === "crowd-control") return CROWD_ROUTES;
+  if (gameId === "prism-drop") return PRISM_MODES;
+  if (gameId === "swing-vector") return SWING_COURSES;
   return [{ id: "0", label: "Survival", hint: "One protocol" }];
 }
 

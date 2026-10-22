@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#090d16"/>
+      <stop offset="0.48" stop-color="#111a2e"/>
+      <stop offset="1" stop-color="#070a12"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#18344f" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#070c16" stop-opacity="0.96"/>
+    </linearGradient>
+    <pattern id="hex" width="32" height="56" patternUnits="userSpaceOnUse">
+      <path d="M16 2 L30 10 L30 26 L16 34 L2 26 L2 10 Z" fill="none" stroke="#7dd3fc" stroke-opacity="0.15" stroke-width="1"/>
+    </pattern>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <radialGradient id="shine" cx="34%" cy="28%" r="62%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="1200" fill="url(#bg)"/>
+  <rect width="800" height="1200" fill="url(#hex)"/>
+  <circle cx="120" cy="140" r="120" fill="#38bdf8" opacity="0.07"/>
+  <circle cx="680" cy="220" r="100" fill="#facc15" opacity="0.05"/>
+  <text x="400" y="78" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="36" font-weight="800" fill="#f8fafc">PRISM DROP</text>
+  <text x="400" y="112" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="16" fill="#bae6fd">Drop the core. Chain the merge.</text>
+  <g filter="url(#glow)">
+    <rect x="168" y="168" width="464" height="900" rx="28" fill="#02060c" opacity="0.4"/>
+    <rect x="180" y="150" width="440" height="920" rx="24" fill="url(#glass)" stroke="#facc15" stroke-width="4"/>
+    <rect x="192" y="162" width="416" height="896" rx="18" fill="none" stroke="#67e8f9" stroke-width="2"/>
+    <line x1="210" y1="280" x2="590" y2="280" stroke="#ff3355" stroke-width="2.4"/>
+    <text x="222" y="274" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="800" fill="#fecdd3">LIMIT</text>
+    <line x1="400" y1="188" x2="400" y2="980" stroke="#67e8f9" stroke-width="1.5" stroke-dasharray="8 7" opacity="0.45"/>
+    <circle cx="400" cy="930" r="46" fill="#38bdf8" opacity="0.18" stroke="#67e8f9" stroke-dasharray="6 5"/>
+    <text x="400" y="936" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="800" fill="#e0f2fe" opacity="0.7">2</text>
+    <g>
+      <circle cx="250" cy="900" r="36" fill="#34d399"/>
+      <circle cx="250" cy="900" r="36" fill="url(#shine)"/>
+      <text x="250" y="906" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="800" fill="#064e3b">4</text>
+      <circle cx="360" cy="880" r="44" fill="#a3e635"/>
+      <circle cx="360" cy="880" r="44" fill="url(#shine)"/>
+      <text x="360" y="886" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="800" fill="#1c1408">8</text>
+      <circle cx="490" cy="860" r="50" fill="#facc15"/>
+      <circle cx="490" cy="860" r="50" fill="url(#shine)"/>
+      <text x="490" y="866" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="800" fill="#1c1408">16</text>
+      <circle cx="300" cy="760" r="54" fill="#fb923c"/>
+      <circle cx="300" cy="760" r="54" fill="url(#shine)"/>
+      <text x="300" y="766" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="800" fill="#1c1408">32</text>
+      <circle cx="460" cy="730" r="58" fill="#f87171"/>
+      <circle cx="460" cy="730" r="58" fill="url(#shine)"/>
+      <text x="460" y="736" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="800" fill="#450a0a">64</text>
+      <circle cx="250" cy="640" r="52" fill="#f472b6"/>
+      <circle cx="250" cy="640" r="52" fill="url(#shine)"/>
+      <text x="250" y="646" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="800" fill="#500724">128</text>
+      <circle cx="400" cy="600" r="64" fill="#a78bfa"/>
+      <circle cx="400" cy="600" r="40" fill="#ddd6fe"/>
+      <polygon points="400,568 424,580 424,604 400,616 376,604 376,580" fill="#f5f3ff" opacity="0.75"/>
+      <circle cx="400" cy="600" r="64" fill="url(#shine)"/>
+      <text x="400" y="606" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="800" fill="#1e1b4b">256</text>
+      <circle cx="520" cy="560" r="46" fill="#e879f9"/>
+      <circle cx="520" cy="560" r="46" fill="url(#shine)"/>
+      <text x="520" y="566" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="800" fill="#4a044e">1024</text>
+      <circle cx="360" cy="470" r="72" fill="#60a5fa"/>
+      <circle cx="360" cy="470" r="46" fill="#dbeafe"/>
+      <polygon points="360,432 390,447 390,477 360,492 330,477 330,447" fill="#eff6ff" opacity="0.8"/>
+      <circle cx="360" cy="470" r="72" fill="url(#shine)"/>
+      <text x="360" y="478" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="800" fill="#1e3a8a">512</text>
+      <circle cx="360" cy="470" r="96" fill="none" stroke="#60a5fa" stroke-width="3"/>
+      <circle cx="360" cy="470" r="118" fill="none" stroke="#fef08a" stroke-width="2" opacity="0.8"/>
+      <text x="360" y="360" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="800" fill="#fef08a">CHAIN ×3 · 512</text>
+      <circle cx="400" cy="210" r="22" fill="#38bdf8" stroke="#facc15" stroke-width="2"/>
+      <circle cx="400" cy="210" r="22" fill="url(#shine)"/>
+      <text x="400" y="216" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="800" fill="#082f49">2</text>
+    </g>
+  </g>
+  <rect x="250" y="1088" width="300" height="52" rx="14" fill="#101826" stroke="#facc15" stroke-width="2"/>
+  <text x="400" y="1120" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="800" fill="#fef9c3">PULSE TILT ¡</text>
+</svg>

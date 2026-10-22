@@ -1,6 +1,8 @@
 "use client";
 
 import { GAME_MANIFESTS } from "@gamesweb/game-sdk";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SliderControl, SwitchControl } from "@/components/platform";
 import { Avatar, useAccent } from "@/components/shell/AppShell";
@@ -22,8 +24,12 @@ export default function SettingsPage() {
   useAccent();
   const player = usePlayer();
   const store = useStore();
+  const router = useRouter();
   const s = player.settings;
   const [cat, setCat] = useState<(typeof CATS)[number]["id"]>("account");
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountError, setAccountError] = useState("");
+  const [deleteStep, setDeleteStep] = useState<"idle" | "confirm">("idle");
   const [controlGame, setControlGame] = useState(GAME_MANIFESTS[0].id);
   const controls = GAME_MANIFESTS.find((g) => g.id === controlGame) ?? GAME_MANIFESTS[0];
   const sync = accountSyncCopy(player);
@@ -77,6 +83,64 @@ export default function SettingsPage() {
               <p className="mt-4 text-[13px] text-[var(--text-dim)]">
                 {player.isGuest ? "Playing as a guest." : "Signed in."} {sync}
               </p>
+              {player.isGuest ? (
+                <p className="mt-4">
+                  <Link href="/auth" className="text-[14px] underline">
+                    Save your progress
+                  </Link>
+                </p>
+              ) : (
+                <div className="mt-6 space-y-3">
+                  <button
+                    type="button"
+                    className="h-11 w-full rounded-full border border-[var(--line)] text-[14px]"
+                    disabled={accountBusy}
+                    onClick={() => {
+                      setAccountError("");
+                      setAccountBusy(true);
+                      void store.signOut().finally(() => setAccountBusy(false));
+                    }}
+                  >
+                    Sign out
+                  </button>
+                  {deleteStep === "idle" ? (
+                    <button
+                      type="button"
+                      className="h-11 w-full text-[14px] text-[var(--danger)]"
+                      disabled={accountBusy}
+                      onClick={() => setDeleteStep("confirm")}
+                    >
+                      Delete account
+                    </button>
+                  ) : (
+                    <div className="space-y-3 border border-[var(--line)] p-4">
+                      <p className="text-[13px] text-[var(--text-dim)]">
+                        This permanently deletes your signed-in account and signs you out. Public scores stay on the board without your name. Local play on this device starts again as a guest.
+                      </p>
+                      <button
+                        type="button"
+                        className="h-11 w-full rounded-full bg-[var(--danger)] text-[var(--bg)] text-[14px]"
+                        disabled={accountBusy}
+                        onClick={() => {
+                          setAccountBusy(true);
+                          setAccountError("");
+                          void store
+                            .deleteAccount()
+                            .then(() => router.replace("/"))
+                            .catch(() => setAccountError("Could not delete the account."))
+                            .finally(() => setAccountBusy(false));
+                        }}
+                      >
+                        Delete permanently
+                      </button>
+                      <button type="button" className="h-11 w-full text-[13px] text-[var(--text-dim)]" onClick={() => setDeleteStep("idle")}>
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                  {accountError ? <p className="text-[13px] text-[var(--danger)]">{accountError}</p> : null}
+                </div>
+              )}
               <label className="mt-4 block">
                 <span className="text-[12px] text-[var(--text-faint)]">Display name</span>
                 <input

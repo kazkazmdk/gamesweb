@@ -1,6 +1,8 @@
 export function formatPlayScore(gameId: string, score: number) {
   if (!Number.isFinite(score) || score <= 0 || score >= 1e12) return null;
-  if (gameId === "velocity-run" || gameId === "knockout-circuit") return `${(score / 1000).toFixed(3)}s`;
+  if (gameId === "velocity-run" || gameId === "knockout-circuit" || gameId === "swing-vector") {
+    return `${(score / 1000).toFixed(3)}s`;
+  }
   if (gameId === "pocket-striker") return `${Math.round(score)} strokes`;
   return Math.round(score).toLocaleString();
 }
@@ -73,6 +75,8 @@ const ZERO_RESULT: Record<string, string> = {
   "territory-rush": "No territory secured",
   "sky-stack": "No stack score",
   "crowd-control": "Run ended before scoring",
+  "prism-drop": "No prisms merged",
+  "swing-vector": "No canyon finish",
 };
 
 export function zeroResultCopy(gameId: string) {

@@ -122,6 +122,70 @@ export type SubmitScoreInput = {
   localSessionId?: string;
 };
 
+export type CompetitiveRun = {
+  runId: string;
+  userId: string | null;
+  anonymousId: string | null;
+  actorId: string;
+  gameId: string;
+  mode: string;
+  score: number;
+  durationMs: number;
+  gameVersion: string;
+  verificationStatus: VerifiedStatus;
+  createdAt: number;
+  metadata?: Record<string, number | string | boolean>;
+};
+
+export type StoredPartyMember = {
+  id: string;
+  name: string;
+  ready: boolean;
+  points: number;
+  lastRoundScore: number | null;
+  joinedAt: number;
+};
+
+export type StoredParty = {
+  id: string;
+  code: string;
+  host: string;
+  members: StoredPartyMember[];
+  playlist: Array<{ gameId: string; mode: string }>;
+  round: number;
+  state: "lobby" | "playing" | "results" | "done";
+  standings: Array<{ id: string; name: string; points: number }>;
+  createdAt: number;
+  persistence: "server";
+  roundRoster: string[];
+  submitted: string[];
+  reactions?: Array<{ actorId: string; name: string; reaction: string; at: number }>;
+};
+
+export type StoredInbox = {
+  id: string;
+  userId: string;
+  type: "challenge" | "friend" | "rival" | "party" | "crew" | "leaderboard";
+  title: string;
+  body: string;
+  href: string;
+  at: number;
+  read: boolean;
+};
+
+export type StoredRival = {
+  selfId: string;
+  otherId: string;
+  otherName: string;
+  winsA: number;
+  winsB: number;
+  draws: number;
+  totalMatches: number;
+  lastMatch: number;
+  streak: number;
+  rivalryScore: number;
+};
+
 export type BackendStore = {
   kind: "memory" | "supabase";
   startSession(input: {
@@ -162,10 +226,27 @@ export type BackendStore = {
   getOrCreateProfile(identity: Identity): Promise<StoredProfile>;
   updateProfile(identity: Identity, patch: Partial<Pick<StoredProfile, "username" | "displayName" | "avatar" | "shareActivity" | "sharePresence" | "sharePublicActivity">>): Promise<StoredProfile | { error: string }>;
   mergeGuest(identity: Identity, input?: { offlineRuns?: OfflineRun[] }): Promise<{ ok: true; profile: StoredProfile; alreadyMerged: boolean } | { error: string }>;
+  deleteAccount(identity: Identity): Promise<{ ok: true } | { error: string }>;
   getIdempotency(scope: string, key: string): Promise<{ status: number; response: unknown } | null>;
   putIdempotency(scope: string, key: string, endpoint: string, status: number, response: unknown, identity: Identity): Promise<void>;
   accountProgress(userId: string): Promise<AccountProgress>;
   getPublicProfile(username: string): Promise<PublicPlayerPayload | null>;
+  getScore(id: string): Promise<StoredScore | null>;
+  createParty(identity: Identity, hostName: string): Promise<StoredParty>;
+  getParty(code: string): Promise<StoredParty | null>;
+  joinParty(identity: Identity, code: string, name: string): Promise<{ ok: true; party: StoredParty; duplicate: boolean } | { ok: false; error: "not_found" | "full" | "closed" }>;
+  setPartyReady(identity: Identity, code: string, ready: boolean): Promise<StoredParty | null>;
+  startParty(identity: Identity, code: string): Promise<StoredParty | { error: string }>;
+  advanceParty(identity: Identity, code: string): Promise<StoredParty | { error: string }>;
+  submitPartyRound(identity: Identity, code: string, runId: string): Promise<StoredParty | { error: string }>;
+  reactParty?(identity: Identity, code: string, name: string, reaction: string): Promise<StoredParty | null>;
+  createChallengeFromRun(identity: Identity, runId: string, type?: string): Promise<{ challenge: import("@gamesweb/game-sdk").ChallengeRecord; url: string } | { error: string }>;
+  getChallenge(code: string): Promise<import("@gamesweb/game-sdk").ChallengeRecord | null>;
+  putChallenge(challenge: import("@gamesweb/game-sdk").ChallengeRecord): Promise<void>;
+  attemptChallengeFromRun(identity: Identity, code: string, runId: string): Promise<{ ok: true; challenge: import("@gamesweb/game-sdk").ChallengeRecord; outcome: "win" | "loss" | "draw" | "pending"; duplicate: boolean } | { ok: false; error: string }>;
+  listInbox(identity: Identity): Promise<StoredInbox[]>;
+  markInboxRead(identity: Identity, id: string): Promise<StoredInbox | null>;
+  listRivals(identity: Identity): Promise<StoredRival[]>;
 };
 
 export type PublicPlayerPayload = {

@@ -25,8 +25,10 @@ export {
   knockoutCircuitManifest,
   neonDriftManifest,
   pocketStrikerManifest,
+  prismDropManifest,
   skyStackManifest,
   swarmProtocolManifest,
+  swingVectorManifest,
   territoryRushManifest,
   velocityRunManifest,
 } from "./manifests";

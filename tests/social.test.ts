@@ -18,8 +18,8 @@ import {
 import { validateScore, lowerIsBetter } from "../packages/database/src/index.ts";
 
 describe("catalog", () => {
-  it("ships eight playable manifests", () => {
-    expect(GAME_MANIFESTS).toHaveLength(8);
+  it("ships ten playable manifests", () => {
+    expect(GAME_MANIFESTS).toHaveLength(10);
     for (const g of GAME_MANIFESTS) {
       expect(g.challengeTypes.length).toBeGreaterThan(0);
       expect(g.socialModes.includes("solo")).toBe(true);

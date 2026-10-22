@@ -1,6 +1,6 @@
 import { analytics, setAnalyticsContext } from "@gamesweb/analytics";
 import { brand, levelFromXp, storageKeys, xpRewards } from "@gamesweb/config";
-import { GAME_MODES, validateScore, type VerifiedStatus } from "@gamesweb/database";
+import { GAME_MODES, lowerIsBetter, validateScore, type VerifiedStatus } from "@gamesweb/database";
 import { applyServerProgression } from "./player/progression-client";
 import { isValidInviteRef } from "./player/invite";
 import {
@@ -93,6 +93,7 @@ export type PlayerSnapshot = {
   backend: "local" | "supabase";
   pendingInvite: string | null;
   syncStatus: "idle" | "saving" | "saved" | "offline" | "review";
+  lastScoreId: string | null;
 };
 
 const defaultAudio: AudioSettings = { master: 0.8, music: 0.45, sfx: 0.7, muted: false };
@@ -158,6 +159,7 @@ function emptyPlayer(id?: string): PlayerSnapshot {
     backend: "local",
     pendingInvite: null,
     syncStatus: "idle",
+    lastScoreId: null,
   };
 }
 
@@ -191,6 +193,7 @@ export const SSR_PLAYER: PlayerSnapshot = {
   backend: "local",
   pendingInvite: null,
   syncStatus: "idle",
+  lastScoreId: null,
 };
 
 type Listener = () => void;
@@ -361,7 +364,7 @@ class PlayerStore {
       endedAt: Date.now(),
       metadata: payload.metadata,
     });
-    const lower = Boolean(payload.metadata.lowerIsBetter);
+    const lower = Boolean(payload.metadata.lowerIsBetter) || lowerIsBetter(gameId);
     const prev = this.personalBest(gameId, payload.mode, lower);
     const improved = lower ? payload.score < prev : payload.score > prev;
     const row: StoredScore = {
@@ -436,6 +439,10 @@ class PlayerStore {
             localSessionId: sessionId,
             idempotencyKey: `score-offline:${sessionId}`,
           });
+          if (retry.ok && retry.data.scoreId) {
+            row.id = retry.data.scoreId;
+            this.snapshot.lastScoreId = retry.data.scoreId;
+          }
           if (retry.ok && retry.data.verification) {
             row.verified = retry.data.verification.status as VerifiedStatus;
             if (retry.data.progressionDiff) this.applyServerProgression(retry.data.progressionDiff);
@@ -447,6 +454,10 @@ class PlayerStore {
         this.persist();
         this.emit();
         return;
+      }
+      if (res.data.scoreId) {
+        row.id = res.data.scoreId;
+        this.snapshot.lastScoreId = res.data.scoreId;
       }
       if (!res.data.verification) {
         // Replayed idempotent submission: the server already holds this run.
@@ -581,6 +592,12 @@ class PlayerStore {
     }
     if (opts.gameId === "crowd-control") {
       this.progressQuest("crowd-control:pack", Number(opts.payload.metadata.pack ?? 0));
+    }
+    if (opts.gameId === "prism-drop") {
+      this.progressQuest("prism-drop:maxTile", Number(opts.payload.metadata.maxTile ?? 0));
+    }
+    if (opts.gameId === "swing-vector" && opts.result === "finish") {
+      this.progressQuest("swing-vector:finish", 1);
     }
 
     const scale = Math.min(1, opts.durationMs / (xpRewards.minRunSecondsForFullXp * 1000));
@@ -780,7 +797,7 @@ class PlayerStore {
   }
 
   leaderboard(gameId: string, mode?: string) {
-    const lower = gameId === "velocity-run";
+    const lower = lowerIsBetter(gameId);
     const rows = this.snapshot.scores.filter((s) => s.gameId === gameId && (!mode || s.mode === mode) && s.verified !== "flagged");
     const best = new Map<string, StoredScore>();
     for (const r of rows) {
@@ -917,6 +934,29 @@ class PlayerStore {
     void this.hydrateRemote();
   }
 
+  async signOut() {
+    await playerApi.logout();
+    this.snapshot.authId = null;
+    this.snapshot.isGuest = true;
+    this.snapshot.friends = [];
+    this.snapshot.pendingSavePrompt = false;
+    analytics.reset();
+    analytics.identify(this.snapshot.id, { guest: true });
+    this.persist();
+    this.emit();
+  }
+
+  async deleteAccount() {
+    const result = await playerApi.deleteAccount();
+    if (!result.ok) throw new Error(result.error.message);
+    this.snapshot = emptyPlayer();
+    this.queue = [];
+    analytics.reset();
+    analytics.identify(this.snapshot.id, { guest: true });
+    this.persist();
+    this.emit();
+  }
+
   async mergeAccount(authId: string, username: string) {
     this.snapshot = {
       ...this.snapshot,
@@ -972,7 +1012,7 @@ class PlayerStore {
           this.snapshot.displayName = me.data.displayName;
           this.snapshot.avatar = me.data.avatar;
           this.snapshot.xp = me.data.xp;
-          this.snapshot.achievements = me.data.achievements;
+          this.snapshot.achievements = Array.from(new Set([...me.data.achievements, ...this.snapshot.achievements]));
           if (me.data.achievementUnlocks) {
             this.snapshot.achievementUnlocks = { ...this.snapshot.achievementUnlocks, ...me.data.achievementUnlocks };
           }
@@ -1002,7 +1042,7 @@ class PlayerStore {
           }
         } else if (serverHasProgress) {
           this.snapshot.xp = me.data.xp;
-          this.snapshot.achievements = me.data.achievements;
+          this.snapshot.achievements = Array.from(new Set([...me.data.achievements, ...this.snapshot.achievements]));
           this.snapshot.questCompleted = me.data.questCompleted ?? this.snapshot.questCompleted;
           this.snapshot.questProgress = me.data.questProgress ?? this.snapshot.questProgress;
           this.snapshot.streak = me.data.streak ?? this.snapshot.streak;

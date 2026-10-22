@@ -18,6 +18,24 @@
 -- Rollback: drop guest_progress / new functions, restore 0003 RPC bodies, re-grant
 -- table writes only if a rollback of the product architecture is required.
 
+insert into public.games (id, slug, title, status, manifest)
+values
+  ('prism-drop', 'prism-drop', 'Prism Drop', 'live', '{"version":"1.0.0"}'::jsonb),
+  ('swing-vector', 'swing-vector', 'Swing Vector', 'live', '{"version":"1.0.0"}'::jsonb)
+on conflict (id) do update set title = excluded.title, slug = excluded.slug, manifest = excluded.manifest;
+
+insert into public.achievements (id, game_id, key, name, description, xp_reward)
+values
+  ('prism-drop:first-merge', 'prism-drop', 'first-merge', 'Fusion Spark', 'Merge two matching prisms.', 10),
+  ('prism-drop:chain-4', 'prism-drop', 'chain-4', 'Cascade Reactor', 'Trigger a 4x merge chain.', 25),
+  ('prism-drop:tile-512', 'prism-drop', 'tile-512', 'High Synthesis', 'Synthesize a 512 prism.', 35),
+  ('prism-drop:tile-2048', 'prism-drop', 'tile-2048', 'Solar Core', 'Synthesize the 2048 prism.', 60),
+  ('swing-vector:first-swing', 'swing-vector', 'first-swing', 'First Latch', 'Complete your first canyon run.', 10),
+  ('swing-vector:sonic-snap', 'swing-vector', 'sonic-snap', 'Sonic Snap', 'Release a full-orbit slingshot boost.', 20),
+  ('swing-vector:clean-canyon', 'swing-vector', 'clean-canyon', 'Zero Scrape', 'Finish a canyon with 0 falls.', 30),
+  ('swing-vector:sub-24', 'swing-vector', 'sub-24', 'Hypersonic', 'Clear Ion Gorge under 24 seconds.', 45)
+on conflict (id) do nothing;
+
 -- ---------------------------------------------------------------------------
 -- Level curve (JS port)
 -- ---------------------------------------------------------------------------
@@ -718,7 +736,7 @@ begin
       if offline_count > 40 then
         exit;
       end if;
-      if coalesce(run ->> 'gameId', '') not in ('neon-drift', 'velocity-run', 'swarm-protocol') then
+      if coalesce(run ->> 'gameId', '') not in ('neon-drift', 'velocity-run', 'swarm-protocol', 'sky-stack', 'knockout-circuit', 'pocket-striker', 'territory-rush', 'crowd-control', 'prism-drop', 'swing-vector') then
         continue;
       end if;
       insert into public.scores (

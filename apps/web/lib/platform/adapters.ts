@@ -32,7 +32,7 @@ export function lastPbEvent(history: PlayRecord[]) {
   for (const h of history) {
     const delta = h.metadata?.pbDelta;
     if (typeof delta !== "number") continue;
-    const improved = h.gameId === "velocity-run" ? delta < 0 : delta > 0;
+    const improved = lowerIsBetter(h.gameId) ? delta < 0 : delta > 0;
     if (!improved) continue;
     return { gameId: h.gameId, score: h.score, delta, at: h.at };
   }
@@ -116,7 +116,7 @@ export function activityFromHistory(history: PlayRecord[], limit = 8): ActivityI
     const game = getManifest(h.gameId);
     const medal = typeof h.metadata?.medal === "string" ? h.metadata.medal : null;
     const delta = typeof h.metadata?.pbDelta === "number" ? h.metadata.pbDelta : null;
-    const improved = delta !== null && (h.gameId === "velocity-run" ? delta < 0 : delta > 0);
+    const improved = delta !== null && (lowerIsBetter(h.gameId) ? delta < 0 : delta > 0);
     const event = improved ? "New PB" : medal ? medal : h.result || "Run";
     return {
       id: `${h.at}-${i}`,

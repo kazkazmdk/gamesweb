@@ -22,7 +22,7 @@ export default function PartyCreatePage() {
         slug="sky-stack"
         kicker="Party"
         title="Open a lobby"
-        body="A server code. Anyone on this instance can join it. Same playlist, shared roster, standings after each result — not a live match room."
+        body="A shared lobby code. Members join, ready up, and the host starts the round. Each player submits their own run. The first finish does not advance the playlist."
         action={
           <ChamferButton
             disabled={busy}

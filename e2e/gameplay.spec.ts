@@ -10,6 +10,7 @@ type GwDebug = {
   score: number;
   paused: boolean;
   timeMs?: number;
+  attemptEpoch?: number;
   kills?: number;
   level?: number;
   sessionDeaths?: number;
@@ -81,13 +82,26 @@ async function waitReady(page: Page, gameId: string) {
 
 async function assertAlive(page: Page) {
   const start = await debugOf(page);
+  // Headless CI renders about one frame per second. Requiring +8 ticks in 6s
+  // measured fps, not a freeze: the loop was alive at +6/+7. A frozen scene
+  // does not advance tick, score, position, or the attempt timer.
   await expect
-    .poll(async () => (await debugOf(page))?.tick ?? 0, { timeout: 6_000 })
-    .toBeGreaterThan((start?.tick ?? 0) + 8);
+    .poll(async () => {
+      const later = await debugOf(page);
+      if (!later || later.frozen === true || later.paused) return false;
+      const tickMoved = (later.tick ?? 0) > (start?.tick ?? 0);
+      const simMoved =
+        Math.abs((later.score ?? 0) - (start?.score ?? 0)) > 0 ||
+        Math.abs(later.playerX - (start?.playerX ?? 0)) > 0.5 ||
+        Math.abs(later.playerY - (start?.playerY ?? 0)) > 0.5 ||
+        Math.abs((later.timeMs ?? 0) - (start?.timeMs ?? 0)) > 16;
+      return tickMoved || simMoved;
+    }, { timeout: 8_000 })
+    .toBe(true);
   const later = await debugOf(page);
   expect(later?.frozen).not.toBe(true);
   expect(later?.longFrames ?? 0).toBeLessThan(90);
-  console.log(`gw-metrics game=${later?.gameId} fps=${later?.fps ?? "n/a"} longFrames=${later?.longFrames ?? 0} tick=${later?.tick ?? 0}`);
+  console.log(`gw-metrics game=${later?.gameId} fps=${later?.fps ?? "n/a"} longFrames=${later?.longFrames ?? 0} tick=${later?.tick ?? 0} startTick=${start?.tick ?? 0}`);
 }
 
 test("neon drift steers, scores, pauses, and retries", async ({ page }) => {
@@ -164,15 +178,20 @@ test("velocity run moves, jumps, dies, and starts a new attempt", async ({ page 
 
   const jumped = await debugOf(page);
   const deathsBefore = jumped!.sessionDeaths ?? jumped!.deaths ?? 0;
+  const epochBefore = jumped!.attemptEpoch ?? 0;
+  const timeBefore = jumped!.timeMs ?? 0;
+  expect(timeBefore).toBeGreaterThan(50);
   await cmd(page, "killPlayer");
   await expect
     .poll(async () => (await debugOf(page))?.sessionDeaths ?? 0)
     .toBeGreaterThan(deathsBefore);
   await expect
-    .poll(async () => (await debugOf(page))?.timeMs ?? 1)
-    .toBeLessThan(50);
-  const next = await debugOf(page);
-  expect(next?.runState).toBe("playing");
+    .poll(async () => {
+      const next = await debugOf(page);
+      if (!next) return false;
+      return (next.attemptEpoch ?? 0) > epochBefore && next.timeMs !== undefined && next.timeMs < timeBefore && next.runState === "playing";
+    }, { timeout: 8_000 })
+    .toBe(true);
   done();
 });
 
@@ -250,13 +269,14 @@ test("a finished run opens the result screen and the score reaches the server", 
   await cmd(page, "finishRun");
 
   const overlay = page.getByText("R or Space retries");
-  await expect(overlay).toBeVisible({ timeout: 5_000 });
-
-  // A tap still in the play rhythm must not dismiss the recap.
-  // Dispatch in-page so Playwright IPC cannot burn the 800ms grace.
-  await page.evaluate(() => {
+  // The recap ignores Space for 800ms after it mounts. Dispatch in the same
+  // page turn that first sees the copy, so a slow runner cannot burn that grace.
+  await page.waitForFunction(() => {
+    const text = document.body.innerText;
+    if (!text.includes("R or Space retries")) return false;
     window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
-  });
+    return document.body.innerText.includes("R or Space retries");
+  }, undefined, { timeout: 20_000 });
   await expect(overlay).toBeVisible();
 
   const res = await scoreReq;

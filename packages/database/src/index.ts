@@ -30,6 +30,7 @@ export {
   ProfileUpdateSchema,
   GuestMergeSchema,
   AuthMagicLinkSchema,
+  AccountDeleteSchema,
   GameSaveSchema,
   UsernameSearchSchema,
   LeaderboardQuerySchema,

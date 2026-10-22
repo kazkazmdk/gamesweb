@@ -2,16 +2,26 @@ import { createHash } from "node:crypto";
 import { appUrl, isVercelProduction } from "@/lib/env";
 import { jsonError } from "@/lib/api/errors";
 
+const SAFE_FETCH_SITES = new Set(["", "same-origin", "same-site", "none"]);
+
 export function assertSameOrigin(req: Request) {
   if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return null;
+
+  const site = (req.headers.get("sec-fetch-site") ?? "").toLowerCase();
+  if (site === "cross-site") {
+    return jsonError("ORIGIN_DENIED", "Cross-site request blocked.", 403);
+  }
+
   const origin = req.headers.get("origin");
   const host = req.headers.get("host");
   if (!origin) {
-    // Same-site navigations and some test clients omit Origin. Allow when Host matches.
-    if (host) return null;
+    // Playwright, unit tests, and server-to-server omit Sec-Fetch-Site.
+    // Browser same-origin POSTs may omit Origin but send same-origin / none.
+    if (SAFE_FETCH_SITES.has(site)) return null;
     return jsonError("ORIGIN_DENIED", "Missing origin.", 403);
   }
-  let allowed: string[] = [appUrl()];
+
+  const allowed = [appUrl()];
   if (host) {
     const proto = req.headers.get("x-forwarded-proto") ?? (isVercelProduction() ? "https" : "http");
     allowed.push(`${proto}://${host}`);

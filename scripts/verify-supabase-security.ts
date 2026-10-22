@@ -59,12 +59,8 @@ function denied(status: number, text: string) {
 }
 
 async function main() {
-  if (!url || !anon) {
-    console.log("SKIP: Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to run live checks.");
-    process.exit(0);
-  }
-  if (!secret) {
-    console.log("SKIP: SUPABASE_SECRET_KEY missing. Publishable-only checks would be incomplete.");
+  if (!url || !anon || !secret) {
+    console.log("SKIP: Supabase live security checks: NOT EXECUTED — no provisioned Gamesweb Supabase credentials");
     process.exit(0);
   }
 
@@ -148,29 +144,41 @@ async function main() {
     detail: `status ${guestRead.status} ${guestRead.text.slice(0, 120)}`,
   });
 
-  const rpc = await rest(anon, "POST", "rpc/finalize_game_run", {
-    p_session_id: "00000000-0000-4000-8000-000000000000",
-    p_identity_user_id: null,
-    p_identity_anonymous_id: "attacker",
-    p_mode: "circuit",
-    p_score: 1,
-    p_duration_ms: 1000,
-    p_result: "finish",
-    p_verified: "verified",
-    p_metadata: {},
-    p_progression: { xpEarned: 2500 },
-    p_flag_reasons: [],
-    p_game_version: "1",
-    p_build_sha: "x",
-    p_offline: false,
-    p_client_started_at: null,
-    p_client_ended_at: null,
-  });
-  checks.push({
-    name: "anon cannot execute finalize_game_run",
-    ok: denied(rpc.status, rpc.text),
-    detail: `status ${rpc.status} ${rpc.text.slice(0, 120)}`,
-  });
+  const socialRpcs = [
+    ["finalize_game_run", {
+      p_session_id: "00000000-0000-4000-8000-000000000000",
+      p_identity_user_id: null,
+      p_identity_anonymous_id: "attacker",
+      p_mode: "circuit",
+      p_score: 1,
+      p_duration_ms: 1000,
+      p_result: "finish",
+      p_verified: "verified",
+      p_metadata: {},
+      p_progression: { xpEarned: 2500 },
+      p_flag_reasons: [],
+      p_game_version: "1",
+      p_build_sha: "x",
+      p_offline: false,
+      p_client_started_at: null,
+      p_client_ended_at: null,
+    }],
+    ["submit_party_round_attempt", { p_code: "XXXXXX", p_actor: "x", p_run_id: "r", p_score: 1, p_trust: "unverified", p_game_id: "sky-stack", p_mode: "climb" }],
+    ["join_party", { p_code: "XXXXXX", p_actor: "x", p_name: "X", p_user_id: null }],
+    ["start_party", { p_code: "XXXXXX", p_actor: "x" }],
+    ["advance_party", { p_code: "XXXXXX", p_actor: "x" }],
+    ["submit_challenge_attempt", { p_code: "XXXXXX", p_actor: "x", p_name: "X", p_run_id: "r", p_score: 1, p_trust: "unverified", p_game_id: "sky-stack", p_mode: "climb" }],
+    ["delete_player_account", { p_user_id: "00000000-0000-4000-8000-000000000000" }],
+  ] as const;
+
+  for (const [name, body] of socialRpcs) {
+    const hit = await rest(anon, "POST", `rpc/${name}`, body);
+    checks.push({
+      name: `anon cannot execute ${name}`,
+      ok: denied(hit.status, hit.text),
+      detail: `status ${hit.status} ${hit.text.slice(0, 120)}`,
+    });
+  }
 
   const serviceGuest = await rest(secret, "GET", "guest_progress?select=anonymous_id&limit=1");
   checks.push({
@@ -194,7 +202,7 @@ async function main() {
   }
 
   if (failed) {
-    console.error(`\n${failed} live Supabase security check(s) failed. Apply 0001–0004 and retry.`);
+    console.error(`\n${failed} live Supabase security check(s) failed. Apply 0001–0010 and retry.`);
     process.exit(1);
   }
   console.log("\nLive Supabase security checks passed.");

@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAccent } from "@/components/shell/AppShell";
 import { usePlayer, useStore } from "@/lib/player";
-import { boardModeFromPlayIndex, resolvePlayIndex } from "@/lib/platform/modes";
+import { boardModeFromPlayIndex, defaultBoardMode, resolvePlayIndex } from "@/lib/platform/modes";
 import { zeroResultCopy } from "@/lib/platform/format";
 import { formatScore } from "@/lib/player-store";
 import { arcadeStore } from "@/lib/social/arcade-store";
@@ -29,6 +29,19 @@ import type { PlatformSDK } from "@gamesweb/game-sdk";
 import type Phaser from "phaser";
 
 const RESULT_INPUT_GRACE_MS = 800;
+
+const DEFAULT_THRESHOLDS: Record<string, { bronze: number; silver: number; gold: number }> = {
+  "neon-drift": { bronze: 15000, silver: 30000, gold: 45000 },
+  "velocity-run": { bronze: 55000, silver: 44000, gold: 36000 },
+  "swarm-protocol": { bronze: 3000, silver: 6000, gold: 10000 },
+  "sky-stack": { bronze: 2500, silver: 5500, gold: 9000 },
+  "knockout-circuit": { bronze: 75000, silver: 60000, gold: 48000 },
+  "pocket-striker": { bronze: 6, silver: 4, gold: 3 },
+  "territory-rush": { bronze: 15000, silver: 30000, gold: 45000 },
+  "crowd-control": { bronze: 6000, silver: 12000, gold: 18000 },
+  "prism-drop": { bronze: 5000, silver: 10000, gold: 16000 },
+  "swing-vector": { bronze: 34000, silver: 26000, gold: 20000 },
+};
 
 export function GameView({ slug }: { slug: string }) {
   const game = getManifest(slug);
@@ -75,7 +88,9 @@ export function GameView({ slug }: { slug: string }) {
     const t = window.setInterval(() => setLoadPct((p) => Math.min(92, p + 8)), 120);
     let dead = false;
     let stage: "import" | "mount" | "create" | "first-frame" = "import";
-    const platform: PlatformSDK = store.createPlatform(game.id, {
+    const seedParam = params.get("seed");
+    const gpParam = params.get("gp");
+    const basePlatform: PlatformSDK = store.createPlatform(game.id, {
       onPause: () => setPaused(true),
       onReady: () => {
         if (dead) return;
@@ -95,6 +110,33 @@ export function GameView({ slug }: { slug: string }) {
         });
       },
     });
+    const enrichMetadata = (meta: Record<string, number | string | boolean>) => {
+      const next = { ...meta };
+      if (seedParam && !next.seed) next.seed = seedParam;
+      if (gpParam !== null && next.gpRound === undefined && Number.isFinite(Number(gpParam))) {
+        next.gpRound = Number(gpParam);
+      }
+      return next;
+    };
+    const platform: PlatformSDK = {
+      ...basePlatform,
+      session: {
+        ...basePlatform.session,
+        end: (res) =>
+          basePlatform.session.end({
+            ...res,
+            metadata: enrichMetadata(res.metadata ?? {}),
+          }),
+      },
+      score: {
+        ...basePlatform.score,
+        submit: (payload) =>
+          basePlatform.score.submit({
+            ...payload,
+            metadata: enrichMetadata(payload.metadata ?? {}),
+          }),
+      },
+    };
 
     async function boot() {
       const parent = wrap.current;
@@ -132,11 +174,54 @@ export function GameView({ slug }: { slug: string }) {
         const mod = await import("@gamesweb/territory-rush");
         stage = "mount";
         instance = mod.mountTerritoryRush(parent, platform, playIndex);
+      } else if (game!.id === "prism-drop") {
+        const mod = await import("@gamesweb/prism-drop");
+        stage = "mount";
+        instance = mod.mountPrismDrop(parent, platform, playIndex);
+      } else if (game!.id === "swing-vector") {
+        const mod = await import("@gamesweb/swing-vector");
+        stage = "mount";
+        instance = mod.mountSwingVector(parent, platform, playIndex);
       } else {
         const mod = await import("@gamesweb/crowd-control");
         stage = "mount";
         instance = mod.mountCrowdControl(parent, platform, playIndex);
       }
+      const boardRows = store.leaderboard(game!.id, defaultBoardMode(game!.id));
+      const rivals = arcadeStore.getSnapshot().rivals;
+      const otherRows = boardRows.filter((r) => !r.isYou && r.score > 0);
+      const rivalNames = new Set(rivals.map((r) => r.otherName.toLowerCase()));
+      const friendNames = new Set(
+        store.snapshot.friends
+          .filter((f) => f.status === "accepted")
+          .flatMap((f) => [f.username.toLowerCase(), f.displayName.toLowerCase()]),
+      );
+      const rivalChallengeScore = arcadeStore
+        .getSnapshot()
+        .challenges.find((c) => c.gameId === game!.id && c.challengerScore > 0)?.challengerScore;
+      const rivalRow =
+        otherRows.find(
+          (r) => rivalNames.has(r.name.toLowerCase()) || (r.username ? rivalNames.has(r.username.toLowerCase()) : false),
+        ) ?? otherRows[0];
+      const friendRow =
+        otherRows.find(
+          (r) =>
+            friendNames.has(r.name.toLowerCase()) || (r.username ? friendNames.has(r.username.toLowerCase()) : false),
+        ) ??
+        otherRows[1] ??
+        otherRows[0];
+      const toMark = (s: number | undefined, fallback: number) =>
+        s && s > 0
+          ? game!.id === "sky-stack"
+            ? s >= 100
+              ? Math.round(s / 100)
+              : Math.round(s)
+            : Math.round(s)
+          : fallback;
+      const friendMark = toMark(friendRow?.score, 18);
+      const rivalMark = toMark(rivalRow?.score ?? rivalChallengeScore, 28);
+      instance.registry.set("friendMark", friendMark);
+      instance.registry.set("rivalMark", rivalMark);
       stage = "create";
       if (dead) {
         instance.destroy(true);
@@ -500,6 +585,39 @@ function Results({
     applied.current = true;
     analytics.track("game_finished", { gameId, score });
     arcadeStore.contributeCrew();
+    if (daily) {
+      const event = dailyEvents.find((e) => e.gameId === gameId);
+      arcadeStore.dailyProgress(day, `${gameId}:${event?.mode ?? "daily"}`, normalizePerformance(gameId, score));
+    }
+    if (gpRound) {
+      const manifest = getManifest(gameId) as
+        | (ReturnType<typeof getManifest> & {
+            challengeThresholds?: { bronze: number; silver: number; gold: number };
+          })
+        | undefined;
+      const t = manifest?.challengeThresholds ?? DEFAULT_THRESHOLDS[gameId];
+      let gpPoints = 2;
+      if (lowerIsBetter(gameId)) {
+        if (result !== "finish") gpPoints = 2;
+        else if (t && score <= t.gold) gpPoints = 10;
+        else if (t && score <= t.silver) gpPoints = 8;
+        else if (t && score <= t.bronze) gpPoints = 6;
+        else gpPoints = 4;
+      } else {
+        if (t && score >= t.gold) gpPoints = 10;
+        else if (t && score >= t.silver) gpPoints = 8;
+        else if (t && score >= t.bronze) gpPoints = 6;
+        else if (score > 0) gpPoints = 4;
+        else gpPoints = 2;
+      }
+      arcadeStore.gpScore(Math.max(0, Number(metadata?.gpRound ?? gpRound ?? 0)), gpPoints);
+    }
+  }, [daily, day, dailyEvents, gameId, gpRound, metadata?.gpRound, result, score]);
+
+  const socialApplied = useRef(false);
+  useEffect(() => {
+    if (socialApplied.current || !player.lastScoreId) return;
+    socialApplied.current = true;
     if (challengeCode && challengeCode !== "NEW") {
       void arcadeStore
         .completeChallenge(
@@ -509,8 +627,8 @@ function Results({
             playerId: player.id,
             playerName: player.displayName || "Guest",
             score,
-            runId: null,
-            trust: player.syncStatus === "saved" ? "verified" : "unverified",
+            runId: player.lastScoreId,
+            trust: "unverified",
             createdAt: Date.now(),
             metadata: { durationMs },
           },
@@ -520,30 +638,10 @@ function Results({
           if (r.ok && r.outcome !== "pending") setChallengeOutcome(r.outcome);
         });
     }
-    if (daily) {
-      const event = dailyEvents.find((e) => e.gameId === gameId);
-      arcadeStore.dailyProgress(day, `${gameId}:${event?.mode ?? "daily"}`, normalizePerformance(gameId, score));
-    }
     if (partyCode) {
-      void arcadeStore.scorePartyRound(partyCode, [{ id: player.id, name: player.displayName || "You", score }], gameId);
+      void arcadeStore.submitPartyRound(partyCode, player.lastScoreId);
     }
-    if (gpRound) arcadeStore.gpScore(Math.max(0, Number(metadata?.gpRound ?? 0)), 10);
-  }, [
-    challengeCode,
-    daily,
-    day,
-    dailyEvents,
-    durationMs,
-    gameId,
-    gpRound,
-    metadata?.gpRound,
-    partyCode,
-    payload,
-    player.displayName,
-    player.id,
-    player.syncStatus,
-    score,
-  ]);
+  }, [challengeCode, durationMs, partyCode, payload, player.displayName, player.id, player.lastScoreId, score]);
 
   function makeChallenge() {
     const game = getManifest(gameId);
@@ -551,14 +649,18 @@ function Results({
       .createChallenge({
         gameId,
         mode: boardModeFromPlayIndex(gameId, resolvePlayIndex(gameId), daily),
-        seed: params.get("seed") ?? `${gameId}:${Date.now()}`,
+        seed:
+          (typeof metadata?.seed === "string" && metadata.seed ? metadata.seed : null) ??
+          params.get("seed") ??
+          `${gameId}:${Date.now()}`,
         type: game ? defaultChallengeType(game) : "beat-score",
         challengerId: player.id,
         challengerName: player.displayName || "Player",
         score,
-        trust: player.syncStatus === "saved" ? "verified" : "unverified",
+        runId: player.lastScoreId,
       })
       .then((made) => {
+        if (!made.ok) return;
         void navigator.clipboard.writeText(`${window.location.origin}${made.url}`);
         setCopied(true);
         analytics.track("challenge_shared", { gameId, code: made.challenge.publicCode });

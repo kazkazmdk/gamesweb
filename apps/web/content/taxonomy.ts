@@ -7,6 +7,8 @@ export const GAME_SEO_KIND: Record<string, string> = {
   "pocket-striker": "Physics Sports Game",
   "territory-rush": "Territory Game",
   "crowd-control": "Crowd Runner",
+  "prism-drop": "Merge Puzzle Game",
+  "swing-vector": "Grapple Physics Game",
 };
 
 export const GENRE_SEO_KIND: Record<string, string> = {
@@ -18,6 +20,7 @@ export const GENRE_SEO_KIND: Record<string, string> = {
   Physics: "Physics Sports Game",
   Arena: "Territory Game",
   Runner: "Crowd Runner",
+  Puzzle: "Merge Puzzle Game",
 };
 
 export function gameSeoKind(slug: string, genre: string): string {

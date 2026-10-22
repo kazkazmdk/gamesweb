@@ -71,4 +71,12 @@ export const policies = {
   presence: { limit: 40, windowMs: 60_000 },
   saves: { limit: 20, windowMs: 60_000 },
   sync: { limit: 20, windowMs: 60_000 },
+  partyCreate: { limit: 8, windowMs: 60_000 },
+  partyJoin: { limit: 20, windowMs: 60_000 },
+  partyGet: { limit: 60, windowMs: 60_000 },
+  challengeCreate: { limit: 8, windowMs: 60_000 },
+  challengeAttempt: { limit: 20, windowMs: 60_000 },
+  inbox: { limit: 40, windowMs: 60_000 },
+  accountLogout: { limit: 30, windowMs: 60_000 },
+  accountDelete: { limit: 3, windowMs: 60 * 60_000 },
 } as const;

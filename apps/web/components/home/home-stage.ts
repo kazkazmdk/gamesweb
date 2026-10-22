@@ -174,6 +174,44 @@ export const HOME_STAGE: Record<string, HomeStageDir> = {
     vignette: 0.2,
     travel: 1,
   },
+  "prism-drop": {
+    family: "diorama",
+    copy: "left",
+    crop: { desktop: "50% 58%", laptop: "48% 60%", mobile: "50% 62%" },
+    tile: "50% 60%",
+    scale: { desktop: 1.08, mobile: 1.04 },
+    lift: "-6%",
+    glow: "#38bdf8",
+    glowX: "50%",
+    glowY: "42%",
+    glowSize: "64% 48%",
+    wash: "rgba(6, 14, 24, 0.12)",
+    leftWash: "linear-gradient(90deg, rgba(0,0,0,.42) 0%, transparent 48%)",
+    bottomWash: "linear-gradient(0deg, rgba(0,0,0,.76) 0%, rgba(0,0,0,.16) 54%, transparent 100%)",
+    contrast: "contrast(1.06) saturate(1.1)",
+    bloom: 1.08,
+    vignette: 0.18,
+    travel: 0,
+  },
+  "swing-vector": {
+    family: "speed",
+    copy: "left",
+    crop: { desktop: "42% 44%", laptop: "40% 46%", mobile: "46% 42%" },
+    tile: "38% 48%",
+    scale: { desktop: 1.14, mobile: 1.08 },
+    lift: "-2%",
+    glow: "#facc15",
+    glowX: "62%",
+    glowY: "40%",
+    glowSize: "68% 46%",
+    wash: "rgba(16, 12, 4, 0.14)",
+    leftWash: "linear-gradient(90deg, rgba(0,0,0,.48) 0%, rgba(0,0,0,.12) 36%, transparent 64%)",
+    bottomWash: "linear-gradient(0deg, rgba(0,0,0,.8) 0%, rgba(0,0,0,.18) 54%, transparent 100%)",
+    contrast: "contrast(1.08) saturate(1.1)",
+    bloom: 1.12,
+    vignette: 0.2,
+    travel: 1,
+  },
 };
 
 export function homeStage(slug: string): HomeStageDir {
@@ -190,6 +228,8 @@ export const HOME_GAME_LABEL: Record<string, string> = {
   "pocket-striker": "Pocket Striker",
   "territory-rush": "Territory Rush",
   "crowd-control": "Crowd Control",
+  "prism-drop": "Prism Drop",
+  "swing-vector": "Swing Vector",
 };
 
 export function homeGameLabel(slug: string, title?: string) {

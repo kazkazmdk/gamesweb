@@ -48,6 +48,10 @@ export function validateScore(payload: ScorePayload): ScoreValidation {
     validateTerritory(payload, durationSec, reasons);
   } else if (payload.gameId === "crowd-control") {
     validateCrowd(payload, durationSec, reasons);
+  } else if (payload.gameId === "prism-drop") {
+    validatePrismDrop(payload, reasons);
+  } else if (payload.gameId === "swing-vector") {
+    validateSwingVector(payload, reasons);
   } else {
     reasons.push("unknown_game");
   }
@@ -60,6 +64,7 @@ export function validateScore(payload: ScorePayload): ScoreValidation {
     "score_exceeds_pace",
     "impossible_time",
     "medal_mismatch",
+    "Pocket Striker table was not cleared",
   ];
   if (reasons.some((r) => hard.includes(r))) {
     return { status: "flagged", reasons };
@@ -107,7 +112,9 @@ function validateVelocity(payload: ScorePayload, reasons: string[]) {
 }
 
 function validateSwarm(payload: ScorePayload, durationSec: number, reasons: string[]) {
-  if (payload.mode !== "survival") reasons.push("invalid_mode");
+  if (payload.mode !== "survival" && payload.mode !== "seed" && payload.mode !== "daily") {
+    reasons.push("invalid_mode");
+  }
   if (payload.score < 0 || payload.score > 1_000_000) reasons.push("score_out_of_range");
   const kills = num(payload.metadata, "kills");
   const level = num(payload.metadata, "level");
@@ -138,6 +145,10 @@ function validateKnockout(payload: ScorePayload, reasons: string[]) {
 }
 
 function validatePocket(payload: ScorePayload, durationSec: number, reasons: string[]) {
+  if (payload.metadata?.result === "death" || payload.metadata?.failed === true) {
+    reasons.push("Pocket Striker table was not cleared");
+    return;
+  }
   if (!["layout", "daily"].includes(payload.mode)) reasons.push("invalid_mode");
   if (payload.score < 1 || payload.score > 40) reasons.push("score_out_of_range");
   if (payload.score === 1 && durationSec < 0.4) reasons.push("duration_too_short");
@@ -159,4 +170,14 @@ function validateCrowd(payload: ScorePayload, durationSec: number, reasons: stri
   const pack = num(payload.metadata, "pack");
   if (pack < 0 || pack > 4000) reasons.push("pack_implausible");
   if (payload.score > 120_000 && durationSec < 12) reasons.push("high_score_fast_run");
+}
+
+function validatePrismDrop(payload: ScorePayload, reasons: string[]) {
+  if (!GAME_MODES["prism-drop"].includes(payload.mode)) reasons.push("invalid_mode");
+  if (payload.score < 0 || payload.score > 5_000_000) reasons.push("score_out_of_range");
+}
+
+function validateSwingVector(payload: ScorePayload, reasons: string[]) {
+  if (!GAME_MODES["swing-vector"].includes(payload.mode)) reasons.push("invalid_mode");
+  if (payload.score < 5_000 || payload.score > 180_000) reasons.push("score_out_of_range");
 }

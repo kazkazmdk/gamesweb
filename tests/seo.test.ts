@@ -6,6 +6,8 @@ import { buildSeoContentReport, seoContentIssues } from "../apps/web/content/qua
 import { SEO_PAGES, indexablePages, sitemapEntries } from "../apps/web/content/registry.ts";
 import { GAME_SEO_KIND, gameSeoKind, gameSeoTitle } from "../apps/web/content/taxonomy.ts";
 import { publicOrigin } from "../apps/web/lib/env.ts";
+import { MECHANICAL_CLAIMS } from "../apps/web/content/claims.ts";
+import { readFileSync } from "node:fs";
 import { GAME_MANIFESTS } from "../packages/game-sdk/src/manifests.ts";
 
 const ENV_KEYS = ["NEXT_PUBLIC_APP_URL", "VERCEL_URL", "VERCEL_ENV"] as const;
@@ -61,10 +63,10 @@ describe("SEO registry quality", () => {
     expect(issues, JSON.stringify(issues, null, 2)).toEqual([]);
   });
 
-  it("keeps the indexable surface in the 50–70 band", () => {
+  it("keeps the indexable surface in the 50–115 band", () => {
     const count = indexablePages().length;
     expect(count).toBeGreaterThanOrEqual(50);
-    expect(count).toBeLessThanOrEqual(70);
+    expect(count).toBeLessThanOrEqual(115);
     expect(sitemapEntries()).toHaveLength(count);
   });
 
@@ -88,7 +90,7 @@ describe("SEO registry quality", () => {
 
   it("builds collections from at least three real games", () => {
     expect(COLLECTIONS.length).toBeGreaterThanOrEqual(6);
-    expect(COLLECTIONS.length).toBeLessThanOrEqual(8);
+    expect(COLLECTIONS.length).toBeLessThanOrEqual(14);
     for (const col of COLLECTIONS) {
       expect(col.games.length).toBeGreaterThanOrEqual(3);
     }
@@ -146,6 +148,14 @@ describe("SEO content quality", () => {
     for (const col of COLLECTIONS) {
       expect(col.audience.length).toBeGreaterThan(20);
       expect(col.pick.length).toBeGreaterThan(20);
+    }
+  });
+
+  it("keeps mechanical claims pointed at real source files", () => {
+    for (const claim of MECHANICAL_CLAIMS) {
+      const file = claim.source.split(":")[0];
+      const src = readFileSync(file, "utf8");
+      expect(src.includes(claim.verify), `${claim.id} missing ${claim.verify} in ${file}`).toBe(true);
     }
   });
 });

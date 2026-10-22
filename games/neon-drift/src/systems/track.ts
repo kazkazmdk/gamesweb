@@ -12,6 +12,7 @@ export type TrackSample = {
   width: number;
   boost: boolean;
   sector: number;
+  turn: number;
 };
 
 export type TrackTheme = {
@@ -200,6 +201,7 @@ export function buildTrack(def: TrackDef, reverse = false): TrackSample[] {
         width: def.widthAt(t),
         boost: false,
         sector: Math.min(2, Math.floor(t * 3)),
+        turn: 0,
       });
     }
   }
@@ -212,6 +214,11 @@ export function buildTrack(def: TrackDef, reverse = false): TrackSample[] {
     samples[i].ty = dy / len;
     samples[i].nx = -samples[i].ty;
     samples[i].ny = samples[i].tx;
+  }
+  for (let i = 0; i < samples.length; i += 1) {
+    const s = samples[i];
+    const look = samples[(i + 4) % samples.length];
+    s.turn = s.tx * look.ty - s.ty * look.tx;
   }
   for (const t of def.boostAt) {
     const i = Math.floor(t * samples.length);

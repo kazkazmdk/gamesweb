@@ -87,7 +87,7 @@ test("sitemap lists only indexable URLs and omits arcade/play", async ({ request
   expect(locs).not.toContain("/friends");
   const urls = xml.match(/<loc>([^<]+)<\/loc>/g) ?? [];
   expect(urls.length).toBeGreaterThanOrEqual(50);
-  expect(urls.length).toBeLessThanOrEqual(70);
+  expect(urls.length).toBeLessThanOrEqual(115);
 });
 
 test("robots.txt points at the sitemap and does not blanket-disallow", async ({ request }) => {

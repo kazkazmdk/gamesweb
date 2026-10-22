@@ -6,6 +6,7 @@ export type Segment = {
   left?: GateOp;
   right?: GateOp;
   lane?: "left" | "right" | "mid";
+  side?: "left" | "right";
 };
 
 export function applyOp(pack: number, op?: GateOp) {

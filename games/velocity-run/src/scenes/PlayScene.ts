@@ -36,6 +36,7 @@ export class VelocityPlayScene extends Phaser.Scene {
   private paused = false;
   private ended = false;
   private dying = 0;
+  private attemptEpoch = 0;
   private running = false;
   private startMs = 0;
   private timeMs = 0;
@@ -60,8 +61,14 @@ export class VelocityPlayScene extends Phaser.Scene {
   private showGhost = true;
   private splitIndex = 0;
   private splits: number[] = [];
+  private splitTimer = 0;
+  private splitDelta: number | null = null;
   private shownHint = true;
   private endedAt = 0;
+  private fastFalls = 0;
+  private wasFastFalling = false;
+  private afterImages: Array<{ x: number; y: number; w: number; h: number; vy: number; vx: number; facing: number }> = [];
+  private landingRings: Array<{ x: number; y: number; rx: number; ry: number; maxRx: number; alpha: number; color: number }> = [];
   private nativeKeys: GameKeyboard | null = null;
 
   constructor() {
@@ -87,6 +94,12 @@ export class VelocityPlayScene extends Phaser.Scene {
     this.signaledReady = false;
     this.splitIndex = 0;
     this.splits = [];
+    this.splitTimer = 0;
+    this.splitDelta = null;
+    this.fastFalls = 0;
+    this.wasFastFalling = false;
+    this.afterImages = [];
+    this.landingRings = [];
     this.camX = this.spawn.x;
     this.camY = this.spawn.y;
     this.camZ = 1;
@@ -139,6 +152,8 @@ export class VelocityPlayScene extends Phaser.Scene {
       one: kb.addKey("ONE"),
       two: kb.addKey("TWO"),
       three: kb.addKey("THREE"),
+      prevCourse: kb.addKey(Phaser.Input.Keyboard.KeyCodes.OPEN_BRACKET),
+      nextCourse: kb.addKey(Phaser.Input.Keyboard.KeyCodes.CLOSED_BRACKET),
     };
     this.nativeKeys?.destroy();
     this.nativeKeys = createGameKeyboard();
@@ -226,13 +241,17 @@ export class VelocityPlayScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.one) || chrome?.onePressed) this.switchCourse(COURSES.findIndex((c) => c.id === "course-1"));
     else if (Phaser.Input.Keyboard.JustDown(this.keys.two) || chrome?.twoPressed) this.switchCourse(COURSES.findIndex((c) => c.id === "course-2"));
     else if (Phaser.Input.Keyboard.JustDown(this.keys.three) || chrome?.threePressed) this.switchCourse(COURSES.findIndex((c) => c.id === "course-3"));
+    else if (Phaser.Input.Keyboard.JustDown(this.keys.prevCourse)) this.switchCourse((this.courseIndex - 1 + COURSES.length) % COURSES.length);
+    else if (Phaser.Input.Keyboard.JustDown(this.keys.nextCourse)) this.switchCourse((this.courseIndex + 1) % COURSES.length);
     if (this.paused) {
       this.draw(dt);
       return;
     }
 
     if (this.dying > 0) {
-      this.dying -= dt * 1000;
+      // Wall-clock ms. Capping this by the physics dt made a 220ms respawn take
+      // several frames, so a slow CI loop never observed the reset timer.
+      this.dying -= delta;
       this.parts.update(dt);
       this.draw(dt);
       if (this.dying <= 0) {
@@ -242,7 +261,13 @@ export class VelocityPlayScene extends Phaser.Scene {
         this.deaths = 0;
         this.splitIndex = 0;
         this.splits = [];
+        this.splitTimer = 0;
+        this.splitDelta = null;
+        this.wasFastFalling = false;
+        this.afterImages = [];
+        this.landingRings = [];
         this.recorder.reset();
+        this.attemptEpoch += 1;
       }
       return;
     }
@@ -277,12 +302,61 @@ export class VelocityPlayScene extends Phaser.Scene {
       this.runner.grounded = false;
       if (wasGround) this.runner.coyote = this.time.now + MOVE.coyoteMs;
       this.runner.input(dt, move, jumpDown, jumpHeld, jumpReleased, down, this.time.now);
+      const prevVy = this.runner.vy;
       this.collide();
       if (this.runner.grounded && !wasGround) {
-        this.parts.burst(this.runner.x + 8, this.runner.y + 28, 6, this.course.theme.accent, 70, 200);
+        const impact = Math.min(1, Math.abs(prevVy) / 720);
+        this.juice.cameraPunch(impact * 0.65);
+        const footX = this.runner.x + this.runner.w * 0.5;
+        const footY = this.runner.y + this.runner.h;
+        this.landingRings.push({
+          x: footX,
+          y: footY,
+          rx: 6 + impact * 10,
+          ry: 2 + impact * 2,
+          maxRx: 24 + impact * 34,
+          alpha: 0.58 + impact * 0.38,
+          color: impact > 0.68 ? 0x38f2ff : this.course.theme.accent,
+        });
+        const dustCount = Math.max(3, Math.round(4 + impact * 8));
+        for (let i = 0; i < dustCount; i += 1) {
+          const dir = i % 2 === 0 ? -1 : 1;
+          const speed = (48 + Math.random() * 85) * (0.55 + impact * 0.85);
+          this.parts.emit({
+            x: footX + dir * (2 + Math.random() * 4),
+            y: footY - 1,
+            vx: dir * speed + this.runner.vx * 0.18,
+            vy: -(12 + Math.random() * 38 * impact),
+            life: 160 + impact * 140,
+            size: 1.8 + impact * 2.2,
+            color: i % 3 === 0 ? 0xffffff : this.course.theme.accent,
+            drag: 0.9,
+          });
+        }
+        this.parts.burst(footX, footY, 6, this.course.theme.accent, 70 + impact * 60, 200);
         this.synth.tone(220 + Math.random() * 30, 0.035, "triangle", 0.028, 0.08);
       }
-      if (down && this.runner.vy > 80) void this.platform.achievement.unlock("fast-fall");
+      if (down && !wasGround && this.runner.vy > 80) {
+        if (!this.wasFastFalling) {
+          this.wasFastFalling = true;
+          this.fastFalls += 1;
+        }
+        void this.platform.achievement.unlock("fast-fall");
+      } else if (this.runner.grounded || !down) {
+        this.wasFastFalling = false;
+      }
+      if (this.ticks % 2 === 0 && (Math.abs(this.runner.vx) > 20 || Math.abs(this.runner.vy) > 20)) {
+        this.afterImages.push({
+          x: this.runner.x,
+          y: this.runner.y,
+          w: this.runner.w,
+          h: this.runner.h,
+          vy: this.runner.vy,
+          vx: this.runner.vx,
+          facing: this.runner.facing,
+        });
+        if (this.afterImages.length > 7) this.afterImages.shift();
+      }
       if (this.running) this.timeMs = this.time.now - this.startMs;
       this.recorder.tick(dt, this.timeMs, this.runner.x, this.runner.y);
       this.hitCheckpoints();
@@ -357,10 +431,18 @@ export class VelocityPlayScene extends Phaser.Scene {
     const pb = this.tape?.splits[this.splitIndex];
     const d = pb !== undefined ? this.timeMs - pb : 0;
     const sign = d >= 0 ? "+" : "";
-    this.splitTxt.setText(pb === undefined ? "SPLIT" : `${sign}${(d / 1000).toFixed(2)}`);
-    this.splitTxt.setColor(d <= 0 ? "#3dff8a" : "#ff4d6d");
+    const badge = pb === undefined ? "PACE" : d <= 0 ? "AHEAD" : "BEHIND";
+    this.splitDelta = pb !== undefined ? d : null;
+    this.splitTimer = 1100;
+    this.splitTxt.setText(
+      pb === undefined
+        ? `SPLIT  ${(this.timeMs / 1000).toFixed(2)}s  ·  ${badge}`
+        : `${sign}${(d / 1000).toFixed(2)}s   ${badge}`,
+    );
+    this.splitTxt.setColor(pb === undefined ? "#38f2ff" : d <= 0 ? "#3dff8a" : "#ff4d6d");
+    this.tweens.killTweensOf(this.splitTxt);
     this.splitTxt.setAlpha(1);
-    this.tweens.add({ targets: this.splitTxt, alpha: 0, delay: 360, duration: 140 });
+    this.tweens.add({ targets: this.splitTxt, alpha: 0, delay: 1100, duration: 240 });
     this.synth.gateChime();
     this.splitIndex += 1;
   }
@@ -389,6 +471,7 @@ export class VelocityPlayScene extends Phaser.Scene {
           attemptDurationMs: Math.floor(this.timeMs),
           verificationLevel: "practice",
           course: this.courseIndex,
+          fastFalls: this.fastFalls,
         },
       });
     }
@@ -454,6 +537,7 @@ export class VelocityPlayScene extends Phaser.Scene {
         nextMedal: next?.name ?? "",
         medalGap: next?.gap ?? 0,
         splits: this.splits.length,
+        fastFalls: this.fastFalls,
       },
     });
   }
@@ -515,17 +599,51 @@ export class VelocityPlayScene extends Phaser.Scene {
       },
       { x: this.camX, y: this.camY },
     );
+    const worldGlow =
+      this.course.world === "training" ? 0x38e8ff : this.course.world === "transit" ? 0xffb038 : 0xb86bff;
+    // Diagonal volumetric cyber-architecture light shafts
+    for (let i = 0; i < 6; i += 1) {
+      const sx = i * 560 + 140 + this.camX * 0.18;
+      g.fillStyle(worldGlow, 0.06 + (i % 2) * 0.025);
+      g.fillTriangle(sx, 0, sx + 140, 0, sx - 210, this.course.height);
+      g.fillTriangle(sx + 140, 0, sx + 10, this.course.height, sx - 210, this.course.height);
+    }
+    // Far depth industrial towers layer
+    const farSkyline =
+      this.course.world === "training"
+        ? mixColor(th.bg, 0x24465c, 0.28)
+        : this.course.world === "transit"
+          ? mixColor(th.bg, 0x283848, 0.42)
+          : mixColor(th.bg, 0x482c64, 0.3);
+    for (let i = 0; i < 20; i += 1) {
+      const fx = i * 220 + this.camX * 0.24;
+      const fh = 240 + ((i * 53) % 160);
+      const fw = 54 + (i % 3) * 18;
+      g.fillStyle(farSkyline, 0.65);
+      g.fillRect(fx, this.course.height - fh - 28, fw, fh);
+      g.fillStyle(worldGlow, 0.22);
+      g.fillRect(fx + 6, this.course.height - fh - 16, fw - 12, 3);
+      g.fillRect(fx + fw * 0.5 - 1, this.course.height - fh - 52, 2, 24);
+    }
     const skyline = this.course.world === "training" ? mixColor(th.bg, 0xc4b498, 0.25) : this.course.world === "transit" ? mixColor(th.bg, 0x8ab0c8, 0.35) : mixColor(th.bg, 0xe8a888, 0.2);
     g.fillStyle(skyline, 1);
     for (let i = 0; i < 16; i += 1) {
       const x = i * 280 + this.camX * 0.42;
       const bh = 180 + (i % 4) * 56;
       g.fillRect(x, this.course.height - bh - 20, 78 + (i % 3) * 16, bh);
-      g.fillStyle(this.course.world === "transit" ? 0xa8d4e8 : 0xffffff, this.course.world === "transit" ? 0.28 : 0.18);
+      g.fillStyle(worldGlow, 0.32);
       g.fillRect(x + 10, this.course.height - bh + 18, 10, 14);
       g.fillRect(x + 30, this.course.height - bh + 46, 10, 14);
       g.fillRect(x + 50, this.course.height - bh + 30, 10, 14);
       g.fillStyle(skyline, 1);
+    }
+    // Rising world-themed ambient cyber particles
+    for (let i = 0; i < 28; i += 1) {
+      const px = ((i * 173 + Math.floor(this.time.now * 0.02)) % Math.max(400, this.course.width));
+      const py = this.course.height - (((this.time.now * (0.045 + (i % 4) * 0.012) + i * 97) % (this.course.height - 60)));
+      const pulse = 0.28 + Math.sin(this.time.now / 260 + i) * 0.16;
+      g.fillStyle(worldGlow, pulse);
+      g.fillCircle(px, py, 2 + (i % 3));
     }
     g.fillStyle(this.course.world === "training" ? 0xd8c8b0 : this.course.world === "transit" ? 0x6a7a88 : 0xe8c4a8, 1);
     g.fillRect(0, this.course.height - 36, this.course.width, 36);
@@ -583,29 +701,90 @@ export class VelocityPlayScene extends Phaser.Scene {
         g.fillStyle(0xffffff, 0.35);
         for (let i = 10; i < live.w; i += 18) g.fillRect(live.x + i, live.y + 1, 8, 3);
       } else if (s.kind === "spike") {
+        g.fillStyle(th.danger, 0.18);
+        g.fillRect(live.x - 2, live.y + live.h - 4, live.w + 4, 6);
         g.fillStyle(th.danger, 1);
         g.fillTriangle(live.x, live.y + live.h, live.x + live.w / 2, live.y, live.x + live.w, live.y + live.h);
         g.fillStyle(0xffffff, 0.35);
         g.fillTriangle(live.x + live.w * 0.3, live.y + live.h * 0.7, live.x + live.w / 2, live.y + 4, live.x + live.w * 0.7, live.y + live.h * 0.7);
       } else if (s.kind === "laser") {
         const pulse = 0.45 + Math.sin(this.time.now / 90) * 0.35;
+        g.fillStyle(th.danger, pulse * 0.22);
+        g.fillRect(live.x - 6, live.y - 4, live.w + 12, live.h + 8);
         g.fillStyle(0x2a2a30, 1);
         g.fillRect(live.x - 8, live.y - 6, 12, live.h + 12);
         g.fillRect(live.x + live.w - 4, live.y - 6, 12, live.h + 12);
+        g.fillStyle(0xffd24a, 0.85);
+        for (let cy = live.y - 2; cy < live.y + live.h + 2; cy += 10) {
+          g.fillRect(live.x - 7, cy, 4, 4);
+          g.fillRect(live.x + live.w + 3, cy, 4, 4);
+        }
         g.fillStyle(th.danger, pulse);
         g.fillRect(live.x, live.y, live.w, live.h);
-        g.fillStyle(0xffffff, 0.7);
-        g.fillRect(live.x, live.y + live.h / 2 - 1, live.w, 2);
+        g.fillStyle(0xffffff, 0.75);
+        g.fillRect(live.x, live.y + live.h / 2 - 1.5, live.w, 3);
+        g.fillStyle(0xff4d6d, 0.85);
+        g.fillCircle(live.x + 2, live.y + live.h / 2, 4);
+        g.fillCircle(live.x + live.w - 2, live.y + live.h / 2, 4);
       } else if (s.kind === "bar") {
+        const warnPulse = 0.25 + Math.sin(this.time.now / 120) * 0.12;
+        const amp = 18;
+        const railMinX = s.x - amp;
+        const railMaxX = s.x + s.w + amp;
+        const railY = s.y + s.h / 2;
+        g.lineStyle(1, th.danger, 0.22);
+        g.strokeRoundedRect(railMinX, s.y, s.w + amp * 2, s.h, 3);
+        g.lineStyle(2, th.danger, 0.55);
+        for (let dx = railMinX + 4; dx < railMaxX - 4; dx += 9) {
+          g.lineBetween(dx, railY, Math.min(railMaxX - 4, dx + 5), railY);
+        }
+        for (const endX of [railMinX, railMaxX]) {
+          g.fillStyle(th.danger, 0.22 + warnPulse * 0.5);
+          g.fillCircle(endX, railY, 6);
+          g.lineStyle(2, 0xffe066, 0.85);
+          g.lineBetween(endX, s.y - 2, endX, s.y + s.h + 2);
+          g.fillStyle(0xffe066, 0.95);
+          g.fillCircle(endX, railY, 2.5);
+        }
+        g.fillStyle(th.danger, warnPulse);
+        g.fillRoundedRect(live.x - 4, live.y - 4, live.w + 8, live.h + 8, 5);
         g.fillStyle(0x2a2a30, 1);
         g.fillCircle(live.x, live.y + live.h / 2, 8);
         g.fillStyle(th.danger, 0.95);
         g.fillRoundedRect(live.x, live.y, live.w, live.h, 3);
+        g.fillStyle(0xffe066, 0.88);
+        for (let cx = live.x + 6; cx < live.x + live.w - 6; cx += 12) {
+          g.fillTriangle(cx, live.y + 2, cx + 6, live.y + live.h / 2, cx, live.y + live.h - 2);
+        }
       } else if (s.kind === "piston") {
+        const warnPulse = 0.22 + Math.sin(this.time.now / 110) * 0.12;
+        const railMinY = s.y - s.h * 0.35;
+        const railMaxY = s.y + s.h * 0.8;
+        const railX = s.x + s.w / 2;
+        g.lineStyle(1.2, th.danger, 0.32);
+        g.strokeRect(s.x - 2, railMinY, s.w + 4, railMaxY - railMinY);
+        g.lineStyle(2, th.danger, 0.55);
+        for (let dy = railMinY + 4; dy < railMaxY - 4; dy += 9) {
+          g.lineBetween(railX, dy, railX, Math.min(railMaxY - 4, dy + 5));
+        }
+        for (const endY of [railMinY, railMaxY]) {
+          g.fillStyle(th.danger, 0.22 + warnPulse * 0.5);
+          g.fillCircle(railX, endY, 6);
+          g.lineStyle(2, 0xffe066, 0.85);
+          g.lineBetween(s.x - 3, endY, s.x + s.w + 3, endY);
+          g.fillStyle(0xffe066, 0.95);
+          g.fillCircle(railX, endY, 2.5);
+        }
+        g.fillStyle(th.danger, warnPulse);
+        g.fillRoundedRect(live.x - 4, live.y - 4, live.w + 8, live.h + 8, 5);
         g.fillStyle(0x3a3a44, 1);
         g.fillRect(live.x + live.w / 2 - 6, live.y, 12, live.h + 24);
         g.fillStyle(th.danger, 0.95);
         g.fillRoundedRect(live.x, live.y, live.w, live.h, 3);
+        g.fillStyle(0xffe066, 0.88);
+        for (let cx = live.x + 4; cx < live.x + live.w - 6; cx += 10) {
+          g.fillTriangle(cx, live.y + live.h - 3, cx + 4, live.y + 4, cx + 8, live.y + live.h - 3);
+        }
         g.fillStyle(0xffffff, 0.25);
         g.fillRect(live.x + 2, live.y + 2, live.w - 4, 3);
       } else if (s.kind === "finish") {
@@ -643,7 +822,35 @@ export class VelocityPlayScene extends Phaser.Scene {
       g.fillCircle(p.x, p.y, p.size);
     }
 
+    for (let i = this.landingRings.length - 1; i >= 0; i -= 1) {
+      const ring = this.landingRings[i];
+      ring.rx += (ring.maxRx - ring.rx) * Math.min(1, dt * 14) + dt * 42;
+      ring.ry += dt * 10;
+      ring.alpha -= dt * 3.1;
+      if (ring.alpha <= 0) {
+        this.landingRings.splice(i, 1);
+        continue;
+      }
+      g.lineStyle(2.2, ring.color, ring.alpha * 0.85);
+      g.strokeEllipse(ring.x, ring.y - 1, ring.rx * 2, ring.ry * 2);
+      g.lineStyle(1.2, 0xffffff, ring.alpha * 0.65);
+      g.lineBetween(ring.x - ring.rx * 0.85, ring.y, ring.x + ring.rx * 0.85, ring.y);
+    }
+
     const r = this.runner;
+    const showTrail =
+      this.dying <= 0 &&
+      (Math.abs(r.vx) > 260 || (r.fastFell && !r.grounded) || (!r.grounded && Math.abs(r.vy) < 95));
+    if (showTrail && this.afterImages.length > 0) {
+      for (let i = 0; i < this.afterImages.length; i += 1) {
+        const pose = this.afterImages[i];
+        const ratio = (i + 1) / (this.afterImages.length + 1);
+        const col = i % 2 === 0 ? 0x38f2ff : 0xff3ca8;
+        g.fillStyle(col, ratio * 0.34);
+        g.fillRoundedRect(pose.x + 1, pose.y + 6, pose.w - 2, pose.h - 6, 4);
+        g.fillCircle(pose.x + pose.w * 0.5, pose.y + 4, 5.5);
+      }
+    }
     drawRunner(g, r.x, r.y, r.w, r.h, {
       facing: r.facing,
       grounded: r.grounded,
@@ -670,6 +877,7 @@ export class VelocityPlayScene extends Phaser.Scene {
       this.overlay.fillStyle(0xffffff, fa);
       this.overlay.fillRect(0, 0, this.scale.width, this.scale.height);
     }
+    this.drawCourseProgressBar(dt);
     if (this.sys.game.device.input.touch) {
       this.overlay.fillStyle(0xffffff, 0.05);
       this.overlay.fillRoundedRect(16, this.scale.height * 0.28, this.scale.width * 0.3, this.scale.height * 0.5, 16);
@@ -686,6 +894,72 @@ export class VelocityPlayScene extends Phaser.Scene {
       }
     }
     this.publishDebug();
+  }
+
+  private drawCourseProgressBar(dt: number) {
+    const w = this.scale.width;
+    const goalX = Math.max(1, this.finish?.x ?? this.course.width);
+    const barW = Math.min(340, Math.max(180, w * 0.34));
+    const barH = 6;
+    const barX = w * 0.5 - barW * 0.5;
+    const barY = 26;
+    const th = this.course.theme;
+    const runnerRatio = clamp(this.runner.x / goalX, 0, 1);
+
+    this.overlay.fillStyle(0x0c141e, 0.58);
+    this.overlay.fillRoundedRect(barX - 4, barY - 4, barW + 8, barH + 8, 6);
+    this.overlay.fillStyle(0xffffff, 0.14);
+    this.overlay.fillRoundedRect(barX, barY, barW, barH, 3);
+    this.overlay.fillStyle(th.accent, 0.72);
+    this.overlay.fillRoundedRect(barX, barY, Math.max(4, barW * runnerRatio), barH, 3);
+
+    const gates = this.course.solids.filter((s) => s.kind === "checkpoint");
+    for (let i = 0; i < gates.length; i += 1) {
+      const cpRatio = clamp(gates[i].x / goalX, 0, 1);
+      const cpX = barX + barW * cpRatio;
+      const cleared = i < this.splitIndex;
+      this.overlay.fillStyle(cleared ? 0x3dff8a : 0xffffff, cleared ? 0.95 : 0.55);
+      this.overlay.fillRect(cpX - 1, barY - 3, 2, barH + 6);
+    }
+
+    if (this.showGhost && this.tape && this.running) {
+      const gp = ghostPose(this.tape.samples, this.timeMs);
+      if (gp) {
+        const ghostRatio = clamp(gp.x / goalX, 0, 1);
+        const gx = barX + barW * ghostRatio;
+        const gy = barY + barH * 0.5;
+        this.overlay.fillStyle(0xb86bff, 0.45);
+        this.overlay.fillCircle(gx, gy, 6.5);
+        this.overlay.fillStyle(0x38f2ff, 0.95);
+        this.overlay.fillCircle(gx, gy, 3.8);
+      }
+    }
+
+    const px = barX + barW * runnerRatio;
+    const py = barY + barH * 0.5;
+    this.overlay.fillStyle(th.accent, 0.45);
+    this.overlay.fillCircle(px, py, 7.5);
+    this.overlay.fillStyle(0xff6a32, 1);
+    this.overlay.fillCircle(px, py, 4.6);
+    this.overlay.fillStyle(0xffffff, 0.95);
+    this.overlay.fillCircle(px, py, 2);
+
+    if (this.splitTimer > 0) {
+      this.splitTimer = Math.max(0, this.splitTimer - dt * 1000);
+      const badgeColor =
+        this.splitDelta === null ? 0x38f2ff : this.splitDelta <= 0 ? 0x3dff8a : 0xff4d6d;
+      const fade = Math.min(1, this.splitTimer / 220);
+      const pillW = 192;
+      const pillH = 26;
+      const cx = w * 0.5;
+      const cy = 92;
+      this.overlay.fillStyle(0x0c141e, 0.68 * fade);
+      this.overlay.fillRoundedRect(cx - pillW * 0.5, cy - pillH * 0.5, pillW, pillH, 13);
+      this.overlay.lineStyle(1.6, badgeColor, 0.85 * fade);
+      this.overlay.strokeRoundedRect(cx - pillW * 0.5, cy - pillH * 0.5, pillW, pillH, 13);
+      this.overlay.fillStyle(badgeColor, 0.22 * fade);
+      this.overlay.fillRoundedRect(cx + pillW * 0.5 - 68, cy - 9, 60, 18, 9);
+    }
   }
 
   private handleChromeTap(x: number, y: number) {
@@ -745,6 +1019,7 @@ export class VelocityPlayScene extends Phaser.Scene {
         deaths: this.deaths,
         sessionDeaths: this.sessionDeaths,
         timeMs: this.timeMs,
+        attemptEpoch: this.attemptEpoch,
         courseId: this.course.id,
         contentId: this.course.id,
         tick: this.ticks,
@@ -756,9 +1031,50 @@ export class VelocityPlayScene extends Phaser.Scene {
         jump: () => {
           this.touchJump = true;
         },
+        seedPeak: () => {
+          this.running = true;
+          this.shownHint = false;
+          this.hint.setVisible(false);
+          this.startMs = this.time.now - 4280;
+          this.timeMs = 4280;
+          const cp = this.course.solids.find((s) => s.kind === "checkpoint")?.x ?? this.spawn.x + 420;
+          this.runner.x = cp + 96;
+          this.runner.y = this.spawn.y - 42;
+          this.runner.vx = 308;
+          this.runner.vy = -115;
+          this.runner.facing = 1;
+          this.runner.grounded = false;
+          this.splitIndex = 1;
+          this.splits = [3820];
+          this.splitDelta = -380;
+          this.splitTimer = 1080;
+          this.afterImages = Array.from({ length: 7 }, (_, i) => ({
+            x: this.runner.x - (7 - i) * 14,
+            y: this.runner.y + (7 - i) * 3.5,
+            w: this.runner.w,
+            h: this.runner.h,
+            vx: 308,
+            vy: -115,
+            facing: 1,
+          }));
+          this.landingRings.push({
+            x: this.runner.x - 64,
+            y: this.spawn.y + this.runner.h,
+            rx: 28,
+            ry: 8,
+            maxRx: 38,
+            alpha: 0.82,
+            color: 0x38f2ff,
+          });
+          this.camX = this.runner.x + 110;
+          this.camY = this.runner.y - 24;
+          this.draw(0.016);
+        },
         hideHud: () => {
           this.hud.setVisible(false);
           this.overlay.setVisible(false);
+          this.splitTxt.setVisible(false);
+          this.hint.setVisible(false);
         },
         setCourse: (id: string) => {
           const key = id.trim().toLowerCase();

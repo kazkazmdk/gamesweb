@@ -7,6 +7,8 @@ export type BallState = {
   vy: number;
   portalCd: number;
   broke?: number;
+  wallHit?: boolean;
+  bumperHit?: boolean;
 };
 
 function bounceRect(s: BallState, x: number, y: number, w: number, h: number, rest = 0.72) {
@@ -34,13 +36,15 @@ export function stepMover(m: MovingBlocker, dt: number) {
 }
 
 export function stepBall(state: BallState, layout: Layout, dt: number): BallState {
-  const s: BallState = { ...state, portalCd: Math.max(0, state.portalCd - dt) };
+  const s: BallState = { ...state, portalCd: Math.max(0, state.portalCd - dt), wallHit: false, bumperHit: false };
   s.x += s.vx * dt;
   s.y += s.vy * dt;
   s.vx *= Math.pow(0.985, dt * 60);
   s.vy *= Math.pow(0.985, dt * 60);
 
-  for (const w of layout.walls) bounceRect(s, w.x, w.y, w.w, w.h);
+  for (const w of layout.walls) {
+    if (bounceRect(s, w.x, w.y, w.w, w.h)) s.wallHit = true;
+  }
   for (const b of layout.bumpers ?? []) {
     const dx = s.x - b.x;
     const dy = s.y - b.y;
@@ -55,10 +59,11 @@ export function stepBall(state: BallState, layout: Layout, dt: number): BallStat
     }
     s.x = b.x + nx * (b.r + 12);
     s.y = b.y + ny * (b.r + 12);
+    s.bumperHit = true;
   }
   for (const m of layout.movingBlockers ?? []) {
     stepMover(m, dt);
-    bounceRect(s, m.x, m.y, m.w, m.h, 0.8);
+    if (bounceRect(s, m.x, m.y, m.w, m.h, 0.8)) s.wallHit = true;
   }
   for (const r of layout.rotators ?? []) {
     r.a += r.speed * dt;
@@ -76,6 +81,7 @@ export function stepBall(state: BallState, layout: Layout, dt: number): BallStat
       s.vy += ny * 80;
       s.x = px + nx * 15;
       s.y = py + ny * 15;
+      s.wallHit = true;
     }
     void tx;
     void ty;
@@ -83,7 +89,7 @@ export function stepBall(state: BallState, layout: Layout, dt: number): BallStat
   for (const g of layout.gates ?? []) {
     g.open = Math.sin((g.t ?? 0) + (g.phase ?? 0)) > 0.15;
     g.t = (g.t ?? 0) + dt * (g.speed ?? 1.4);
-    if (!g.open) bounceRect(s, g.x, g.y, g.w, g.h, 0.7);
+    if (!g.open && bounceRect(s, g.x, g.y, g.w, g.h, 0.7)) s.wallHit = true;
   }
   for (const p of layout.forcePads ?? []) {
     if (s.x > p.x && s.x < p.x + p.w && s.y > p.y && s.y < p.y + p.h) {

@@ -9,6 +9,8 @@ const POSITION: Record<string, Record<string, string>> = {
   "pocket-striker": { backdrop: "32% 58%", hero: "30% 56%", tile: "30% 56%" },
   "territory-rush": { backdrop: "48% 48%", hero: "48% 50%", tile: "48% 50%" },
   "crowd-control": { backdrop: "30% 62%", hero: "32% 64%", tile: "32% 64%" },
+  "prism-drop": { backdrop: "50% 58%", hero: "50% 56%", tile: "50% 60%" },
+  "swing-vector": { backdrop: "42% 46%", hero: "40% 44%", tile: "38% 48%" },
 };
 
 const JPG = new Set([
