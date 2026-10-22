@@ -294,9 +294,26 @@ export class SwarmPlayScene extends Phaser.Scene {
   }
 
   private seedPeakField() {
+    this.started = true;
+    this.choosing = null;
+    this.cards.forEach((c) => c.setAlpha(0));
     this.runStartedAt = this.time.now - 270_000;
+    this.level = Math.max(5, this.level);
+    this.xp = Math.floor(xpToLevel(this.level) * 0.68);
+    this.kills = Math.max(48, this.kills);
+    this.killStreak = 14;
+    this.killStreakTimer = 1.35;
+    this.build.blade = Math.max(2, this.build.blade);
+    this.build.magnet = Math.max(1, this.build.magnet);
+    this.emitGridPulse(this.px, this.py, 260, 1.4, 0x38f2ff);
     for (const e of this.enemies) {
       if (e.kind !== "boss" && e.kind !== "warden") e.active = false;
+    }
+    const bossSlot = this.enemies.find((e) => !e.active);
+    if (bossSlot && !this.enemies.some((e) => e.active && (e.kind === "boss" || e.kind === "warden"))) {
+      spawnEnemy(bossSlot, "boss", this.px + 175, this.py - 95, 1.2);
+      bossSlot.hp = Math.floor(bossSlot.max * 0.62);
+      this.bossSpawned = true;
     }
     const want = this.quality === "low" ? 36 : 56;
     const kinds: Array<Enemy["kind"]> = ["chaser", "dart", "tank", "spitter", "splitter", "swarmling", "elite"];

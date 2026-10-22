@@ -63,6 +63,8 @@ export class KnockoutScene extends Phaser.Scene {
   private falls = 0;
   private checkpointIdx = 0;
   private checkpointBannerTimer = 0;
+  private coyoteMs = 0;
+  private jumpBufferMs = 0;
   private camX = 0;
   private camY = 0;
   private touchMove = 0;
@@ -108,6 +110,8 @@ export class KnockoutScene extends Phaser.Scene {
     this.checkpointBannerTimer = 0;
     this.dash = 0;
     this.dying = 0;
+    this.coyoteMs = 0;
+    this.jumpBufferMs = 0;
     this.recorder = [];
     this.playerTrail = [];
     this.usedExpert = false;
@@ -382,10 +386,17 @@ export class KnockoutScene extends Phaser.Scene {
       this.platform.session.start();
     }
     if (!this.ended) {
+      if (this.grounded) this.coyoteMs = 95;
+      else this.coyoteMs = Math.max(0, this.coyoteMs - delta);
+      if (jump) this.jumpBufferMs = 115;
+      else this.jumpBufferMs = Math.max(0, this.jumpBufferMs - delta);
+
       this.vx = move * (this.dash > 0 ? 420 : 260);
-      if (jump && this.grounded) {
+      if (this.jumpBufferMs > 0 && (this.grounded || this.coyoteMs > 0)) {
         this.vy = -620;
         this.grounded = false;
+        this.coyoteMs = 0;
+        this.jumpBufferMs = 0;
         this.synth.tone(340, 0.04, "square", 0.03, 0.1);
         this.parts.burst(this.x + 11, this.y + 30, 8, 0xffffff, 45, 160);
       }
@@ -1148,6 +1159,30 @@ export class KnockoutScene extends Phaser.Scene {
         },
         jump: () => {
           this.touchJump = true;
+        },
+        seedPeak: () => {
+          this.running = true;
+          this.started = this.time.now - 8400;
+          this.timeMs = 8400;
+          this.elapsed = 8400;
+          const plat =
+            this.map.solids.find((s) => (s.kind === "solid" || s.kind === "mover") && s.x > this.spawn.x + 650 && s.x < this.spawn.x + 1450) ??
+            this.map.solids[1];
+          this.x = plat ? plat.x + Math.min(80, plat.w * 0.4) : this.spawn.x + 920;
+          this.y = plat ? plat.y - 32 : this.spawn.y - 40;
+          this.vx = 260;
+          this.vy = -120;
+          this.checkpointIdx = 2;
+          this.checkpointBannerTimer = 1.25;
+          this.playerTrail = [
+            { x: this.x - 42, y: this.y + 10 },
+            { x: this.x - 28, y: this.y + 6 },
+            { x: this.x - 14, y: this.y + 3 },
+          ];
+          this.camX = this.x;
+          this.camY = this.y - 40;
+          this.updateRaceRank();
+          this.draw();
         },
         hideHud: () => {
           this.hud.setVisible(false);

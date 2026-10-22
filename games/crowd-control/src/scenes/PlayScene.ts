@@ -965,6 +965,10 @@ export class CrowdScene extends Phaser.Scene {
           const snap = this.targetFraming();
           this.viewZoom = snap.zoom;
           this.viewCy = snap.cy;
+          if (n >= 80) {
+            this.clash = { t: 0.78, left: n, right: 28, lane: 0 };
+            this.spawnPopup(this.scale.width * 0.5, this.scale.height * 0.44, "+24", "#4ade80");
+          }
         },
         seekGate: () => {
           const next = this.segs.find((s) => (s.type === "gate" || s.type === "finish") && s.z > this.z + 8);

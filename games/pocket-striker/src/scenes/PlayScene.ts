@@ -791,6 +791,21 @@ export class PocketScene extends Phaser.Scene {
       g.fillCircle(b.x - 4, b.y - 4, 5);
     }
     for (const m of this.layout.movingBlockers ?? []) {
+      // Grooved oscillation track & endpoint pins for moving obstacle readability
+      g.lineStyle(2, 0xffffff, 0.22);
+      if (m.axis === "x") {
+        const cy = m.y + m.h * 0.5;
+        g.lineBetween(m.min, cy, m.max + m.w, cy);
+        g.fillStyle(brass, 0.7);
+        g.fillCircle(m.min, cy, 3);
+        g.fillCircle(m.max + m.w, cy, 3);
+      } else {
+        const cx = m.x + m.w * 0.5;
+        g.lineBetween(cx, m.min, cx, m.max + m.h);
+        g.fillStyle(brass, 0.7);
+        g.fillCircle(cx, m.min, 3);
+        g.fillCircle(cx, m.max + m.h, 3);
+      }
       g.fillStyle(0x000000, 0.25);
       g.fillRoundedRect(m.x + 2, m.y + 3, m.w, m.h, 5);
       g.fillStyle(theme === "arcade" ? 0x38bdf8 : 0xd97706, 1);
@@ -900,6 +915,15 @@ export class PocketScene extends Phaser.Scene {
       },
       {
         finishRun: () => this.sink(true),
+        seedPeak: () => {
+          this.aiming = true;
+          this.ax = this.bx - 96;
+          this.ay = this.by + 78;
+          this.wallThisShot = true;
+          this.banked = true;
+          this.bumperShockwaves.push({ x: this.layout.hole.x - 110, y: this.layout.hole.y + 30, r: 16, t: 0.28 });
+          this.draw();
+        },
         hideHud: () => {
           this.hud.setVisible(false);
           this.bannerLabel.setVisible(false);

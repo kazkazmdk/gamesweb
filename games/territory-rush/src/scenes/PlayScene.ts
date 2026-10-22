@@ -844,11 +844,15 @@ export class TerritoryScene extends Phaser.Scene {
       this.drawLeaderCrown(g, px, py - c * 1.55);
     }
     if (this.trailThreat && this.hud.visible) {
-      const warnY = py - c * (leaderId === 1 ? 2.25 : 1.55);
+      const warnY = py + c * 1.05;
+      g.fillStyle(0x1f0810, 0.88);
+      g.fillRoundedRect(px - 62, warnY - 10, 124, 20, 8);
+      g.lineStyle(1.6, 0xff1e42, 0.95);
+      g.strokeRoundedRect(px - 62, warnY - 10, 124, 20, 8);
       this.dangerLabel
         ?.setPosition(px, warnY)
-        .setColor(dangerWave > 0.5 ? "#ff1e42" : "#ffffff")
-        .setScale(0.96 + dangerWave * 0.14)
+        .setColor(dangerWave > 0.5 ? "#ff4d6d" : "#ffffff")
+        .setScale(0.96 + dangerWave * 0.1)
         .setVisible(true);
     } else {
       this.dangerLabel?.setVisible(false);
@@ -920,6 +924,10 @@ export class TerritoryScene extends Phaser.Scene {
           this.px = 15;
           this.py = 17;
           this.vis = { x: this.px, y: this.py };
+          if (this.bots[0]) {
+            this.bots[0].x = 14;
+            this.bots[0].y = 12;
+          }
         },
         closeLoop: () => {
           this.trail = authoredCaptureLoop(COLS, ROWS);

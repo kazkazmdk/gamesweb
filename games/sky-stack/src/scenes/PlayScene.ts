@@ -730,6 +730,21 @@ export class SkyStackScene extends Phaser.Scene {
             if (top) this.moving.x = top.x;
             this.tryPlace();
           }
+          if (target >= 20 && this.stack.length > 0) {
+            const top = this.stack[this.stack.length - 1];
+            this.moving.x = top.x + 18;
+            this.feverTrail = [this.moving.x - 36, this.moving.x - 24, this.moving.x - 12];
+            this.scraps.push({
+              x: top.x + top.w + 4,
+              y: top.y + 18,
+              w: 22,
+              vx: 46,
+              vy: 140,
+              rot: 0.22,
+              vr: 2.8,
+              color: 0xffdf6b,
+            });
+          }
         },
         hideHud: () => {
           this.hud.setVisible(false);

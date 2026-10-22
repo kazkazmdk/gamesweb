@@ -78,6 +78,9 @@ test("eight games art direction matrix", async ({ page }) => {
     }
     if (slug === "crowd-control") await cmd(page, "setPack", 10);
     if (slug === "sky-stack") await cmd(page, "stackTo", 4);
+    if (slug === "knockout-circuit") await cmd(page, "seedPeak");
+    if (slug === "velocity-run") await cmd(page, "seedPeak");
+    if (slug === "pocket-striker") await cmd(page, "seedPeak");
     await page.waitForTimeout(700);
     await save(page, `${slug}-mid-1440`);
 
@@ -87,7 +90,10 @@ test("eight games art direction matrix", async ({ page }) => {
       await save(page, "crowd-control-pack-30-1440");
       await cmd(page, "setPack", 86);
     }
-    if (slug === "swarm-protocol") await cmd(page, "grantXp", 18);
+    if (slug === "swarm-protocol") await cmd(page, "seedPeak");
+    if (slug === "velocity-run") await cmd(page, "seedPeak");
+    if (slug === "knockout-circuit") await cmd(page, "seedPeak");
+    if (slug === "pocket-striker") await cmd(page, "seedPeak");
     if (slug === "sky-stack") await cmd(page, "stackTo", 28);
     if (slug === "territory-rush") {
       await cmd(page, "closeLoop");

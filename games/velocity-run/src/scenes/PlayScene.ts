@@ -1031,6 +1031,45 @@ export class VelocityPlayScene extends Phaser.Scene {
         jump: () => {
           this.touchJump = true;
         },
+        seedPeak: () => {
+          this.running = true;
+          this.shownHint = false;
+          this.hint.setVisible(false);
+          this.startMs = this.time.now - 4280;
+          this.timeMs = 4280;
+          const cp = this.course.solids.find((s) => s.kind === "checkpoint")?.x ?? this.spawn.x + 420;
+          this.runner.x = cp + 96;
+          this.runner.y = this.spawn.y - 42;
+          this.runner.vx = 308;
+          this.runner.vy = -115;
+          this.runner.facing = 1;
+          this.runner.grounded = false;
+          this.splitIndex = 1;
+          this.splits = [3820];
+          this.splitDelta = -380;
+          this.splitTimer = 1080;
+          this.afterImages = Array.from({ length: 7 }, (_, i) => ({
+            x: this.runner.x - (7 - i) * 14,
+            y: this.runner.y + (7 - i) * 3.5,
+            w: this.runner.w,
+            h: this.runner.h,
+            vx: 308,
+            vy: -115,
+            facing: 1,
+          }));
+          this.landingRings.push({
+            x: this.runner.x - 64,
+            y: this.spawn.y + this.runner.h,
+            rx: 28,
+            ry: 8,
+            maxRx: 38,
+            alpha: 0.82,
+            color: 0x38f2ff,
+          });
+          this.camX = this.runner.x + 110;
+          this.camY = this.runner.y - 24;
+          this.draw(0.016);
+        },
         hideHud: () => {
           this.hud.setVisible(false);
           this.overlay.setVisible(false);
