@@ -82,6 +82,14 @@ const ACHIEVEMENT_XP: Record<string, number> = {
   "crowd-control:pack-120": 35,
   "crowd-control:finish-80": 35,
   "crowd-control:win-boss": 30,
+  "prism-drop:first-merge": 10,
+  "prism-drop:chain-4": 25,
+  "prism-drop:tile-512": 35,
+  "prism-drop:tile-2048": 60,
+  "swing-vector:first-swing": 10,
+  "swing-vector:sonic-snap": 20,
+  "swing-vector:clean-canyon": 30,
+  "swing-vector:sub-24": 45,
 };
 
 for (const ach of allAchievements()) {

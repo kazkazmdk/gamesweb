@@ -163,6 +163,8 @@ const TYPICAL: Record<string, { great: number; lower: boolean }> = {
   "pocket-striker": { great: 3, lower: true },
   "territory-rush": { great: 42000, lower: false },
   "crowd-control": { great: 18000, lower: false },
+  "prism-drop": { great: 16000, lower: false },
+  "swing-vector": { great: 22000, lower: true },
 };
 
 export function normalizePerformance(gameId: string, score: number): number {

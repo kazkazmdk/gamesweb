@@ -7,7 +7,9 @@ values
   ('knockout-circuit', 'knockout-circuit', 'Knockout Circuit', 'live', '{"version":"1.0.0"}'::jsonb),
   ('pocket-striker', 'pocket-striker', 'Pocket Striker', 'live', '{"version":"1.0.0"}'::jsonb),
   ('territory-rush', 'territory-rush', 'Territory Rush', 'live', '{"version":"1.0.0"}'::jsonb),
-  ('crowd-control', 'crowd-control', 'Crowd Control', 'live', '{"version":"1.0.0"}'::jsonb)
+  ('crowd-control', 'crowd-control', 'Crowd Control', 'live', '{"version":"1.0.0"}'::jsonb),
+  ('prism-drop', 'prism-drop', 'Prism Drop', 'live', '{"version":"1.0.0"}'::jsonb),
+  ('swing-vector', 'swing-vector', 'Swing Vector', 'live', '{"version":"1.0.0"}'::jsonb)
 on conflict (id) do update set title = excluded.title, slug = excluded.slug, manifest = excluded.manifest;
 
 insert into public.achievements (id, game_id, key, name, description, xp_reward)
@@ -51,7 +53,15 @@ values
   ('crowd-control:cut-in', 'crowd-control', 'cut-in', 'Cut In', 'Take a hidden shortcut.', 20),
   ('crowd-control:pack-120', 'crowd-control', 'pack-120', 'Pack 120', 'Reach 120 in the pack.', 35),
   ('crowd-control:finish-80', 'crowd-control', 'finish-80', 'Parade', 'Finish with 80 or more in the pack.', 35),
-  ('crowd-control:win-boss', 'crowd-control', 'win-boss', 'Boss Cleared', 'Finish and clear the boss.', 30)
+  ('crowd-control:win-boss', 'crowd-control', 'win-boss', 'Boss Cleared', 'Finish and clear the boss.', 30),
+  ('prism-drop:first-merge', 'prism-drop', 'first-merge', 'Fusion Spark', 'Merge two matching prisms.', 10),
+  ('prism-drop:chain-4', 'prism-drop', 'chain-4', 'Cascade Reactor', 'Trigger a 4x merge chain.', 25),
+  ('prism-drop:tile-512', 'prism-drop', 'tile-512', 'High Synthesis', 'Synthesize a 512 prism.', 35),
+  ('prism-drop:tile-2048', 'prism-drop', 'tile-2048', 'Solar Core', 'Synthesize the 2048 prism.', 60),
+  ('swing-vector:first-swing', 'swing-vector', 'first-swing', 'First Latch', 'Complete your first canyon run.', 10),
+  ('swing-vector:sonic-snap', 'swing-vector', 'sonic-snap', 'Sonic Snap', 'Release a full-orbit slingshot boost.', 20),
+  ('swing-vector:clean-canyon', 'swing-vector', 'clean-canyon', 'Zero Scrape', 'Finish a canyon with 0 falls.', 30),
+  ('swing-vector:sub-24', 'swing-vector', 'sub-24', 'Hypersonic', 'Clear Ion Gorge under 24 seconds.', 45)
 on conflict (id) do nothing;
 
 create or replace function public.is_known_game(p_id text)

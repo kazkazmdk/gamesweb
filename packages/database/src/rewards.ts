@@ -207,6 +207,27 @@ export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
     }
   }
 
+  if (ctx.gameId === "prism-drop") {
+    const maxTile = Number(stats.maxTile ?? 0);
+    const chain = Number(stats.maxChain ?? stats.chain ?? 0);
+    const merges = Number(stats.merges ?? 0);
+    if (merges >= 1 || maxTile >= 4 || chain >= 1) unlock("prism-drop:first-merge");
+    if (chain >= 4) unlock("prism-drop:chain-4");
+    if (maxTile >= 512) unlock("prism-drop:tile-512");
+    if (maxTile >= 2048) unlock("prism-drop:tile-2048");
+  }
+
+  if (ctx.gameId === "swing-vector") {
+    const finished = ctx.result === "finish";
+    const snaps = Number(stats.sonicSnaps ?? stats.snaps ?? 0);
+    if (finished) unlock("swing-vector:first-swing");
+    if (Boolean(stats.sonicSnap) || snaps >= 1) unlock("swing-vector:sonic-snap");
+    if (finished && Number(stats.falls ?? 0) === 0) unlock("swing-vector:clean-canyon");
+    if (finished && ctx.mode === "canyon-1" && ctx.score > 0 && ctx.score < 24_000) {
+      unlock("swing-vector:sub-24");
+    }
+  }
+
   const questProgress = { ...ctx.questProgress };
   const questsCompleted: string[] = [];
   const quests = dailyQuests(ctx.dayKey);
@@ -247,6 +268,10 @@ export function computeRunRewards(ctx: RunContext): ProgressionDiff & {
       value = value + Math.max(0, ctx.score - value);
     } else if (q.stat === "crowd-control:pack" && ctx.gameId === "crowd-control") {
       value = value + Math.max(0, ctx.score - value);
+    } else if (q.stat === "prism-drop:maxTile" && ctx.gameId === "prism-drop") {
+      value = Math.max(value, Number(stats.maxTile ?? 0));
+    } else if (q.stat === "swing-vector:finish" && ctx.gameId === "swing-vector" && ctx.result === "finish") {
+      value = value + 1;
     }
     questProgress[q.id] = value;
     if (value >= q.target) {

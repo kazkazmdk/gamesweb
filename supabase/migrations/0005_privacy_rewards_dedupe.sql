@@ -1,6 +1,12 @@
 -- Privacy split, transactional one-shot XP, merge local_session_id dedupe,
 -- guest achievement timestamps. Additive on 0001–0004.
 
+insert into public.games (id, slug, title, status, manifest)
+values
+  ('prism-drop', 'prism-drop', 'Prism Drop', 'live', '{"version":"1.0.0"}'::jsonb),
+  ('swing-vector', 'swing-vector', 'Swing Vector', 'live', '{"version":"1.0.0"}'::jsonb)
+on conflict (id) do update set title = excluded.title, slug = excluded.slug, manifest = excluded.manifest;
+
 insert into public.achievements (id, game_id, key, name, description, xp_reward)
 values
   ('neon-drift:first-slide', 'neon-drift', 'first-slide', 'First Slide', 'Enter a drift.', 15),
@@ -32,7 +38,15 @@ values
   ('swarm-protocol:dash-kill', 'swarm-protocol', 'dash-kill', 'Dash Kill', 'Kill while dashing.', 20),
   ('swarm-protocol:kills-200', 'swarm-protocol', 'kills-200', 'Kills 200', 'Reach 200 kills.', 40),
   ('swarm-protocol:shield', 'swarm-protocol', 'shield', 'Shield', 'Pick a shield upgrade.', 15),
-  ('swarm-protocol:chain', 'swarm-protocol', 'chain', 'Chain', 'Chain a kill streak.', 15)
+  ('swarm-protocol:chain', 'swarm-protocol', 'chain', 'Chain', 'Chain a kill streak.', 15),
+  ('prism-drop:first-merge', 'prism-drop', 'first-merge', 'Fusion Spark', 'Merge two matching prisms.', 10),
+  ('prism-drop:chain-4', 'prism-drop', 'chain-4', 'Cascade Reactor', 'Trigger a 4x merge chain.', 25),
+  ('prism-drop:tile-512', 'prism-drop', 'tile-512', 'High Synthesis', 'Synthesize a 512 prism.', 35),
+  ('prism-drop:tile-2048', 'prism-drop', 'tile-2048', 'Solar Core', 'Synthesize the 2048 prism.', 60),
+  ('swing-vector:first-swing', 'swing-vector', 'first-swing', 'First Latch', 'Complete your first canyon run.', 10),
+  ('swing-vector:sonic-snap', 'swing-vector', 'sonic-snap', 'Sonic Snap', 'Release a full-orbit slingshot boost.', 20),
+  ('swing-vector:clean-canyon', 'swing-vector', 'clean-canyon', 'Zero Scrape', 'Finish a canyon with 0 falls.', 30),
+  ('swing-vector:sub-24', 'swing-vector', 'sub-24', 'Hypersonic', 'Clear Ion Gorge under 24 seconds.', 45)
 on conflict (id) do nothing;
 --
 -- * share_presence / share_public_activity start from share_activity.
@@ -652,7 +666,7 @@ begin
       if offline_count > 40 then
         exit;
       end if;
-      if coalesce(run ->> 'gameId', '') not in ('neon-drift', 'velocity-run', 'swarm-protocol', 'sky-stack', 'knockout-circuit', 'pocket-striker', 'territory-rush', 'crowd-control') then
+      if coalesce(run ->> 'gameId', '') not in ('neon-drift', 'velocity-run', 'swarm-protocol', 'sky-stack', 'knockout-circuit', 'pocket-striker', 'territory-rush', 'crowd-control', 'prism-drop', 'swing-vector') then
         continue;
       end if;
       local_id := nullif(left(coalesce(run ->> 'localSessionId', ''), 80), '');

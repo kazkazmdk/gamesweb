@@ -7,6 +7,8 @@ export const GAME_IDS = [
   "pocket-striker",
   "territory-rush",
   "crowd-control",
+  "prism-drop",
+  "swing-vector",
 ] as const;
 export type GameId = (typeof GAME_IDS)[number];
 
@@ -32,6 +34,8 @@ export const GAME_MODES: Record<GameId, readonly string[]> = {
   "pocket-striker": ["layout", "daily"],
   "territory-rush": ["arena", "daily"],
   "crowd-control": ["rush", "daily"],
+  "prism-drop": ["well", "daily"],
+  "swing-vector": ["canyon-1", "canyon-2", "canyon-3", "daily"],
 };
 
 export const VELOCITY_MEDALS: Record<
@@ -52,7 +56,7 @@ export const VELOCITY_MEDALS: Record<
   "course-3d": { platinum: 72000, gold: 86000, silver: 104000, bronze: 126000 },
 };
 
-export const LOWER_IS_BETTER_GAMES = ["velocity-run", "knockout-circuit", "pocket-striker"] as const;
+export const LOWER_IS_BETTER_GAMES = ["velocity-run", "knockout-circuit", "pocket-striker", "swing-vector"] as const;
 
 export const PRESENCE_STALE_MS = 2 * 60 * 1000;
 export const MAX_SAVE_BYTES = 48_000;
@@ -74,6 +78,8 @@ export function defaultMode(gameId: string): string {
   if (gameId === "pocket-striker") return "layout";
   if (gameId === "territory-rush") return "arena";
   if (gameId === "crowd-control") return "rush";
+  if (gameId === "prism-drop") return "well";
+  if (gameId === "swing-vector") return "canyon-1";
   return "foundation";
 }
 

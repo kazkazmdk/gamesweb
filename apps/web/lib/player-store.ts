@@ -593,6 +593,12 @@ class PlayerStore {
     if (opts.gameId === "crowd-control") {
       this.progressQuest("crowd-control:pack", Number(opts.payload.metadata.pack ?? 0));
     }
+    if (opts.gameId === "prism-drop") {
+      this.progressQuest("prism-drop:maxTile", Number(opts.payload.metadata.maxTile ?? 0));
+    }
+    if (opts.gameId === "swing-vector" && opts.result === "finish") {
+      this.progressQuest("swing-vector:finish", 1);
+    }
 
     const scale = Math.min(1, opts.durationMs / (xpRewards.minRunSecondsForFullXp * 1000));
     void this.addXp(Math.round(xpRewards.runComplete * scale + (opts.durationMs / 60000) * xpRewards.runCompletePerMinute), "run");

@@ -39,6 +39,8 @@ const DEFAULT_THRESHOLDS: Record<string, { bronze: number; silver: number; gold:
   "pocket-striker": { bronze: 6, silver: 4, gold: 3 },
   "territory-rush": { bronze: 15000, silver: 30000, gold: 45000 },
   "crowd-control": { bronze: 6000, silver: 12000, gold: 18000 },
+  "prism-drop": { bronze: 5000, silver: 10000, gold: 16000 },
+  "swing-vector": { bronze: 34000, silver: 26000, gold: 20000 },
 };
 
 export function GameView({ slug }: { slug: string }) {
@@ -172,6 +174,14 @@ export function GameView({ slug }: { slug: string }) {
         const mod = await import("@gamesweb/territory-rush");
         stage = "mount";
         instance = mod.mountTerritoryRush(parent, platform, playIndex);
+      } else if (game!.id === "prism-drop") {
+        const mod = await import("@gamesweb/prism-drop");
+        stage = "mount";
+        instance = mod.mountPrismDrop(parent, platform, playIndex);
+      } else if (game!.id === "swing-vector") {
+        const mod = await import("@gamesweb/swing-vector");
+        stage = "mount";
+        instance = mod.mountSwingVector(parent, platform, playIndex);
       } else {
         const mod = await import("@gamesweb/crowd-control");
         stage = "mount";

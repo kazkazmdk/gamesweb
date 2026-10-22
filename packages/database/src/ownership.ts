@@ -133,6 +133,28 @@ export function reconstructAchievementsFromScores(scores: ScoreLike[]): string[]
         out.add("crowd-control:win-boss");
       }
     }
+    if (s.gameId === "prism-drop") {
+      const maxTile = Number(s.metadata.maxTile ?? 0);
+      const chain = Number(s.metadata.maxChain ?? s.metadata.chain ?? 0);
+      const merges = Number(s.metadata.merges ?? 0);
+      if (merges >= 1 || maxTile >= 4 || chain >= 1) out.add("prism-drop:first-merge");
+      if (chain >= 4) out.add("prism-drop:chain-4");
+      if (maxTile >= 512) out.add("prism-drop:tile-512");
+      if (maxTile >= 2048) out.add("prism-drop:tile-2048");
+    }
+    if (s.gameId === "swing-vector") {
+      const failed =
+        s.metadata.result === "death" || s.metadata.result === "timeout" || s.metadata.result === "fail";
+      const finished = s.metadata.result === "finish" || !failed;
+      if (finished) out.add("swing-vector:first-swing");
+      if (Boolean(s.metadata.sonicSnap) || Number(s.metadata.sonicSnaps ?? s.metadata.snaps ?? 0) >= 1) {
+        out.add("swing-vector:sonic-snap");
+      }
+      if (finished && Number(s.metadata.falls ?? 0) === 0) out.add("swing-vector:clean-canyon");
+      if (finished && s.mode === "canyon-1" && s.score > 0 && s.score < 24_000) {
+        out.add("swing-vector:sub-24");
+      }
+    }
   }
   return [...out];
 }

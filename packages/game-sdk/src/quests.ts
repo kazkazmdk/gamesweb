@@ -145,6 +145,26 @@ const POOL: QuestDefinition[] = [
     target: 40,
     xp: 50,
   },
+  {
+    id: "pd-tile-512",
+    title: "Half-kilowatt",
+    description: "Reach the 512 prism in Prism Drop.",
+    type: "daily",
+    gameId: "prism-drop",
+    stat: "prism-drop:maxTile",
+    target: 512,
+    xp: 55,
+  },
+  {
+    id: "sv-finish",
+    title: "Sling through",
+    description: "Finish a canyon in Swing Vector.",
+    type: "daily",
+    gameId: "swing-vector",
+    stat: "swing-vector:finish",
+    target: 1,
+    xp: 50,
+  },
 ];
 
 export function dailyQuests(day = utcDayKey()): QuestDefinition[] {
