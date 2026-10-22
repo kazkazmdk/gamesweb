@@ -83,8 +83,8 @@ export function collectSeoIssues(): SeoIssue[] {
   }
 
   const count = indexable.length;
-  if (count < 50 || count > 80) {
-    issues.push({ code: "count", message: `Expected 50–80 indexable URLs, got ${count}` });
+  if (count < 50 || count > 115) {
+    issues.push({ code: "count", message: `Expected 50–115 indexable URLs, got ${count}` });
   }
 
   return issues;

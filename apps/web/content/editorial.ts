@@ -133,6 +133,15 @@ export const GAME_EDITORIAL: GameEditorial[] = [
       "Orbital Collision and Pulse Ring buy space when the silhouette wall closes. Keep the player readable; do not stand in your own nova.",
       "The Core is the win condition. Do not spend the last minute kiting trash if the boss clock has started.",
     ],
+    scoring: {
+      lead: "Swarm Protocol's ranked salvage is kills times twelve, plus survival time divided by twenty, plus raw damage, plus a four-thousand bounty when the Core drops.",
+      rules: [
+        "Every hostile you drop adds exactly 12 salvage. The Clearance trophy at 200 kills is a separate badge and does not multiply this term.",
+        "Elapsed survival is divided by 20 before it joins the bank, so a minute of kiting is a small add next to the bodies you actually drop.",
+        "damageDone is summed unscaled. An upgrade raises this term only by the hits it lands, and a nova that misses the horde adds nothing.",
+        "The Core bounty is a flat 4000, stamped once when the boss falls. Endless play after the result screen is not folded into that ranked salvage.",
+      ],
+    },
   },
   {
     slug: "sky-stack",
@@ -154,6 +163,15 @@ export const GAME_EDITORIAL: GameEditorial[] = [
     controlsLead:
       "One action: Space, click, or tap places the slab. R retries. That is the whole map.",
     strategy: [],
+    scoring: {
+      lead: "Sky Stack pays the placement itself: 220 for a full-width perfect, 140 for a near cut, 80 for a thin keep, then a combo slope and a fever double.",
+      rules: [
+        "A perfect is an overlap of at least 96 percent of the moving width. The next rung keeps that full width and the sliced leftover is zero.",
+        "A near cut sits between 82 and 96 percent. The overhang falls away, the combo still climbs, and the tower gets narrower.",
+        "The combo slope is 0.18 per step: bank equals base times (1 + combo × 0.18). An ordinary 'ok' placement drops that combo by one.",
+        "Fever begins on an eight-perfect streak and doubles the whole placement. A miss scores zero and ends the climb. Floor 30 and floor 67 are height badges, not extra multipliers.",
+      ],
+    },
   },
   {
     slug: "knockout-circuit",
@@ -179,6 +197,73 @@ export const GAME_EDITORIAL: GameEditorial[] = [
       "Liftwell and Conveyor are vertical factory climbs. Dash only after a mover lines up; a wasted dash drops you onto a beam.",
       "Risk Line and Hammer Run pay for greedy high routes. If the ghost took the low safe line, you only win by taking the expert pad.",
       "Disc Yard, Tile Drop, and Bridge Rush are event maps. Silhouettes are large on purpose — route around the toy, do not thread it like Velocity spikes.",
+    ],
+    scoring: {
+      lead: "Knockout Circuit ranks the banner clock in whole milliseconds. A shorter crossing wins, and a hazard scrape matters only because the clock never stops.",
+      rules: [
+        "The submitted score is the floored millisecond total. These eight maps have no point bank, no lap counter, and no stroke column.",
+        "Hammers, beams, and inflating gates do not subtract a style score. They shove you off the foam, and recovery time stays on the clock.",
+        "Shift dash is a speed burst, not a shield. Throwing it into a rising gate usually adds more milliseconds than the burst removes.",
+        "A ghost is a position tape of a recorded run. Beating it means a lower millisecond total on that same map, not a higher trick score.",
+      ],
+    },
+    courses: [
+      {
+        id: "map-a",
+        name: "Starter Gates",
+        world: "Factory",
+        subtitle: "A 2800-wide factory floor: hammer spinner, sliding mover, inflating gate, then a disc before the finish banner.",
+        medals: "Teaching clock. Lower milliseconds win.",
+      },
+      {
+        id: "map-b",
+        name: "Liftwell",
+        world: "Factory",
+        subtitle: "A vertical 2200-tall shaft of movers and beams. The banner sits near the top of the well, not at the right edge.",
+        medals: "Climb clock. A wasted dash drops you a floor.",
+      },
+      {
+        id: "map-c",
+        name: "Risk Line",
+        world: "Skyworks",
+        subtitle: "A 3200-wide skyworks span with a high expert shelf over a safe floor line and a falling pad before the banner.",
+        medals: "Greedy high line versus the low safe clock.",
+      },
+      {
+        id: "map-d",
+        name: "Hammer Run",
+        world: "Factory",
+        subtitle: "Pink factory lane packed with two large hammer spinners and a mid beam. The fast pads sit late, after the second spinner.",
+        medals: "Spinner lane. Touching a hammer only costs time.",
+      },
+      {
+        id: "map-e",
+        name: "Disc Yard",
+        world: "Signal Core",
+        subtitle: "Signal-core yard of discs, one mover, and a narrow gate. The fast shelf is short and sits just before the last disc.",
+        medals: "Disc yard clock across the signal floor.",
+      },
+      {
+        id: "map-f",
+        name: "Conveyor",
+        world: "Factory",
+        subtitle: "Paired movers back to back, then a beam, a spinner, and a late gate. The belt is the read, not a jump puzzle.",
+        medals: "Belt clock. Wait for the second mover's phase.",
+      },
+      {
+        id: "map-g",
+        name: "Tile Drop",
+        world: "Skyworks",
+        subtitle: "Three falling tiles in a row over a skyworks floor, then a spinner. The fast pad is the only shelf that skips a drop.",
+        medals: "Falling-tile clock. Standing on a tile as it goes is a time loss.",
+      },
+      {
+        id: "map-h",
+        name: "Bridge Rush",
+        world: "Signal Core",
+        subtitle: "The longest signal span: mover, beam, spinner, a fast shelf, an expert bridge, a falling pad, and a final gate.",
+        medals: "Bridge clock. The expert pad is optional pace.",
+      },
     ],
   },
   {
@@ -207,6 +292,59 @@ export const GAME_EDITORIAL: GameEditorial[] = [
       "Arcade Lab adds portals and pulse pads. Aim at the portal pair, not the hole, when Pulse Circuit is the daily.",
       "Aces unlock Ace. Banks unlock Cushion. Par or better unlocks Table Manners. None of those require a long combo.",
     ],
+    scoring: {
+      lead: "Pocket Striker ranks strokes on the table in front of you. Fewer putts beat par, a one-stroke hole-out is an ace, and twelve strokes without a pocket ends the attempt.",
+      rules: [
+        "The stored result is the stroke count, and lower wins. Bench Bank and Neon Bank print par 2, Vise Run and Fountain Spin print par 3, and Pulse Circuit prints par 4.",
+        "A bank is cushion contact and then the pocket on that same stroke. It flags the Cushion badge; it does not multiply a point total.",
+        "An ace is a hole-out with strokes equal to 1. It still posts as one on the lower-is-better board.",
+        "If the striker is still loose after 12 strokes and has slowed under speed 8, the table closes as a miss. No clock bonus rescues it.",
+      ],
+    },
+    courses: [
+      {
+        id: "l1",
+        name: "Bench Bank",
+        world: "Workshop",
+        subtitle: "Par-2 workshop bench. The striker starts low-left, the pocket sits high-left, and a bumper plus an upward pad fill the middle.",
+        medals: "Par 2. One stroke is an ace.",
+      },
+      {
+        id: "l2",
+        name: "Vise Run",
+        world: "Workshop",
+        subtitle: "Par-3 horizontal vise. A blocker slides on the vertical axis between two walls, so the window opens and closes on a timer.",
+        medals: "Par 3. Late release, not a harder hit.",
+      },
+      {
+        id: "l7",
+        name: "Hedge Cut",
+        world: "Garden",
+        subtitle: "Par-2 garden gap. Two hedge posts leave a narrow mouth, and a round bumper sits on the line between striker and pocket.",
+        medals: "Par 2. Soft pace dies nearer the hole.",
+      },
+      {
+        id: "l10",
+        name: "Fountain Spin",
+        world: "Garden",
+        subtitle: "Par-3 garden fountain. A long rotator sweeps the open green around a center bumper, with no wall to hide a hero line.",
+        medals: "Par 3. Wait until the arm is leaving the mouth.",
+      },
+      {
+        id: "l13",
+        name: "Neon Bank",
+        world: "Arcade Lab",
+        subtitle: "Par-2 arcade bank. The pocket mirrors the striker on the left rail, with a bumper and a strong upward pad under the shelf.",
+        medals: "Par 2. The pad is the bank, not the pocket.",
+      },
+      {
+        id: "l14",
+        name: "Portal Pair",
+        world: "Arcade Lab",
+        subtitle: "Par-2 arcade portals. A wall blocks the straight line, and the paired rings are the only path from the top-left start to the bottom-right pocket.",
+        medals: "Par 2. Aim the ring, then the hole.",
+      },
+    ],
   },
   {
     slug: "territory-rush",
@@ -233,6 +371,15 @@ export const GAME_EDITORIAL: GameEditorial[] = [
       "After a fill wave, sit on the new border for a beat. The next trail start is safest from freshly owned color.",
       "Majority (50%) is an achievement, not the only win. A 30% clean map with two cuts can still beat a greedy 45% death.",
     ],
+    scoring: {
+      lead: "Territory Rush turns the floor into a sum: owned percent times 400, plus 250 for each trail you cut, plus 8 times your largest fill, plus 40 for every closed loop in the chain.",
+      rules: [
+        "Owned percent is measured after each fill and scaled by 400. Half the arena is 200 points from this term before any cut is counted.",
+        "Severing a bot trail adds 250. Getting your own exposed trail cut adds nothing and ends the claim.",
+        "Only the single largest fill is multiplied by 8. Three timid bites lose this term to one deep loop.",
+        "Each loop you close without being cut adds 40 to the chain term. The roughly ninety-second horn stops the sum; the horn itself is not the score.",
+      ],
+    },
   },
   {
     slug: "crowd-control",
@@ -259,6 +406,108 @@ export const GAME_EDITORIAL: GameEditorial[] = [
       "TAX is a filter. Take it only when the remaining count still clears the next fight.",
       "Hidden left cuts unlock Cut In. They are shorter, not always richer. Ghosts that finish with 80+ usually mixed a rich right with one cut.",
       "Dash is for compressing into a gate and for fights, not for skipping the arithmetic.",
+    ],
+    scoring: {
+      lead: "Crowd Control cashes the pack that survives the boulevard: headcount times 120, times a finish tier from the remaining bodies, plus the distance the rush actually traveled.",
+      rules: [
+        "Finish tiers read the final headcount only: 12 bodies pay 1.5×, 24 pay 2×, 48 pay 3×, and 96 or more pay 4×. Under 12 the tier stays 1×.",
+        "The posted number is finalPack × 120 × that tier, then plus traveled distance. A fat pack that dies in the last fight cashes the smaller headcount.",
+        "A clash removes the smaller squad. Equal squads wipe both sides, so a fair fight posts a zero toward the finish tier.",
+        "A boss drains bodies over time before the tier is chosen: 18 per second under 16 bodies, 10 under 28, and 4 once the pack is already fat.",
+      ],
+    },
+  },
+  {
+    slug: "prism-drop",
+    kind: "Merge Puzzle Game",
+    hubTitle: "Prism Drop — Free Online Merge Puzzle Game",
+    hubDescription:
+      "Drop numbered neon prisms into a containment well, fuse equals from 2 through 2048, and spend Pulse Tilt before the stack crosses the lip.",
+    whyDistinct:
+      "Prism Drop is the only Gamesweb well where equal values synthesize and a shockwave can keep the reaction going. It is not a slab climb and not a stroke table.",
+    run: [
+      "A 2, 4, or 8 waits in the cradle. Slide it, then commit the drop so it lands beside its twin instead of sealing the mouth.",
+      "Contact between equals replaces both with the next rung. The shockwave can bump a third pair before the pile goes still.",
+      "Pulse Tilt leans the whole well. Overflow — any prism over the containment line — banks the ladder and ends the attempt.",
+    ],
+    guideLead:
+      "Prism Drop is a vertical synthesis puzzle. Leave a matching neighbor under the cradle, and save the lean for a buried pair that gravity will not finish.",
+    howToLead:
+      "Slide the cradle, drop the prism, and lean the well only when two equals are one shove apart.",
+    controlsLead:
+      "The cradle slides sideways, the drop commits the prism, and Pulse Tilt leans the containment well. Clearing the pile does not change which rungs can fuse.",
+    strategy: [
+      "Keep crumbs of 2, 4, and 8 along one wall and park every 32-and-up rung in the opposite corner, or the next shockwave synthesizes the wrong pair.",
+      "Do not lean on the first drops. An early Pulse Tilt opens a gap under the lip and the following prism has nowhere safe to sit.",
+      "Line up a 16 merging into a 32 so the shockwave completes a second 32 beside it. Four fuses from one drop are the cascade the well is built to pay.",
+      "The 512 and 1024 rungs are wide. Feed them with a vertical half-ladder, as a corner build would, except this pile can spill over the containment line.",
+    ],
+    scoring: {
+      lead: "Prism Drop banks the rung you synthesize: values from 2 through 2048 pay when created, a fusion shockwave adds a bump, and an open chain multiplies the unsettled reaction.",
+      rules: [
+        "Creating a prism scores its face — 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, or 2048 — when a fusion synthesizes that rung, not when the cradle merely drops it.",
+        "A fusion shockwave shoves neighbors. If it starts another equal-value contact before the pile sleeps, that next fusion joins the same chain.",
+        "The chain multiplier climbs with each extra fusion from the unsettled shockwave, and it resets when the well goes still. Cascade Reactor is four or more merges from a single drop.",
+        "Overflow across the containment lip banks the total and ends the attempt. The 2048 core is the top rung. Prisms that never fused do not pay a second time.",
+      ],
+    },
+  },
+  {
+    slug: "swing-vector",
+    kind: "Grapple Physics Game",
+    hubTitle: "Swing Vector — Free Online Grapple Physics Game",
+    hubDescription:
+      "Latch a magnetic pylon, ride the pendulum, and release a charged Sonic Snap through the canyon's boost rings. Three gates, and a lower time wins.",
+    whyDistinct:
+      "Swing Vector is a tethered pendulum. Pace is stored by orbiting a pylon, then spent as a slingshot. It is not a drift car and not a rooftop jump.",
+    run: [
+      "Hold to latch the nearest magnetic pylon and stay on the arc. Air nudges only exist after you detach.",
+      "Sonic Snap arms after the pendulum travels π × 1.35 radians. Release as that arc comes around so the exit threads a boost ring.",
+      "Ion Gorge, Pendulum Vault, and Hyperion Trench each end at a finish gate. A fall keeps the millisecond clock running and scraps the clean run.",
+    ],
+    guideLead:
+      "Swing Vector is a three-canyon grapple. The useful read is the release angle: a charged Sonic Snap should leave through a boost ring, not into the wall.",
+    howToLead:
+      "Hold the latch, finish the orbit when the roof allows the circle, then release toward the next pylon or ring.",
+    controlsLead:
+      "Holding keeps the tether on the magnetic pylon. Releasing spends the arc as a launch. Left and right are air nudges after you detach, not steering while you are latched.",
+    strategy: [
+      "Pump the pendulum through the bottom of the arc before you release. A Sonic Snap arms only after the bob has traveled π × 1.35 radians, and the top of a tired swing has already given that pace back.",
+      "Pendulum Vault hides teeth under the cable. Stay attached through the charge, then leave before a hazard bar clips the rising bob.",
+      "Boost rings sit on the exit, not on the anchor. Thread the slingshot through the ring while the 0.65s snap window is still open.",
+      "Ion Gorge's nine pylons forgive a late latch. Hyperion Trench is 4200 long with thirteen anchors, so a short hop between rings falls to the floor.",
+    ],
+    scoring: {
+      lead: "Swing Vector ranks each canyon clock in milliseconds. Platinum through bronze are authored per gate, and a charged Sonic Snap is a slingshot rather than a point multiplier.",
+      rules: [
+        "Lower finish time wins. Ion Gorge medals are platinum 16.00s, gold 20.00s, silver 26.00s, and bronze 34.00s.",
+        "Pendulum Vault medals are 18.00 / 22.50 / 29.00 / 38.00. Hyperion Trench medals are 20.00 / 25.00 / 32.00 / 42.00. A fast gorge does not move the other two clocks.",
+        "Sonic Snap arms when absolute pendulum travel reaches π × 1.35 radians. Releasing then adds about 190 horizontal pace and a 0.65s boost window. An early release is only the plain launch.",
+        "Boost rings mark the exits: five in Ion Gorge, six in the Vault, seven in the Trench. The posted result is still the gate clock. Hypersonic is Ion Gorge under 24 seconds, between that canyon's gold and silver.",
+      ],
+    },
+    courses: [
+      {
+        id: "canyon-1",
+        name: "Ion Gorge",
+        world: "Gorge",
+        subtitle: "Warm the cable. Nine low pylons and five boost rings across 3400 of open gorge, with room to charge one Sonic Snap before the gate.",
+        medals: "16.00 / 20.00 / 26.00 / 34.00",
+      },
+      {
+        id: "canyon-2",
+        name: "Pendulum Vault",
+        world: "Vault",
+        subtitle: "Charge the snap. Eleven anchors, six boost rings, and vault teeth across 3800. Clear the hazard bars while the orbit is still attached.",
+        medals: "18.00 / 22.50 / 29.00 / 38.00",
+      },
+      {
+        id: "canyon-3",
+        name: "Hyperion Trench",
+        world: "Trench",
+        subtitle: "Three rivals, one gold cable. Thirteen pylons and seven boost rings across 4200. The gaps after each ring are longer than a timid hop.",
+        medals: "20.00 / 25.00 / 32.00 / 42.00",
+      },
     ],
   },
 ];

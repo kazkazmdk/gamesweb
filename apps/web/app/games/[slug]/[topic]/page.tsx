@@ -164,27 +164,49 @@ export default async function GameTopicPage({
         ) : null}
 
         {topic === "courses" && ed.courses ? (
-          <ul className="space-y-4">
-            {ed.courses.map((c) => (
-              <li key={c.id} className="border-t border-[var(--line)] pt-3">
-                <h2 className="display text-[26px] text-[var(--text)]">{c.name}</h2>
-                <p className="meta mt-1">
-                  {c.world} · {c.subtitle}
-                </p>
-                <p className="mt-2">{c.medals}</p>
-              </li>
-            ))}
-          </ul>
+          <table className="w-full border-collapse text-left text-[13px]">
+            <caption className="mb-3 text-left text-[15px] text-[var(--text)]">{game.title} courses</caption>
+            <thead>
+              <tr className="border-b border-[var(--line)] text-[11px] uppercase tracking-[0.14em] text-[var(--text-faint)]">
+                <th scope="col" className="py-2 pr-3 font-medium">Course</th>
+                <th scope="col" className="py-2 pr-3 font-medium">World</th>
+                <th scope="col" className="py-2 pr-3 font-medium">Line</th>
+                <th scope="col" className="py-2 font-medium">Target</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ed.courses.map((c) => (
+                <tr key={c.id} className="border-t border-[var(--line)] align-top">
+                  <th scope="row" className="py-3 pr-3 font-medium text-[var(--text)]">{c.name}</th>
+                  <td className="py-3 pr-3">{c.world}</td>
+                  <td className="py-3 pr-3">{c.subtitle}</td>
+                  <td className="py-3">{c.medals}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         ) : null}
 
         {topic === "scoring" && ed.scoring ? (
           <>
             <p>{ed.scoring.lead}</p>
-            <ul className="list-disc space-y-2 pl-5">
-              {ed.scoring.rules.map((r) => (
-                <li key={r}>{r}</li>
-              ))}
-            </ul>
+            <table className="w-full border-collapse text-left text-[13px]">
+              <caption className="mb-3 text-left text-[15px] text-[var(--text)]">How {game.title} scores a run</caption>
+              <thead>
+                <tr className="border-b border-[var(--line)] text-[11px] uppercase tracking-[0.14em] text-[var(--text-faint)]">
+                  <th scope="col" className="py-2 pr-3 font-medium">#</th>
+                  <th scope="col" className="py-2 font-medium">Rule</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ed.scoring.rules.map((rule, index) => (
+                  <tr key={rule} className="border-t border-[var(--line)] align-top">
+                    <td className="py-3 pr-3 text-[var(--text-faint)]">{index + 1}</td>
+                    <td className="py-3">{rule}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </>
         ) : null}
 
